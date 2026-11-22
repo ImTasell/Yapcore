@@ -9,13 +9,15 @@
 
 pub mod api;
 pub mod bot;
+pub mod commands;
 pub mod config;
 pub mod error;
 pub mod ids;
 pub mod models;
 
 pub use api::ApiClient;
-pub use bot::{Bot, BotBuilder};
+pub use bot::{Bot, BotBuilder, ShutdownHandle};
+pub use commands::{CommandContext, HandlerError, HandlerResult};
 pub use config::{Config, ConfigBuilder, ConfigError, DEFAULT_API_BASE_URL};
 pub use error::{ApiError, Error, Result};
 pub use ids::{
