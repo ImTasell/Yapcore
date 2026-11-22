@@ -40,7 +40,7 @@ The following is the human-readable REST endpoint index as exposed by the develo
 | GET | `/commands` | Read registered commands |
 | PUT | `/commands` | Replace the entire command list: `{ "commands": [{ "name": "ping", "description": "..." }] }` |
 
-Command registration constraints: up to 100 commands; names are 1–32 lowercase letters, numbers, hyphens or underscores; descriptions max 100 characters; names must be unique. Since PUT replaces the whole list, Yapcore must send the complete registry, not one command at a time.
+Command registration constraints: up to 50 commands; names are 1–32 lowercase letters, numbers, hyphens or underscores; descriptions max 100 characters; names must be unique. Since PUT replaces the whole list, Yapcore must send the complete registry, not one command at a time.
 
 ### Event polling
 
@@ -192,7 +192,7 @@ This is distinct from a channel webhook URL used by external services to post me
 | --- | --- |
 | Polling | 100 events per response; wait up to 25 seconds; event retention one day |
 | Catch-up | `max_age` up to 86,400 seconds |
-| Commands | 100 commands per bot; name 1–32 chars; description max 100 |
+| Commands | 50 commands per bot; name 1–32 chars; description max 100 |
 | Message content | 2,000 characters |
 | Messages | 30/minute per server and 30/minute overall per bot; verified bots may send 300/minute overall; DM limit is per DM |
 | Message history | Default 50; max 100 |
@@ -248,7 +248,7 @@ The upstream Python framework is much broader than the documented overview. The 
 These should form the stable Rust feature baseline:
 
 - Bot authentication, `GET /me`, profile edits, status, avatar/banner.
-- Command registration and the 100-command list.
+- Command registration and the 50-command list.
 - Event polling and documented event delivery.
 - Message send/edit/delete/fetch, replies, embeds, buttons, reactions, pinning and bulk delete.
 - Interaction callback: reply, ephemeral, update and acknowledgement.
