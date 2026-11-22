@@ -212,6 +212,23 @@ impl Bot {
         Ok(self)
     }
 
+    /// Register an asynchronous listener for a Yapper event type.
+    ///
+    /// The handler receives the full event envelope, including unknown JSON
+    /// fields. Multiple listeners for one event type run in registration order.
+    pub fn on_event<F, Fut>(
+        &mut self,
+        event_type: impl Into<String>,
+        handler: F,
+    ) -> std::result::Result<&mut Self, EventRegistrationError>
+    where
+        F: Fn(crate::models::EventEnvelope) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        self.events.register(event_type, handler)?;
+        Ok(self)
+    }
+
     /// Return the currently registered command definitions in name order.
     ///
     /// This is useful for inspection and for synchronizing the registry once
