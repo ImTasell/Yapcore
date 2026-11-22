@@ -296,6 +296,84 @@ impl Bot {
         self.api.get_member(server_id, user_id).await
     }
 
+    /// Add a role to a server member. Requires Manage Roles permission.
+    pub async fn add_role(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &UserId,
+        role_id: &crate::ids::RoleId,
+    ) -> Result<()> {
+        self.api.add_role(server_id, user_id, role_id).await
+    }
+
+    /// Remove a role from a server member. Requires Manage Roles permission.
+    pub async fn remove_role(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &UserId,
+        role_id: &crate::ids::RoleId,
+    ) -> Result<()> {
+        self.api.remove_role(server_id, user_id, role_id).await
+    }
+
+    /// Set a server member's nickname; an empty string clears it.
+    pub async fn set_nickname(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &UserId,
+        nickname: &str,
+    ) -> Result<serde_json::Value> {
+        self.api.set_nickname(server_id, user_id, nickname).await
+    }
+
+    /// Kick a member from a server. Requires Kick Members permission.
+    pub async fn kick_member(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &UserId,
+    ) -> Result<serde_json::Value> {
+        self.api.kick_member(server_id, user_id).await
+    }
+
+    /// Ban a member from a server. Requires Ban Members permission.
+    pub async fn ban_member(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &UserId,
+    ) -> Result<serde_json::Value> {
+        self.api.ban_member(server_id, user_id).await
+    }
+
+    /// List bans in a server. Requires Ban Members permission.
+    pub async fn list_bans(
+        &self,
+        server_id: &crate::ids::ServerId,
+    ) -> Result<Vec<crate::models::Ban>> {
+        self.api.list_bans(server_id).await
+    }
+
+    /// Remove a server ban. Requires Ban Members permission.
+    pub async fn unban_member(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &UserId,
+    ) -> Result<()> {
+        self.api.unban_member(server_id, user_id).await
+    }
+
+    /// Set a member timeout. Use zero minutes to clear the timeout.
+    pub async fn timeout_member(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &UserId,
+        minutes: Option<u32>,
+        reason: Option<&str>,
+    ) -> Result<serde_json::Value> {
+        self.api
+            .timeout_member(server_id, user_id, minutes, reason)
+            .await
+    }
+
     /// List roles in a server.
     pub async fn list_roles(
         &self,
