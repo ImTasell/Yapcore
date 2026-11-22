@@ -349,6 +349,31 @@ impl Bot {
         self.api.get_me().await
     }
 
+    /// Send a message with button action rows.
+    pub async fn send_message_with_components(
+        &self,
+        channel_id: &ChannelId,
+        content: Option<&str>,
+        components: &[crate::models::ActionRow],
+    ) -> Result<Message> {
+        self.api
+            .send_message_with_components(channel_id, content, components)
+            .await
+    }
+
+    /// Send a message containing any supported combination of text, embeds and buttons.
+    pub async fn send_rich_message(
+        &self,
+        channel_id: &ChannelId,
+        content: Option<&str>,
+        embeds: &[crate::models::Embed],
+        components: &[crate::models::ActionRow],
+    ) -> Result<Message> {
+        self.api
+            .send_rich_message(channel_id, content, embeds, components)
+            .await
+    }
+
     /// Send a message with optional text content and up to five embeds.
     pub async fn send_message_with_embeds(
         &self,
