@@ -382,7 +382,7 @@ The default graph stays intentionally small:
 - thiserror for structured errors.
 - secrecy for token redaction/zeroization support.
 - tracing for library diagnostics.
-- httpdate and fastrand for Retry-After parsing and non-cryptographic retry jitter.
+- httpdate for parsing Retry-After headers.
 
 Do not add async-trait, futures-util, bytes, url, uuid, chrono, a database, a CLI parser, WebSocket client, LiveKit, or a plugin runtime to the baseline. The standard library and existing dependencies cover the initial design.
 
