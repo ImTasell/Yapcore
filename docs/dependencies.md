@@ -12,27 +12,26 @@ The goal is a small, boring, well-supported dependency graph. The current releas
 
 | Crate | Current release checked | Cargo requirement | Used for | Decision |
 | --- | --- | --- | --- | --- |
-| tokio | 1.54.1 | \`1.54\` | Async runtime, macros, timers, sync and signal support | Required |
-| reqwest | 0.13.5 | \`0.13.5\` | HTTPS REST client | Required |
-| serde | 1.0.229 | \`1.0\` | Typed serialization/deserialization | Required |
-| serde_json | 1.0.154 | \`1.0\` | JSON bodies and flexible raw event payloads | Required |
-| thiserror | 2.0.18 | \`2.0\` | Public structured errors | Required |
-| secrecy | 0.10.3 | \`0.10\` | Redacted secret wrapper and zeroization support | Required |
-| tracing | 0.1.44 | \`0.1\` | Structured diagnostics/instrumentation | Required |
-| httpdate | 1.0.3 | \`1.0\` | Parse the HTTP-date form of Retry-After | Required |
-| fastrand | 2.5.0 | \`2.5\` | Non-cryptographic jitter for retry backoff only | Required |
+| tokio | 1.54.1 | `1.54` | Async runtime, macros, timers and synchronization | Required |
+| reqwest | 0.13.5 | `0.13.5` | HTTPS REST client | Required |
+| serde | 1.0.229 | `1.0` | Typed serialization/deserialization | Required |
+| serde_json | 1.0.154 | `1.0` | JSON bodies and flexible raw event payloads | Required |
+| thiserror | 2.0.18 | `2.0` | Public structured errors | Required |
+| secrecy | 0.10.3 | `0.10` | Redacted secret wrapper and zeroization support | Required |
+| tracing | 0.1.44 | `0.1` | Structured diagnostics/instrumentation | Required |
+| httpdate | 1.0.3 | `1.0` | Parse the HTTP-date form of Retry-After | Required |
+| fastrand | 2.5.0 | `2.5` | Non-cryptographic jitter for retry backoff only | Required |
 
 ### Tokio features
 
 Enable only:
 
-- \`macros\`: \`#[tokio::main]\` and \`#[tokio::test]\`.
-- \`rt-multi-thread\`: normal bot application runtime.
-- \`time\`: request/backoff/shutdown deadlines.
-- \`sync\`: watch and bounded mpsc channels.
-- \`signal\`: Ctrl+C in examples; the library itself does not install signal handlers.
+- `macros`: `#[tokio::main]` and `#[tokio::test]`.
+- `rt-multi-thread`: normal bot application runtime.
+- `time`: request/backoff/shutdown deadlines.
+- `sync`: watch and bounded mpsc channels.
 
-Do not enable \`full\`. The v0.1 client uses Reqwest for network I/O and does not need Tokio's raw TCP/UDP, filesystem, process or io-util features.
+Do not enable `full`. The v0.1 client uses Reqwest for network I/O and does not need Tokio's raw TCP/UDP, filesystem, process, io-util or signal features. An application that wants Tokio's Ctrl+C helper can enable `signal` on its own Tokio dependency.
 
 ### Reqwest features
 
@@ -73,7 +72,7 @@ Secrecy's zeroization support reduces accidental retention but is not a promise 
 
 | Crate | Requirement | Used for | Normal user build? |
 | --- | --- | --- | --- |
-| wiremock | \`0.6.5\` | Isolated mock HTTP API server for contract tests | No; dev-dependency only |
+| wiremock | `0.6.5` | Isolated mock HTTP API server for contract tests | No; dev-dependency only |
 
 Wiremock supports Tokio and isolated per-test mock servers. Its dependency graph is larger than the production graph, but it is compiled only for tests and gives deterministic HTTP contract coverage without a real Yapper token.
 
@@ -143,9 +142,9 @@ Do not commit an artificially exact Cargo.lock generated from a different Rust t
 4. Do not implement cryptographic primitives ourselves.
 5. Use Rust's standard library for simple IDs, timestamp strings, ownership and future boxing.
 6. Re-check crate MSRV before adopting a dependency that raises Yapcore's declared MSRV.
-7. Enable Cargo features explicitly; avoid broad \`full\` or \`default\` features when they pull in capabilities we do not use.
-8. Review the dependency tree with \`cargo tree -e features\` before releases.
-9. Use \`cargo deny\` or an equivalent CI check for license/security policy after the initial crate compiles.
+7. Enable Cargo features explicitly; avoid broad `full` or `default` features when they pull in capabilities we do not use.
+8. Review the dependency tree with `cargo tree -e features` before releases.
+9. Use `cargo deny` or an equivalent CI check for license/security policy after the initial crate compiles.
 10. Update the dependency audit whenever a new direct runtime dependency is added.
 
 ## 6. Sources
