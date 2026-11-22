@@ -597,14 +597,14 @@ impl Bot {
         Ok(())
     }
 
-    async fn dispatch_interaction_event(
-        &self,
-        event: &crate::models::EventEnvelope,
-    ) -> Result<()> {
+    async fn dispatch_interaction_event(&self, event: &crate::models::EventEnvelope) -> Result<()> {
         let data = &event.data;
 
         let Some(interaction_id) = data.get("id").and_then(Value::as_str) else {
-            tracing::warn!(event_id = event.id, "interaction event has no interaction ID");
+            tracing::warn!(
+                event_id = event.id,
+                "interaction event has no interaction ID"
+            );
             return Ok(());
         };
         let interaction_id = match InteractionId::new(interaction_id) {
@@ -616,7 +616,10 @@ impl Bot {
         };
 
         let Some(token) = data.get("token").and_then(Value::as_str) else {
-            tracing::warn!(event_id = event.id, "interaction event has no callback token");
+            tracing::warn!(
+                event_id = event.id,
+                "interaction event has no callback token"
+            );
             return Ok(());
         };
         let Some(custom_id) = data.get("custom_id").and_then(Value::as_str) else {
