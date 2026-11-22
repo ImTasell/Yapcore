@@ -114,9 +114,7 @@ impl ApiClient {
             embed_text += embed.text_characters();
         }
         if embed_text > 6_000 {
-            return Err(Error::MessageEmbedsTooLong {
-                actual: embed_text,
-            });
+            return Err(Error::MessageEmbedsTooLong { actual: embed_text });
         }
 
         let mut body = serde_json::Map::new();
@@ -845,7 +843,9 @@ mod tests {
             crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174002").unwrap();
 
         assert!(matches!(
-            client.send_message_with_embeds(&channel_id, None, &[]).await,
+            client
+                .send_message_with_embeds(&channel_id, None, &[])
+                .await,
             Err(Error::EmptyMessagePayload)
         ));
     }
