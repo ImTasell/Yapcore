@@ -96,10 +96,10 @@ Rust API should favor explicit typed command registration and async handlers. It
 | [x] Documented | Reply to message | `ApiClient::reply_message`; `CommandContext::reply` |
 | [ ] Documented | Send embed(s) | Embed builder and Serde serialization |
 | [x] Documented | Edit/delete own message | `ApiClient::edit_message` / `delete_message`; `Bot` convenience wrappers |
-| [~] Documented | Fetch one/recent/forward messages | `get_message` exists; recent/forward pagination remains |
-| [ ] Documented | Bulk delete | Up to documented API limit |
-| [ ] Documented | Pin/unpin | Typed API methods |
-| [~] Documented | Add/remove/list reactions | Add/remove exist with encoded emoji path segments; list remains |
+| [~] Documented | Fetch one/recent/forward messages | Single-message fetch exists; recent/forward pagination remains |
+| [x] Documented | Bulk delete | `bulk_delete_messages` validates the 1–100 ID limit and preserves deleted/skipped results |
+| [x] Documented | Pin/unpin | `pin_message` / `unpin_message` REST methods |
+| [x] Documented | Add/remove/list reactions | List, add and remove; emoji is encoded as one path segment |
 | [ ] Verify | Four-file multipart send and sticker IDs | Confirm current upload contract and limits |
 | [x] Documented | Button interactions: reply/ephemeral/update/ack | Exact `on_button` and prefix `button` registrations; shared secret-safe response session and two-second auto-ack |
 | [~] Documented | Interaction expiry and answer count limits | Enforces ten-response cap and auto-ack margin; explicit expires_at tracking remains |
