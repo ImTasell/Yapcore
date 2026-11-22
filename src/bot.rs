@@ -250,6 +250,68 @@ impl Bot {
         self.api.get_messages_after(channel_id, after).await
     }
 
+    /// List servers the bot has been added to.
+    pub async fn list_servers(&self) -> Result<Vec<crate::models::Server>> {
+        self.api.list_servers().await
+    }
+
+    /// Fetch details for one server.
+    pub async fn get_server(
+        &self,
+        server_id: &crate::ids::ServerId,
+    ) -> Result<crate::models::Server> {
+        self.api.get_server(server_id).await
+    }
+
+    /// List visible channels globally or within one server.
+    pub async fn list_channels(
+        &self,
+        server_id: Option<&crate::ids::ServerId>,
+        channel_type: Option<crate::models::ChannelType>,
+    ) -> Result<crate::models::ChannelListing> {
+        self.api.list_channels(server_id, channel_type).await
+    }
+
+    /// Fetch one visible channel.
+    pub async fn get_channel(
+        &self,
+        channel_id: &ChannelId,
+    ) -> Result<crate::models::Channel> {
+        self.api.get_channel(channel_id).await
+    }
+
+    /// List server members in user-ID order.
+    pub async fn list_members(
+        &self,
+        server_id: &crate::ids::ServerId,
+        limit: Option<usize>,
+        after: Option<&UserId>,
+    ) -> Result<Vec<crate::models::Member>> {
+        self.api.list_members(server_id, limit, after).await
+    }
+
+    /// Fetch one server member.
+    pub async fn get_member(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &UserId,
+    ) -> Result<crate::models::Member> {
+        self.api.get_member(server_id, user_id).await
+    }
+
+    /// List roles in a server.
+    pub async fn list_roles(
+        &self,
+        server_id: &crate::ids::ServerId,
+    ) -> Result<Vec<crate::models::Role>> {
+        self.api.list_roles(server_id).await
+    }
+
+    /// Fetch one public user profile.
+    pub async fn get_user(&self, user_id: &UserId) -> Result<crate::models::UserProfile> {
+        self.api.get_user(user_id).await
+    }
+
     /// Fetch one message from a channel.
     pub async fn get_message(
         &self,
