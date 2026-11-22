@@ -84,6 +84,8 @@ impl CommandContext {
 
     /// Send a new message to the command's channel without a reply reference.
     pub async fn say(&self, content: impl AsRef<str>) -> Result<Message> {
-        self.api.send_message(&self.channel_id, content.as_ref()).await
+        self.api
+            .send_message(&self.channel_id, content.as_ref())
+            .await
     }
 }
