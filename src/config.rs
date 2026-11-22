@@ -125,10 +125,7 @@ impl ConfigBuilder {
     }
 
     /// Read the token from an environment variable.
-    pub fn token_from_env(
-        mut self,
-        variable: impl AsRef<str>,
-    ) -> Result<Self, ConfigError> {
+    pub fn token_from_env(mut self, variable: impl AsRef<str>) -> Result<Self, ConfigError> {
         let variable = variable.as_ref();
         let token = std::env::var(variable)
             .map_err(|_| ConfigError::MissingEnvironmentVariable(variable.to_owned()))?;
@@ -216,9 +213,7 @@ impl ConfigBuilder {
 fn validate_token(token: &str) -> Result<(), ConfigError> {
     let valid_shape = token.starts_with("yb_")
         && token.len() > 3
-        && token
-            .bytes()
-            .all(|byte| (0x21..=0x7e).contains(&byte));
+        && token.bytes().all(|byte| (0x21..=0x7e).contains(&byte));
 
     if valid_shape {
         Ok(())
@@ -271,7 +266,10 @@ mod tests {
 
     #[test]
     fn rejects_invalid_token_shapes() {
-        let error = Config::builder().token("not-a-bot-token").build().unwrap_err();
+        let error = Config::builder()
+            .token("not-a-bot-token")
+            .build()
+            .unwrap_err();
         assert_eq!(error, ConfigError::InvalidToken);
     }
 
