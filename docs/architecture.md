@@ -42,13 +42,16 @@ The first working runtime is intentionally narrower than the long-term architect
 
 - One bot instance owns one poll loop.
 - Poll responses are dispatched sequentially in server order.
-- Local text-prefix commands are registered with `Bot::command`.
-- `CommandContext` exposes `command`, `args`, `argv`, `reply` and `say`.
+- `Bot::run` fetches the profile, synchronizes the full command registry with `PUT /commands`, then begins polling.
+- Registered commands can be invoked by a configured text prefix or through a slash-command `command` event.
+- `CommandContext` exposes `command`, `args`, `argv`, `reply` and `say`; slash invocations also expose `ephemeral` and `ack`.
+- Slash callbacks use secret-wrapped tokens and are auto-acknowledged after two seconds if a handler has not answered, leaving margin before the platform's three-second deadline.
+- Interaction response attempts are capped at ten per invocation and are not automatically retried.
 - `Bot::run` starts from the newest cursor and stops through a clonable watch-channel shutdown handle.
 - Poll transport failures use bounded exponential backoff; 429/503 are retried only when Yapper supplies `Retry-After`.
 - Command handler failures are logged and isolated from the poll loop.
 
-This slice does not yet synchronize slash commands automatically, dispatch slash-command interaction events, expose general event listeners, or provide an ordered persistent cursor store. Those features are intentionally not implied by the initial `!ping` example. The target bounded-concurrency design below remains a future milestone; the current sequential dispatcher is the conservative first implementation.
+General event listeners (beyond command dispatch), button-interaction handlers, persistent cursor storage, and bounded-concurrency dispatch remain future milestones. The current sequential dispatcher is the conservative first implementation.
 
 ### Explicitly deferred
 
