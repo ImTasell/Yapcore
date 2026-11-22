@@ -405,7 +405,7 @@ mod tests {
         let embed = Embed::builder()
             .title("Yapcore")
             .description("Rust bot framework")
-            .color(0x5865_FF)
+            .color(0x0058_65FF)
             .field(EmbedField::new("Language", "Rust").unwrap().inline(true))
             .footer(EmbedFooter::new("Built with Yapcore").unwrap())
             .build()
