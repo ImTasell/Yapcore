@@ -180,7 +180,7 @@ The visible tests do not amount to an end-to-end contract suite for every REST e
 | Main module header says Python 3.9+, package metadata says Python 3.10+ | Distribution metadata is stricter than the source header | Do not infer runtime compatibility from the header alone |
 | README describes the single-file version as standard-library-only, package metadata depends on python-dotenv | Package and single-file distribution requirements differ | Make .env loading optional in Rust or document its dependency clearly |
 
-## 7. Licensing is a release blocker
+## 7. Licensing alignment
 
 The upstream Python repository declares **GPL-3.0-only** in its package metadata and includes a GPL-3.0 license. Yapcore's license was changed from MIT to GPL-3.0-only on 2026-11-21 to align with the upstream framework's declared license.
 
