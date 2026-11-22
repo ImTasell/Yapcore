@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime};
 
-use reqwest::header::HeaderValue;
 use reqwest::StatusCode;
+use reqwest::header::HeaderValue;
 use serde_json::Value;
 use thiserror::Error;
 
@@ -33,13 +33,21 @@ impl ApiError {
         let message = error_value
             .and_then(Value::as_str)
             .or_else(|| value.get("message").and_then(Value::as_str))
-            .or_else(|| error_value.and_then(|error| error.get("message")).and_then(Value::as_str))
+            .or_else(|| {
+                error_value
+                    .and_then(|error| error.get("message"))
+                    .and_then(Value::as_str)
+            })
             .unwrap_or_else(|| status.canonical_reason().unwrap_or("request failed"));
 
         let code = value
             .get("code")
             .and_then(Value::as_str)
-            .or_else(|| error_value.and_then(|error| error.get("code")).and_then(Value::as_str))
+            .or_else(|| {
+                error_value
+                    .and_then(|error| error.get("code"))
+                    .and_then(Value::as_str)
+            })
             .map(str::to_owned);
 
         let permission = value
@@ -160,7 +168,10 @@ mod tests {
     #[test]
     fn parses_retry_after_seconds() {
         let header = HeaderValue::from_static("12");
-        assert_eq!(parse_retry_after(Some(&header)), Some(Duration::from_secs(12)));
+        assert_eq!(
+            parse_retry_after(Some(&header)),
+            Some(Duration::from_secs(12))
+        );
     }
 
     #[test]
