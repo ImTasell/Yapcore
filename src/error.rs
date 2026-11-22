@@ -196,6 +196,27 @@ pub enum Error {
         actual: usize,
     },
 
+    /// A nickname is longer than Yapper's 32-character limit.
+    #[error("nickname is {actual} characters; the maximum is 32")]
+    NicknameTooLong {
+        /// Actual nickname length.
+        actual: usize,
+    },
+
+    /// A moderation reason is longer than Yapper's 200-character limit.
+    #[error("moderation reason is {actual} characters; the maximum is 200")]
+    ModerationReasonTooLong {
+        /// Actual reason length.
+        actual: usize,
+    },
+
+    /// A timeout duration is above the platform's 28-day maximum.
+    #[error("timeout duration must be between 0 and 40,320 minutes; received {actual}")]
+    TimeoutTooLong {
+        /// Requested timeout duration.
+        actual: u32,
+    },
+
     /// The request failed before a usable HTTP response was received.
     ///
     /// The underlying Reqwest error has its URL removed to avoid accidental
