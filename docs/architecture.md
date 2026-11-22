@@ -167,17 +167,11 @@ async fn main() -> Result<()> {
         Ok(())
     })?;
 
-    let shutdown = bot.shutdown_handle();
-    tokio::spawn(async move {
-        let _ = tokio::signal::ctrl_c().await;
-        shutdown.cancel();
-    });
-
     bot.run().await
 }
 ~~~
 
-The library does not install process signal handlers automatically. Applications decide how Ctrl+C, service-manager signals or their own shutdown conditions map to the shutdown handle.
+The library does not install process signal handlers automatically. Applications may clone the shutdown handle and cancel it when their own shutdown condition fires. Applications that use Tokio's Ctrl+C helper must enable Tokio's `signal` feature in their own dependency declaration; Yapcore does not enable process-signal support for every consumer.
 
 ### Async handler representation
 
