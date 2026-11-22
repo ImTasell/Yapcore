@@ -94,7 +94,7 @@ Rust API should favor explicit typed command registration and async handlers. It
 | --- | --- | --- |
 | [x] Documented | Send plain-text message | `ApiClient::send_message` / `Bot::send_message` |
 | [x] Documented | Reply to message | `ApiClient::reply_message`; `CommandContext::reply` |
-| [ ] Documented | Send embed(s) | Embed builder and Serde serialization |
+| [x] Documented | Send embed(s) | `Embed::builder` and `send_message_with_embeds`; validates message-wide limits |
 | [x] Documented | Edit/delete own message | `ApiClient::edit_message` / `delete_message`; `Bot` convenience wrappers |
 | [x] Documented | Fetch one/recent/forward messages | `get_message`, `get_recent_messages(limit, before)`, and `get_messages_after(after)`; page limits are validated locally |
 | [x] Documented | Bulk delete | `bulk_delete_messages` validates the 1–100 ID limit and preserves deleted/skipped results |
@@ -112,8 +112,8 @@ Rust API should favor explicit typed command registration and async handlers. It
 
 | Status | Python feature | Rust target |
 | --- | --- | --- |
-| [ ] Documented | Embed title/description/url/color/author/footer/fields/image/thumbnail/timestamp | `Embed` builder |
-| [ ] Documented | Up to 5 embeds and 6000 aggregate characters | Validation helpers; server remains final authority |
+| [x] Documented | Embed title/description/url/color/author/footer/fields/image/thumbnail/timestamp | Typed `Embed`, `EmbedAuthor`, `EmbedFooter`, and `EmbedField` builders |
+| [x] Documented | Up to 5 embeds and 6000 aggregate characters | Local validation across all embeds before sending |
 | [ ] Documented | Button row and button styles | `Button` and `ActionRow` builders |
 | [ ] Documented | Link buttons | Validate HTTPS URL |
 | [ ] Documented | Disabled buttons and emoji | Builder fields |
