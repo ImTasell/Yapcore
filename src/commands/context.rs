@@ -43,16 +43,19 @@ impl CommandContext {
         channel_id: ChannelId,
         author_id: Option<UserId>,
     ) -> Self {
-        Self::build(
+        let argv = args.split_whitespace().map(str::to_owned).collect();
+
+        Self {
             api,
             command,
             content,
             args,
-            Some(message_id),
+            argv,
+            message_id: Some(message_id),
             channel_id,
             author_id,
-            None,
-        )
+            interaction: None,
+        }
     }
 
     pub(crate) fn new_interaction(
@@ -71,28 +74,6 @@ impl CommandContext {
             response_count: Arc::new(AtomicU8::new(0)),
         };
 
-        Self::build(
-            api,
-            command,
-            content,
-            args,
-            None,
-            channel_id,
-            author_id,
-            Some(interaction),
-        )
-    }
-
-    fn build(
-        api: ApiClient,
-        command: String,
-        content: String,
-        args: String,
-        message_id: Option<MessageId>,
-        channel_id: ChannelId,
-        author_id: Option<UserId>,
-        interaction: Option<InteractionCredentials>,
-    ) -> Self {
         let argv = args.split_whitespace().map(str::to_owned).collect();
 
         Self {
@@ -101,10 +82,10 @@ impl CommandContext {
             content,
             args,
             argv,
-            message_id,
+            message_id: None,
             channel_id,
             author_id,
-            interaction,
+            interaction: Some(interaction),
         }
     }
 
