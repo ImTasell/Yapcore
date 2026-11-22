@@ -45,7 +45,7 @@ The first working runtime is intentionally narrower than the long-term architect
 - `Bot::run` fetches the profile, synchronizes the full command registry with `PUT /commands`, then begins polling.
 - Registered commands can be invoked by a configured text prefix or through a slash-command `command` event.
 - `CommandContext` exposes `command`, `args`, `argv`, `reply` and `say`; slash invocations also expose `ephemeral` and `ack`.
-- The REST client and `Bot` facade support fetching one message, recent and forward message history, editing/deleting, bulk delete (1–100 IDs), pin/unpin, and reaction list/add/remove.
+- The REST client and `Bot` facade support fetching one message, recent and forward message history, editing/deleting, bulk delete (1–100 IDs), pin/unpin, reaction list/add/remove, and text-plus-embed sends with local limits.
 - Slash callbacks use secret-wrapped tokens and are auto-acknowledged after two seconds if a handler has not answered, leaving margin before the platform's three-second deadline.
 - Interaction response attempts are capped at ten per invocation and are not automatically retried.
 - `Bot::on_button` registers exact custom IDs; `Bot::button` registers custom-ID prefixes. Handlers receive an interaction context with reply, ephemeral, update and ack operations.
