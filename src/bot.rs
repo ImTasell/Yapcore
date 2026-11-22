@@ -273,10 +273,7 @@ impl Bot {
     }
 
     /// Fetch one visible channel.
-    pub async fn get_channel(
-        &self,
-        channel_id: &ChannelId,
-    ) -> Result<crate::models::Channel> {
+    pub async fn get_channel(&self, channel_id: &ChannelId) -> Result<crate::models::Channel> {
         self.api.get_channel(channel_id).await
     }
 
