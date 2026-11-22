@@ -475,4 +475,55 @@ mod tests {
         let bot = Bot::builder().token("yb_test-token").build().unwrap();
         assert!(bot.ignore_bots);
     }
+
+    #[tokio::test]
+    async fn dispatches_prefix_message_to_registered_async_handler() {
+        use std::sync::{Arc, Mutex};
+
+        let mut bot = Bot::builder()
+            .token("yb_test-token")
+            .prefixes(["!", "!!"])
+            .build()
+            .unwrap();
+
+        let received = Arc::new(Mutex::new(None));
+        let received_by_handler = received.clone();
+
+        bot.command("ping", "Check whether the bot is alive", move |context| {
+            let received = received_by_handler.clone();
+            async move {
+                *received.lock().unwrap() = Some((
+                    context.command().to_owned(),
+                    context.args().to_owned(),
+                    context.argv().to_vec(),
+                ));
+                Ok(())
+            }
+        })
+        .unwrap();
+
+        let event = crate::models::EventEnvelope {
+            id: 1,
+            event_type: "message".to_owned(),
+            data: serde_json::json!({
+                "id": "123e4567-e89b-12d3-a456-426614174001",
+                "channel_id": "123e4567-e89b-12d3-a456-426614174002",
+                "author_id": "123e4567-e89b-12d3-a456-426614174003",
+                "author_bot": false,
+                "content": "!!ping hello there"
+            }),
+            created_at: None,
+        };
+
+        bot.dispatch_event(&event, None).await.unwrap();
+
+        assert_eq!(
+            *received.lock().unwrap(),
+            Some((
+                "ping".to_owned(),
+                "hello there".to_owned(),
+                vec!["hello".to_owned(), "there".to_owned()]
+            ))
+        );
+    }
 }
