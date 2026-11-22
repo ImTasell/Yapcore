@@ -117,8 +117,7 @@ mod tests {
             .register("ping", "Ping", |_context| async { Ok(()) })
             .unwrap();
 
-        let result =
-            registry.register("ping", "Duplicate", |_context| async { Ok(()) });
+        let result = registry.register("ping", "Duplicate", |_context| async { Ok(()) });
 
         assert_eq!(result, Err(CommandDefinitionError::DuplicateName));
     }
