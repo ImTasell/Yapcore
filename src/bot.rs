@@ -268,6 +268,33 @@ impl Bot {
         self.api.get_reactions(channel_id, message_id).await
     }
 
+    /// Pin a message. Requires Manage Messages permission.
+    pub async fn pin_message(
+        &self,
+        channel_id: &ChannelId,
+        message_id: &MessageId,
+    ) -> Result<()> {
+        self.api.pin_message(channel_id, message_id).await
+    }
+
+    /// Unpin a message. Requires Manage Messages permission.
+    pub async fn unpin_message(
+        &self,
+        channel_id: &ChannelId,
+        message_id: &MessageId,
+    ) -> Result<()> {
+        self.api.unpin_message(channel_id, message_id).await
+    }
+
+    /// Bulk-delete between 1 and 100 messages in a channel.
+    pub async fn bulk_delete_messages(
+        &self,
+        channel_id: &ChannelId,
+        message_ids: &[MessageId],
+    ) -> Result<serde_json::Value> {
+        self.api.bulk_delete_messages(channel_id, message_ids).await
+    }
+
     /// Add the bot's reaction to a message.
     pub async fn add_reaction(
         &self,
