@@ -131,7 +131,7 @@ Do not expose both a huge builder API and dozens of raw JSON methods for the sam
 | [x] Documented | List/get servers | `list_servers` / `get_server` with forward-compatible models |
 | [x] Documented | List server/global channels and channel details | `list_channels` with text/voice filters, categories, and `get_channel` |
 | [x] Documented | List members with pagination / fetch one member | `list_members(limit, after)` and `get_member`; validates 1–500 page size |
-| [~] Documented | Roles list/get/create/edit/delete/reorder | `list_roles` and member assignment/removal exist; role CRUD/reorder remain |
+| [~] Mixed | Roles list/get/create/edit/delete/reorder | `list_roles` is documented; get/create/edit/delete/reorder are implemented from upstream source, mock-tested, and await live contract verification. `RoleEditOptions` provides a typed patch builder |
 | [x] Documented | Add/remove role | `add_role` / `remove_role` with shared 403 error handling |
 | [ ] Documented | Get and set permissions/overrides | Documented permission endpoints first |
 | [x] Documented | Kick/ban/unban/list bans/timeout | Typed ban models, role-safe REST methods and local timeout/reason validation |
