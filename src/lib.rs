@@ -21,9 +21,9 @@ pub use commands::{CommandContext, HandlerError, HandlerResult};
 pub use config::{Config, ConfigBuilder, ConfigError, DEFAULT_API_BASE_URL};
 pub use error::{ApiError, Error, Result};
 pub use ids::{
-    CategoryId, ChannelId, EmojiId, IdError, MessageId, RoleId, ServerId, ThreadId, UserId,
+    CategoryId, ChannelId, EmojiId, IdError, InteractionId, MessageId, RoleId, ServerId, ThreadId, UserId,
     WebhookId,
 };
 pub use models::{
-    BotProfile, CommandDefinition, CommandDefinitionError, EventBatch, EventEnvelope, Message,
+    BotProfile, CommandDefinition, CommandDefinitionError, EventBatch, EventEnvelope, InteractionResponseType, Message,
 };
