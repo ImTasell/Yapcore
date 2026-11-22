@@ -195,5 +195,5 @@ This note is an engineering record, not legal advice. Preserve required copyrigh
 3. Treat gateway, voice-media connection, extra events and undocumented endpoint families as verification items.
 4. Preserve the broad command, event, component and server-management surface through idiomatic Rust abstractions.
 5. Keep telemetry disabled unless a user explicitly enables it.
-6. Resolve the MIT/GPL conflict before translating implementation code.
+6. Keep the GPL-3.0-only license and preserve required upstream copyright/license notices for reused or translated material.
 
