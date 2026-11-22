@@ -10,6 +10,7 @@ use crate::api::ApiClient;
 use crate::commands::{CommandContext, CommandRegistry, HandlerResult, SlashCommandInvocation};
 use crate::config::{Config, ConfigBuilder, ConfigError};
 use crate::error::{Error, Result};
+use crate::events::{EventRegistrationError, EventRegistry};
 use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
 use crate::interactions::{
     ButtonRegistry, InteractionContext, InteractionInvocation, InteractionRegistrationError,
@@ -126,6 +127,7 @@ impl BotBuilder {
             api,
             commands: CommandRegistry::default(),
             buttons: ButtonRegistry::default(),
+            events: EventRegistry::default(),
             prefixes: self.prefixes,
             ignore_bots: self.ignore_bots,
             shutdown,
@@ -139,6 +141,7 @@ pub struct Bot {
     api: ApiClient,
     commands: CommandRegistry,
     buttons: ButtonRegistry,
+    events: EventRegistry,
     prefixes: Vec<String>,
     ignore_bots: bool,
     shutdown: watch::Sender<bool>,
