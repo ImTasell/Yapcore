@@ -430,9 +430,7 @@ mod tests {
         ));
 
         let embed = (0..10).fold(Embed::builder(), |builder, index| {
-            builder.field(
-                EmbedField::new(format!("field-{index}"), "x".repeat(1_024)).unwrap(),
-            )
+            builder.field(EmbedField::new(format!("field-{index}"), "x".repeat(1_024)).unwrap())
         });
 
         assert!(matches!(
