@@ -11,7 +11,7 @@ use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transpor
 use crate::ids::InteractionId;
 use crate::models::{
     BotProfile, CommandDefinition, Embed, EventBatch, InteractionResponseType, Message,
-    validate_command_list,
+    validate_action_rows, validate_command_list,
 };
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
@@ -90,6 +90,30 @@ impl ApiClient {
         content: Option<&str>,
         embeds: &[Embed],
     ) -> Result<Message> {
+        self.send_rich_message(channel_id, content, embeds, &[]).await
+    }
+
+    /// Send a message with button action rows.
+    ///
+    /// The platform requires visible text or at least one embed alongside
+    /// components; use send_rich_message when combining buttons and embeds.
+    pub async fn send_message_with_components(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        content: Option<&str>,
+        components: &[crate::models::ActionRow],
+    ) -> Result<Message> {
+        self.send_rich_message(channel_id, content, &[], components).await
+    }
+
+    /// Send a message containing any supported combination of text, embeds and buttons.
+    pub async fn send_rich_message(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        content: Option<&str>,
+        embeds: &[Embed],
+        components: &[crate::models::ActionRow],
+    ) -> Result<Message> {
         if embeds.len() > 5 {
             return Err(Error::TooManyEmbeds {
                 actual: embeds.len(),
@@ -117,12 +141,17 @@ impl ApiClient {
             return Err(Error::MessageEmbedsTooLong { actual: embed_text });
         }
 
+        validate_action_rows(components)?;
+
         let mut body = serde_json::Map::new();
         if let Some(content) = content {
             body.insert("content".to_owned(), serde_json::json!(content));
         }
         if !embeds.is_empty() {
             body.insert("embeds".to_owned(), serde_json::to_value(embeds)?);
+        }
+        if !components.is_empty() {
+            body.insert("components".to_owned(), serde_json::to_value(components)?);
         }
 
         let route = format!("channels/{channel_id}/messages");
@@ -790,6 +819,71 @@ mod tests {
         assert_eq!(payload["type"], "ephemeral");
         assert_eq!(payload["content"], "Only you can see this");
         assert!(response["ok"].as_bool().unwrap());
+    }
+
+    #[tokio::test]
+    async fn send_message_with_components_serializes_button_rows() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "id": MESSAGE_ID,
+                "channel_id": CHANNEL_ID,
+                "content": "Vote below"
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let row = crate::models::ActionRow::new([
+            crate::models::Button::success("Yes", "vote:yes").unwrap(),
+            crate::models::Button::danger("No", "vote:no").unwrap(),
+            crate::models::Button::link("Rules", "https://example.com/rules").unwrap(),
+        ])
+        .unwrap();
+
+        let _message = client
+            .send_message_with_components(&channel_id, Some("Vote below"), &[row])
+            .await
+            .unwrap();
+        let request = server.finish();
+
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["components"][0]["type"], "row");
+        assert_eq!(payload["components"][0]["components"][0]["style"], "success");
+        assert_eq!(payload["components"][0]["components"][1]["custom_id"], "vote:no");
+        assert_eq!(payload["components"][0]["components"][2]["url"], "https://example.com/rules");
+    }
+
+    #[tokio::test]
+    async fn send_rich_message_rejects_duplicate_custom_ids_across_rows() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        let channel_id =
+            crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174002").unwrap();
+        let rows = [
+            crate::models::ActionRow::new([
+                crate::models::Button::primary("First", "duplicate").unwrap(),
+            ])
+            .unwrap(),
+            crate::models::ActionRow::new([
+                crate::models::Button::secondary("Second", "duplicate").unwrap(),
+            ])
+            .unwrap(),
+        ];
+
+        assert!(matches!(
+            client
+                .send_message_with_components(&channel_id, Some("Buttons"), &rows)
+                .await,
+            Err(Error::ComponentValidation(
+                crate::models::ComponentValidationError::DuplicateCustomId
+            ))
+        ));
     }
 
     #[tokio::test]
