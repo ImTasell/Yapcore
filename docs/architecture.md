@@ -47,11 +47,15 @@ The first working runtime is intentionally narrower than the long-term architect
 - `CommandContext` exposes `command`, `args`, `argv`, `reply` and `say`; slash invocations also expose `ephemeral` and `ack`.
 - Slash callbacks use secret-wrapped tokens and are auto-acknowledged after two seconds if a handler has not answered, leaving margin before the platform's three-second deadline.
 - Interaction response attempts are capped at ten per invocation and are not automatically retried.
+- `Bot::on_button` registers exact custom IDs; `Bot::button` registers custom-ID prefixes. Handlers receive an interaction context with reply, ephemeral, update and ack operations.
+- Unanswered slash/button handlers are acknowledged after two seconds, leaving margin before Yapper's three-second deadline.
+- `Bot::on_event` registers ordered asynchronous listeners for any event type; listeners receive the full raw-preserving event envelope.
+- A synthetic `ready` event is dispatched after profile retrieval and command synchronization.
 - `Bot::run` starts from the newest cursor and stops through a clonable watch-channel shutdown handle.
 - Poll transport failures use bounded exponential backoff; 429/503 are retried only when Yapper supplies `Retry-After`.
-- Command handler failures are logged and isolated from the poll loop.
+- Command, button and generic event-handler failures are logged and isolated from later listeners/polling.
 
-General event listeners (beyond command dispatch), button-interaction handlers, persistent cursor storage, and bounded-concurrency dispatch remain future milestones. The current sequential dispatcher is the conservative first implementation.
+The current dispatcher is sequential. Select-menu and modal-submit handlers, persistent cursor storage, bounded-concurrency dispatch and typed wrappers for individual server events remain future milestones.
 
 ### Explicitly deferred
 
