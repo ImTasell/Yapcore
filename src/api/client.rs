@@ -1853,7 +1853,10 @@ mod tests {
             .clear_color()
             .mentionable(false)
             .position(4);
-        let role = client.edit_role(&server_id, &role_id, &changes).await.unwrap();
+        let role = client
+            .edit_role(&server_id, &role_id, &changes)
+            .await
+            .unwrap();
         let request = server.finish();
         assert!(request.starts_with(
             "PATCH /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/roles/123e4567-e89b-12d3-a456-426614174023 HTTP/1.1"
@@ -1880,18 +1883,12 @@ mod tests {
     async fn rejects_empty_role_edit_options_before_networking() {
         let config = Config::builder().token("yb_test-token").build().unwrap();
         let client = ApiClient::new(config).unwrap();
-        let server_id =
-            crate::ids::ServerId::new("123e4567-e89b-12d3-a456-426614174020").unwrap();
-        let role_id =
-            crate::ids::RoleId::new("123e4567-e89b-12d3-a456-426614174023").unwrap();
+        let server_id = crate::ids::ServerId::new("123e4567-e89b-12d3-a456-426614174020").unwrap();
+        let role_id = crate::ids::RoleId::new("123e4567-e89b-12d3-a456-426614174023").unwrap();
 
         assert!(matches!(
             client
-                .edit_role(
-                    &server_id,
-                    &role_id,
-                    &crate::models::RoleEditOptions::new()
-                )
+                .edit_role(&server_id, &role_id, &crate::models::RoleEditOptions::new())
                 .await,
             Err(Error::EmptyRoleEditOptions)
         ));
