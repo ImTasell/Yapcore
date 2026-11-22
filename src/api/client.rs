@@ -814,7 +814,7 @@ mod tests {
             .title("Yapcore")
             .description("Native Rust framework")
             .color(0x5865_FF)
-            .field(EmbedField::new("Language", "Rust").unwrap())
+            .field(crate::models::EmbedField::new("Language", "Rust").unwrap())
             .build()
             .unwrap();
 
