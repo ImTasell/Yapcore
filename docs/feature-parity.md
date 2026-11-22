@@ -96,7 +96,7 @@ Rust API should favor explicit typed command registration and async handlers. It
 | [x] Documented | Reply to message | `ApiClient::reply_message`; `CommandContext::reply` |
 | [ ] Documented | Send embed(s) | Embed builder and Serde serialization |
 | [x] Documented | Edit/delete own message | `ApiClient::edit_message` / `delete_message`; `Bot` convenience wrappers |
-| [~] Documented | Fetch one/recent/forward messages | Single-message fetch exists; recent/forward pagination remains |
+| [x] Documented | Fetch one/recent/forward messages | `get_message`, `get_recent_messages(limit, before)`, and `get_messages_after(after)`; page limits are validated locally |
 | [x] Documented | Bulk delete | `bulk_delete_messages` validates the 1–100 ID limit and preserves deleted/skipped results |
 | [x] Documented | Pin/unpin | `pin_message` / `unpin_message` REST methods |
 | [x] Documented | Add/remove/list reactions | List, add and remove; emoji is encoded as one path segment |
