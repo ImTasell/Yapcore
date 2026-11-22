@@ -73,7 +73,7 @@ The official docs say event history is retained for one day. A persistent cursor
 | Status | Python feature | Rust target |
 | --- | --- | --- |
 | [x] Documented | Register command names/descriptions | Validated local command registry |
-| [~] Documented | Slash command synchronization | `ApiClient::sync_commands` exists; runtime slash handling/automatic sync awaits interaction support |
+| [x] Documented | Slash command synchronization | `Bot::run` synchronizes the full command registry before polling |
 | [x] Documented | Prefix-command parsing | Longest matching prefix, case-insensitive name handling |
 | [x] Documented | `args` and `argv` | Typed `CommandContext` argument access |
 | [x] Documented | 50 command maximum per bot (Python SDK local cap is 100) | Rust follows the stricter official platform cap before full-list sync |
@@ -81,8 +81,8 @@ The official docs say event history is retained for one day. A persistent cursor
 | [ ] Verify | Typed options: string/integer/number/boolean/user/channel/role | Typed option schema and parser |
 | [ ] Verify | Choices and named `key=value` input | Parser compatibility tests |
 | [ ] Verify | Usage/error replies on invalid arguments | Optional built-in validation response |
-| [ ] Documented | Command event distinct from regular message | Separate event/interaction handling |
-| [ ] Documented | Auto-acknowledge unanswered slash interactions | Track whether the response has already been sent; respect deadline |
+| [x] Documented | Command event distinct from regular message | Route slash `command` events to interaction-aware command contexts |
+| [~] Documented | Auto-acknowledge unanswered slash interactions | Two-second auto-ack fallback and ten-response counter; live timing still needs a test-bot smoke test |
 
 Rust API should favor explicit typed command registration and async handlers. It does not need to imitate Python decorators.
 
