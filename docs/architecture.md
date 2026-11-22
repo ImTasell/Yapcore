@@ -309,7 +309,35 @@ Retries are centralized and method-aware. Reqwest's own retry behavior is not re
 
 A client-generated nonce must not be introduced as an idempotency mechanism unless Yapper documents and confirms server-side support.
 
-## 8. Models, IDs and serialization
+### Initial runtime defaults
+
+These are starting defaults for v0.1, not hard-coded limits. Every operational value that affects reliability should be configurable:
+
+| Setting | Default |
+| --- | --- |
+| Long-poll wait | 25 seconds (platform maximum) |
+| HTTP request timeout | 40 seconds |
+| Maximum response body | 16 MiB |
+| Maximum concurrent ordinary event handlers | 8 |
+| Shutdown drain grace period | 5 seconds |
+| Transport retry attempts | 3 retries after the initial attempt |
+| Transport backoff | 500 ms base, exponential, capped at 30 seconds, with jitter |
+| Total automatic retry wait budget | 60 seconds |
+
+Retry-After is a server instruction, not a hint to retry sooner. If the requested wait exceeds the remaining automatic retry budget, return the structured API error with its Retry-After value rather than retrying early or blocking forever. Cancellation must interrupt backoff and long-poll waits.
+
+## 8. Security defaults
+
+1. Require HTTPS for the API base URL. Permit plain HTTP only for loopback mock servers when an explicit test-only override is enabled.
+2. Never place a bot token, interaction token or event-webhook secret in a URL or query string.
+3. Mark the Authorization header value as sensitive and disable automatic redirects for authenticated API calls.
+4. Store secrets in a redacting secret wrapper. Do not derive a Debug representation that reveals them.
+5. Do not log request/response bodies by default. Avoid logging full Reqwest errors without sanitizing their URL, because an error can retain the request URL.
+6. Treat interaction and event-webhook secrets with the same care as the bot token.
+7. Keep telemetry absent from v0.1; never send usage data unless a future explicit opt-in feature is enabled.
+8. Keep body-size limits and upload limits enforced before data is accepted or transmitted.
+
+## 9. Models, IDs and serialization
 
 - Use Serde structs for stable documented response shapes.
 - Use enums for known discriminants, with an `Unknown(String)`/raw-value path where forward compatibility is required.
@@ -321,7 +349,7 @@ A client-generated nonce must not be introduced as an idempotency mechanism unle
 
 Do not eagerly deserialize fields that are not stable in the current official contract. Unknown data should be retained or ignored safely rather than breaking the event loop.
 
-## 9. Commands and framework registration
+## 10. Commands and framework registration
 
 ### Commands
 
@@ -342,7 +370,7 @@ A Rust cog is a statically linked group of command and event registrations with 
 
 Implement the stable documented Embed and Button payload surface first. Keep builders as plain serializable data. Do not freeze Select, Modal or Components V2 payload types until the official schema/live test-bot verification is complete.
 
-## 10. Dependency and feature policy
+## 11. Dependency and feature policy
 
 The exact dependency decisions and Cargo manifest are recorded in [dependencies.md](dependencies.md).
 
@@ -360,7 +388,7 @@ Do not add async-trait, futures-util, bytes, url, uuid, chrono, a database, a CL
 
 No optional features are declared until there is a real, verified capability or optional dependency to gate. .env loading, telemetry, gateway support and experimental platform extensions can be evaluated separately.
 
-## 11. Testing and quality gates
+## 12. Testing and quality gates
 
 ### Unit tests
 
@@ -408,7 +436,7 @@ cargo test --all-features
 
 Also test the declared MSRV (1.85) separately from current stable. Cache the Cargo registry and build outputs. Keep CI free of live platform credentials.
 
-## 12. Implementation sequence
+## 13. Implementation sequence
 
 1. **M0 — Decisions (complete):** GPL-3.0-only, source audit, feature inventory, API contract and architecture decisions.
 2. **M1 — Crate foundation:** Cargo manifest, lint policy, public Error, Config, secret token wrapper, typed IDs and API client.
