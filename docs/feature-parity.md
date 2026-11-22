@@ -131,11 +131,11 @@ Do not expose both a huge builder API and dozens of raw JSON methods for the sam
 | [x] Documented | List/get servers | `list_servers` / `get_server` with forward-compatible models |
 | [x] Documented | List server/global channels and channel details | `list_channels` with text/voice filters, categories, and `get_channel` |
 | [x] Documented | List members with pagination / fetch one member | `list_members(limit, after)` and `get_member`; validates 1–500 page size |
-| [~] Documented | Roles list/get/create/edit/delete/reorder | `list_roles` exists; individual role and mutation methods remain |
-| [ ] Documented | Add/remove role | Role assignment endpoints |
+| [~] Documented | Roles list/get/create/edit/delete/reorder | `list_roles` and member assignment/removal exist; role CRUD/reorder remain |
+| [x] Documented | Add/remove role | `add_role` / `remove_role` with shared 403 error handling |
 | [ ] Documented | Get and set permissions/overrides | Documented permission endpoints first |
-| [ ] Documented | Kick/ban/unban/list bans/timeout | Moderation endpoints |
-| [ ] Documented | Edit nickname | Member endpoint |
+| [x] Documented | Kick/ban/unban/list bans/timeout | Typed ban models, role-safe REST methods and local timeout/reason validation |
+| [x] Documented | Edit nickname | `set_nickname` validates 32 characters; empty string clears |
 | [ ] Documented | Create/edit/delete channel | Channel endpoints |
 | [ ] Documented | Create/rename/delete category | Category endpoints |
 | [ ] Documented | Open DM/send DM | User DM endpoints |
