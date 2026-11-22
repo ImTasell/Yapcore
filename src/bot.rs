@@ -7,7 +7,7 @@ use serde_json::Value;
 use tokio::sync::watch;
 
 use crate::api::ApiClient;
-use crate::commands::{CommandContext, CommandRegistry, HandlerResult};
+use crate::commands::{CommandContext, CommandRegistry, HandlerResult, SlashCommandInvocation};
 use crate::config::{Config, ConfigBuilder, ConfigError};
 use crate::error::{Error, Result};
 use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
@@ -502,13 +502,15 @@ impl Bot {
 
         let context = CommandContext::new_interaction(
             self.api.clone(),
-            command.clone(),
-            content,
-            args,
-            interaction_id,
-            token,
-            channel_id,
-            author_id,
+            SlashCommandInvocation {
+                command: command.clone(),
+                content,
+                args,
+                interaction_id,
+                interaction_token: token,
+                channel_id,
+                author_id,
+            },
         );
         let response_count = context
             .interaction_response_count()
