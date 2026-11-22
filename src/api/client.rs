@@ -1731,6 +1731,173 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn adds_and_removes_member_roles_with_documented_routes() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
+        const ROLE_ID: &str = "123e4567-e89b-12d3-a456-426614174023";
+
+        let server = LocalMockServer::start(204, &[], String::new());
+        let client = test_client(&server, 1024).await;
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+        let user_id = crate::ids::UserId::new(USER_ID).unwrap();
+        let role_id = crate::ids::RoleId::new(ROLE_ID).unwrap();
+
+        client.add_role(&server_id, &user_id, &role_id).await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "PUT /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/members/123e4567-e89b-12d3-a456-426614174022/roles/123e4567-e89b-12d3-a456-426614174023 HTTP/1.1"
+        ));
+
+        let server = LocalMockServer::start(204, &[], String::new());
+        let client = test_client(&server, 1024).await;
+        client
+            .remove_role(&server_id, &user_id, &role_id)
+            .await
+            .unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "DELETE /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/members/123e4567-e89b-12d3-a456-426614174022/roles/123e4567-e89b-12d3-a456-426614174023 HTTP/1.1"
+        ));
+    }
+
+    #[tokio::test]
+    async fn sets_member_nickname_and_validates_its_length() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({ "ok": true }).to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+        let user_id = crate::ids::UserId::new(USER_ID).unwrap();
+
+        client.set_nickname(&server_id, &user_id, "Member").await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "PATCH /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/members/123e4567-e89b-12d3-a456-426614174022 HTTP/1.1"
+        ));
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["nickname"], "Member");
+
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        assert!(matches!(
+            client.set_nickname(&server_id, &user_id, &"x".repeat(33)).await,
+            Err(Error::NicknameTooLong { actual: 33 })
+        ));
+    }
+
+    #[tokio::test]
+    async fn kicks_and_bans_members_with_user_id_payloads() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
+
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+        let user_id = crate::ids::UserId::new(USER_ID).unwrap();
+
+        let server = LocalMockServer::start(200, &[], r#"{"ok":true}"#.to_owned());
+        let client = test_client(&server, 1024).await;
+        client.kick_member(&server_id, &user_id).await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "POST /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/kick HTTP/1.1"
+        ));
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["user_id"], USER_ID);
+
+        let server = LocalMockServer::start(200, &[], r#"{"ok":true}"#.to_owned());
+        let client = test_client(&server, 1024).await;
+        client.ban_member(&server_id, &user_id).await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "POST /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/bans HTTP/1.1"
+        ));
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["user_id"], USER_ID);
+    }
+
+    #[tokio::test]
+    async fn lists_bans_and_unbans_member() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "bans": [{
+                    "user_id": USER_ID,
+                    "banned_by": "123e4567-e89b-12d3-a456-426614174003",
+                    "created_at": "2026-11-22T00:00:00Z",
+                    "user": { "id": USER_ID, "username": "banned-user" }
+                }]
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+
+        let bans = client.list_bans(&server_id).await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "GET /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/bans HTTP/1.1"
+        ));
+        assert_eq!(bans.len(), 1);
+        assert_eq!(bans[0].user.as_ref().and_then(|user| user.username.as_deref()), Some("banned-user"));
+
+        let server = LocalMockServer::start(204, &[], String::new());
+        let client = test_client(&server, 1024).await;
+        let user_id = crate::ids::UserId::new(USER_ID).unwrap();
+        client.unban_member(&server_id, &user_id).await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "DELETE /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/bans/123e4567-e89b-12d3-a456-426614174022 HTTP/1.1"
+        ));
+    }
+
+    #[tokio::test]
+    async fn sets_and_clears_timeouts_with_reason_and_limits() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
+
+        let server = LocalMockServer::start(200, &[], r#"{"ok":true}"#.to_owned());
+        let client = test_client(&server, 1024).await;
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+        let user_id = crate::ids::UserId::new(USER_ID).unwrap();
+
+        client
+            .timeout_member(&server_id, &user_id, Some(30), Some("Rule violation"))
+            .await
+            .unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "POST /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/timeouts HTTP/1.1"
+        ));
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["user_id"], USER_ID);
+        assert_eq!(payload["minutes"], 30);
+        assert_eq!(payload["reason"], "Rule violation");
+
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        assert!(matches!(
+            client.timeout_member(&server_id, &user_id, Some(40_321), None).await,
+            Err(Error::TimeoutTooLong { actual: 40_321 })
+        ));
+        assert!(matches!(
+            client.timeout_member(&server_id, &user_id, Some(1), Some(&"x".repeat(201))).await,
+            Err(Error::ModerationReasonTooLong { actual: 201 })
+        ));
+    }
+
+    #[tokio::test]
     async fn lists_servers_from_the_documented_response_wrapper() {
         const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
 
