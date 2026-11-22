@@ -1473,9 +1473,11 @@ mod tests {
         let details = client.get_server(&server_id).await.unwrap();
         let request = server.finish();
 
-        assert!(request.starts_with(
-            "GET /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020 HTTP/1.1"
-        ));
+        assert!(
+            request.starts_with(
+                "GET /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020 HTTP/1.1"
+            )
+        );
         assert_eq!(details.name.as_deref(), Some("Example server"));
     }
 
@@ -1501,9 +1503,11 @@ mod tests {
         let channel = client.get_channel(&channel_id).await.unwrap();
         let request = server.finish();
 
-        assert!(request.starts_with(
-            "GET /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174021 HTTP/1.1"
-        ));
+        assert!(
+            request.starts_with(
+                "GET /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174021 HTTP/1.1"
+            )
+        );
         assert_eq!(channel.name.as_deref(), Some("general"));
     }
 
@@ -1592,9 +1596,10 @@ mod tests {
         let user = client.get_user(&user_id).await.unwrap();
         let request = server.finish();
 
-        assert!(request.starts_with(
-            "GET /api/bot/v1/users/123e4567-e89b-12d3-a456-426614174022 HTTP/1.1"
-        ));
+        assert!(
+            request
+                .starts_with("GET /api/bot/v1/users/123e4567-e89b-12d3-a456-426614174022 HTTP/1.1")
+        );
         assert_eq!(user.username.as_deref(), Some("example-user"));
         assert_eq!(user.display_name.as_deref(), Some("Example"));
     }
