@@ -1,9 +1,26 @@
-use crate::api::ApiClient;
-use crate::error::Result;
-use crate::ids::{ChannelId, MessageId, UserId};
-use crate::models::Message;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Context passed to a registered prefix-command handler.
+use secrecy::SecretString;
+
+use crate::api::ApiClient;
+use crate::error::{Error, Result};
+use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
+use crate::models::InteractionResponseType;
+
+/// Shared credentials and response state for a slash-command interaction.
+///
+/// The token's Debug output is redacted by secrecy. The atomic state prevents
+/// two concurrent handler paths from accidentally sending competing initial
+/// responses.
+#[derive(Debug, Clone)]
+struct InteractionCredentials {
+    id: InteractionId,
+    token: SecretString,
+    answered: Arc<AtomicBool>,
+}
+
+/// Context passed to a registered prefix or slash-command handler.
 #[derive(Debug, Clone)]
 pub struct CommandContext {
     api: ApiClient,
@@ -11,9 +28,10 @@ pub struct CommandContext {
     content: String,
     args: String,
     argv: Vec<String>,
-    message_id: MessageId,
+    message_id: Option<MessageId>,
     channel_id: ChannelId,
     author_id: Option<UserId>,
+    interaction: Option<InteractionCredentials>,
 }
 
 impl CommandContext {
@@ -26,6 +44,56 @@ impl CommandContext {
         channel_id: ChannelId,
         author_id: Option<UserId>,
     ) -> Self {
+        Self::build(
+            api,
+            command,
+            content,
+            args,
+            Some(message_id),
+            channel_id,
+            author_id,
+            None,
+        )
+    }
+
+    pub(crate) fn new_interaction(
+        api: ApiClient,
+        command: String,
+        content: String,
+        args: String,
+        interaction_id: InteractionId,
+        interaction_token: String,
+        channel_id: ChannelId,
+        author_id: Option<UserId>,
+    ) -> Self {
+        let interaction = InteractionCredentials {
+            id: interaction_id,
+            token: SecretString::from(interaction_token),
+            answered: Arc::new(AtomicBool::new(false)),
+        };
+
+        Self::build(
+            api,
+            command,
+            content,
+            args,
+            None,
+            channel_id,
+            author_id,
+            Some(interaction),
+        )
+    }
+
+    fn build(
+        api: ApiClient,
+        command: String,
+        content: String,
+        args: String,
+        message_id: Option<MessageId>,
+        channel_id: ChannelId,
+        author_id: Option<UserId>,
+        interaction: Option<InteractionCredentials>,
+    ) -> Self {
         let argv = args.split_whitespace().map(str::to_owned).collect();
 
         Self {
@@ -37,6 +105,7 @@ impl CommandContext {
             message_id,
             channel_id,
             author_id,
+            interaction,
         }
     }
 
@@ -45,7 +114,7 @@ impl CommandContext {
         &self.command
     }
 
-    /// Full content of the message that invoked the command.
+    /// Full content of the message or slash-command invocation.
     pub fn content(&self) -> &str {
         &self.content
     }
@@ -60,32 +129,107 @@ impl CommandContext {
         &self.argv
     }
 
-    /// ID of the message that invoked the command.
-    pub fn message_id(&self) -> &MessageId {
-        &self.message_id
+    /// ID of the message that invoked this command, or None for slash commands.
+    pub fn message_id(&self) -> Option<&MessageId> {
+        self.message_id.as_ref()
     }
 
-    /// ID of the channel containing the command message.
+    /// ID of the channel containing this command.
     pub fn channel_id(&self) -> &ChannelId {
         &self.channel_id
     }
 
-    /// ID of the message author, when supplied by Yapper.
+    /// ID of the command author, when supplied by Yapper.
     pub fn author_id(&self) -> Option<&UserId> {
         self.author_id.as_ref()
     }
 
-    /// Reply to the message that invoked this command.
-    pub async fn reply(&self, content: impl AsRef<str>) -> Result<Message> {
+    /// Whether this command came from Yapper's slash-command menu.
+    pub fn is_interaction(&self) -> bool {
+        self.interaction.is_some()
+    }
+
+    /// Reply to the command.
+    ///
+    /// Prefix commands create a quoted channel message. Slash commands use
+    /// the interaction callback and answer the command invocation itself.
+    pub async fn reply(&self, content: impl AsRef<str>) -> Result<()> {
+        let content = content.as_ref();
+
+        if self.interaction.is_some() {
+            return self
+                .answer_interaction(InteractionResponseType::Reply, Some(content))
+                .await;
+        }
+
+        let message_id = self
+            .message_id
+            .as_ref()
+            .ok_or(Error::MessageContextRequired)?;
+
         self.api
-            .reply_message(&self.channel_id, &self.message_id, content.as_ref())
+            .reply_message(&self.channel_id, message_id, content)
+            .await?;
+        Ok(())
+    }
+
+    /// Send a message in the command's channel.
+    ///
+    /// For prefix commands this is a normal unquoted message. For slash
+    /// commands it is equivalent to reply, matching Yapper's Python SDK.
+    pub async fn say(&self, content: impl AsRef<str>) -> Result<()> {
+        let content = content.as_ref();
+
+        if self.interaction.is_some() {
+            return self
+                .answer_interaction(InteractionResponseType::Reply, Some(content))
+                .await;
+        }
+
+        self.api.send_message(&self.channel_id, content).await?;
+        Ok(())
+    }
+
+    /// Send a response visible only to the person who invoked a slash command.
+    pub async fn ephemeral(&self, content: impl AsRef<str>) -> Result<()> {
+        self.answer_interaction(InteractionResponseType::Ephemeral, Some(content.as_ref()))
             .await
     }
 
-    /// Send a new message to the command's channel without a reply reference.
-    pub async fn say(&self, content: impl AsRef<str>) -> Result<Message> {
-        self.api
-            .send_message(&self.channel_id, content.as_ref())
+    /// Acknowledge a slash command without posting a visible message.
+    pub async fn ack(&self) -> Result<()> {
+        self.answer_interaction(InteractionResponseType::Ack, None)
             .await
+    }
+
+    pub(crate) fn interaction_answered_state(&self) -> Option<Arc<AtomicBool>> {
+        self.interaction
+            .as_ref()
+            .map(|interaction| interaction.answered.clone())
+    }
+
+    async fn answer_interaction(
+        &self,
+        response_type: InteractionResponseType,
+        content: Option<&str>,
+    ) -> Result<()> {
+        let Some(interaction) = self.interaction.as_ref() else {
+            return Err(Error::InteractionRequired);
+        };
+
+        if interaction.answered.swap(true, Ordering::AcqRel) {
+            return Err(Error::InteractionAlreadyAnswered);
+        }
+
+        self.api
+            .respond_interaction(
+                &interaction.id,
+                &interaction.token,
+                response_type,
+                content,
+            )
+            .await?;
+
+        Ok(())
     }
 }
