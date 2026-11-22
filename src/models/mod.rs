@@ -32,4 +32,6 @@ pub use interaction::InteractionResponseType;
 
 mod server;
 
-pub use server::{Channel, ChannelCategory, ChannelListing, Member, Role, Server, UserProfile};
+pub use server::{
+    Channel, ChannelCategory, ChannelListing, ChannelType, Member, Role, Server, UserProfile,
+};
