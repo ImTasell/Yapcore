@@ -205,6 +205,10 @@ impl Bot {
         let profile = self.api.get_me().await?;
         let bot_id = profile.id.clone();
 
+        // Yapper's PUT /commands replaces the full registry, so always sync
+        // the complete set once before beginning event polling.
+        self.api.sync_commands(&self.commands.definitions()).await?;
+
         tracing::info!(
             username = profile.username.as_deref().unwrap_or("<unknown>"),
             "Yapcore bot connected"
