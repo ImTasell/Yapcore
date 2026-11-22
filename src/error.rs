@@ -145,6 +145,13 @@ pub enum Error {
     #[error("reaction emoji identifier must not be empty")]
     InvalidEmoji,
 
+    /// A bulk-delete request must contain between 1 and 100 message IDs.
+    #[error("bulk delete requires 1-100 message IDs; received {actual}")]
+    InvalidBulkDeleteCount {
+        /// Number of message IDs supplied.
+        actual: usize,
+    },
+
     /// The request failed before a usable HTTP response was received.
     ///
     /// The underlying Reqwest error has its URL removed to avoid accidental
