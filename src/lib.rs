@@ -29,7 +29,8 @@ pub use ids::{
 };
 pub use interactions::{InteractionContext, InteractionRegistrationError};
 pub use models::{
-    BotProfile, CommandDefinition, CommandDefinitionError, Embed, EmbedAuthor, EmbedBuilder,
-    EmbedField, EmbedFooter, EmbedValidationError, EventBatch, EventEnvelope,
+    ActionRow, BotProfile, Button, ButtonStyle, CommandDefinition, CommandDefinitionError,
+    ComponentValidationError, Embed, EmbedAuthor, EmbedBuilder, EmbedField, EmbedFooter,
+    EmbedValidationError, EventBatch, EventEnvelope,
     InteractionResponseType, Message,
 };
