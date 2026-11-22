@@ -648,6 +648,175 @@ mod tests {
         assert!(bot.ignore_bots);
     }
 
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::mpsc::{self, Receiver};
+    use std::thread::{self, JoinHandle};
+
+    struct CallbackServer {
+        uri: String,
+        request: Receiver<String>,
+        thread: Option<JoinHandle<()>>,
+    }
+
+    impl CallbackServer {
+        fn start() -> Self {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let address = listener.local_addr().unwrap();
+            let uri = format!("http://{address}");
+            let (sender, request) = mpsc::channel();
+
+            let thread = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+
+                let mut request_bytes = Vec::new();
+                let mut buffer = [0_u8; 1024];
+                let mut expected_length = None;
+
+                loop {
+                    let read = stream.read(&mut buffer).unwrap();
+                    if read == 0 {
+                        break;
+                    }
+                    request_bytes.extend_from_slice(&buffer[..read]);
+
+                    if expected_length.is_none() {
+                        if let Some(header_end) = request_bytes
+                            .windows(4)
+                            .position(|window| window == b"\r\n\r\n")
+                        {
+                            let body_start = header_end + 4;
+                            let headers = String::from_utf8_lossy(&request_bytes[..header_end]);
+                            let content_length = headers
+                                .lines()
+                                .find_map(|line| {
+                                    let (name, value) = line.split_once(':')?;
+                                    name.eq_ignore_ascii_case("content-length")
+                                        .then(|| value.trim().parse::<usize>().ok())
+                                        .flatten()
+                                })
+                                .unwrap_or(0);
+                            expected_length = Some(body_start + content_length);
+                        }
+                    }
+
+                    if expected_length.is_some_and(|length| request_bytes.len() >= length) {
+                        break;
+                    }
+                }
+
+                let request_text = String::from_utf8_lossy(&request_bytes).into_owned();
+                let _ = sender.send(request_text);
+
+                let response_body = "{}";
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{}",
+                    response_body.len(),
+                    response_body
+                );
+                stream.write_all(response.as_bytes()).unwrap();
+            });
+
+            Self {
+                uri,
+                request,
+                thread: Some(thread),
+            }
+        }
+
+        fn uri(&self) -> &str {
+            &self.uri
+        }
+
+        fn finish(mut self) -> String {
+            self.thread.take().unwrap().join().unwrap();
+            self.request.recv().unwrap()
+        }
+    }
+
+    fn test_bot(server: &CallbackServer) -> Bot {
+        Bot::builder()
+            .token("yb_test-token")
+            .api_base_url(format!("{}/api/bot/v1", server.uri()))
+            .allow_insecure_http_for_tests(true)
+            .build()
+            .unwrap()
+    }
+
+    fn slash_command_event() -> crate::models::EventEnvelope {
+        crate::models::EventEnvelope {
+            id: 7,
+            event_type: "command".to_owned(),
+            data: serde_json::json!({
+                "id": "123e4567-e89b-12d3-a456-426614174010",
+                "token": "slash/token",
+                "command": "ping",
+                "args": "hello there",
+                "user_id": "123e4567-e89b-12d3-a456-426614174003",
+                "username": "test-user",
+                "channel_id": "123e4567-e89b-12d3-a456-426614174002"
+            }),
+            created_at: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn dispatches_slash_command_reply_through_interaction_callback() {
+        let server = CallbackServer::start();
+        let mut bot = test_bot(&server);
+
+        bot.command("ping", "Check whether the bot is alive", |context| async move {
+            assert!(context.is_interaction());
+            assert_eq!(context.command(), "ping");
+            assert_eq!(context.args(), "hello there");
+            context.reply("Pong from slash!").await
+                .map_err(|error| -> crate::HandlerError { Box::new(error) })?;
+            Ok(())
+        })
+        .unwrap();
+
+        bot.dispatch_event(&slash_command_event(), None)
+            .await
+            .unwrap();
+
+        let request = server.finish();
+        assert!(request.starts_with(
+            "POST /api/bot/v1/interactions/123e4567-e89b-12d3-a456-426614174010/slash%2Ftoken/callback HTTP/1.1"
+        ));
+
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["type"], "reply");
+        assert_eq!(payload["content"], "Pong from slash!");
+    }
+
+    #[tokio::test]
+    async fn automatically_acknowledges_slash_command_handlers_without_a_response() {
+        let server = CallbackServer::start();
+        let mut bot = test_bot(&server);
+
+        bot.command("ping", "Check whether the bot is alive", |_context| async {
+            Ok(())
+        })
+        .unwrap();
+
+        bot.dispatch_event(&slash_command_event(), None)
+            .await
+            .unwrap();
+
+        let request = server.finish();
+        assert!(request.starts_with(
+            "POST /api/bot/v1/interactions/123e4567-e89b-12d3-a456-426614174010/slash%2Ftoken/callback HTTP/1.1"
+        ));
+
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["type"], "ack");
+    }
+
     #[tokio::test]
     async fn dispatches_prefix_message_to_registered_async_handler() {
         use std::sync::{Arc, Mutex};
