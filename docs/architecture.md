@@ -3,7 +3,7 @@
 **Status:** Locked for the v0.1 implementation baseline  
 **Decision date:** 2026-11-21  
 **License:** GPL-3.0-only  
-**Crate:** \`yapcore\`  
+**Crate:** `yapcore`  
 **Protocol authority:** the current public Yapper developer guide and API contract in [api-contract.md](api-contract.md)
 
 This document is the implementation contract for the initial crate. It intentionally separates the stable, documented platform surface from unverified features in the Python framework. "Feature parity" means reproducing supported behavior, not copying Python's syntax or internals.
@@ -27,13 +27,13 @@ The framework must not claim support for API behavior that Yapper does not docum
 
 ### Stable v0.1 platform contract
 
-- REST base URL: \`https://www.yapper.website/api/bot/v1\`.
-- Authentication header: \`Authorization: Bot <token>\`.
+- REST base URL: `https://www.yapper.website/api/bot/v1`.
+- Authentication header: `Authorization: Bot <token>`.
 - JSON is the default request/response representation.
-- Event transport: long polling through \`GET /events?after=<cursor>&wait=25\`.
+- Event transport: long polling through `GET /events?after=<cursor>&wait=25`.
 - Poll response cap: 100 events; maximum long-poll wait: 25 seconds.
-- Commands are synchronized as a complete list through \`PUT /commands\`.
-- Message, embed, button-interaction, server, channel, member, role, moderation, DM-opening and voice-state APIs follow the public contract in \`api-contract.md\`.
+- Commands are synchronized as a complete list through `PUT /commands`.
+- Message, embed, button-interaction, server, channel, member, role, moderation, DM-opening and voice-state APIs follow the public contract in `api-contract.md`.
 - Use a real bot token from the Developer settings. Normal user-account automation is out of scope.
 
 ### Explicitly deferred
@@ -56,7 +56,7 @@ The optional signed event webhook is a server-side delivery configuration, not t
 
 | Item | Decision |
 | --- | --- |
-| Package | One library crate named \`yapcore\` |
+| Package | One library crate named `yapcore` |
 | Edition | Rust 2024 |
 | MSRV | Rust 1.85 |
 | Version | Start at 0.1.0 |
@@ -185,7 +185,7 @@ type Handler =
     Arc<dyn Fn(CommandContext) -> HandlerFuture + Send + Sync + 'static>;
 ~~~
 
-The public registration method is generic over a closure and its future, then stores a boxed future internally. This keeps call sites simple (\`|ctx| async move { ... }\`) without requiring users to write boxed futures.
+The public registration method is generic over a closure and its future, then stores a boxed future internally. This keeps call sites simple (`|ctx| async move { ... }`) without requiring users to write boxed futures.
 
 Handlers receive owned contexts and owned event data. No handler future may borrow from the poller's temporary response buffer. Do not use unsafe lifetime tricks.
 
@@ -193,26 +193,26 @@ Handlers receive owned contexts and owned event data. No handler future may borr
 
 Use separate context types for different operations:
 
-- \`MessageContext\`: message metadata and reply/say helpers.
-- \`CommandContext\`: command name, arguments, parsed options when supported, reply and ephemeral response helpers.
-- \`InteractionContext\`: interaction ID, user/message metadata and callback response helpers.
-- \`EventContext\`: typed event plus the API client for general listeners.
+- `MessageContext`: message metadata and reply/say helpers.
+- `CommandContext`: command name, arguments, parsed options when supported, reply and ephemeral response helpers.
+- `InteractionContext`: interaction ID, user/message metadata and callback response helpers.
+- `EventContext`: typed event plus the API client for general listeners.
 
-Context methods are async where they perform network requests. Raw platform payload access remains available through a \`serde_json::Value\` accessor for forward compatibility.
+Context methods are async where they perform network requests. Raw platform payload access remains available through a `serde_json::Value` accessor for forward compatibility.
 
 ### Bot lifecycle
 
-\`Bot::run()\` performs this sequence:
+`Bot::run()` performs this sequence:
 
 1. Validate already-built configuration.
-2. Fetch the bot profile with \`GET /me\`.
-3. Synchronize the full registered command list with \`PUT /commands\`.
+2. Fetch the bot profile with `GET /me`.
+3. Synchronize the full registered command list with `PUT /commands`.
 4. Determine the initial cursor according to the configured start policy.
 5. Run exactly one long-poll loop.
 6. Dispatch events with bounded concurrency.
 7. Exit when the shutdown handle is cancelled; stop starting new work and drain in-flight handlers for a bounded grace period.
 
-A \`BotHandle\` contains only the shutdown sender and any intentionally public control operations. It must not expose mutable internals.
+A `BotHandle` contains only the shutdown sender and any intentionally public control operations. It must not expose mutable internals.
 
 ## 6. Runtime and event-delivery model
 
@@ -221,18 +221,18 @@ A \`BotHandle\` contains only the shutdown sender and any intentionally public c
 - Exactly one poller per bot instance.
 - Use the documented 25-second maximum wait.
 - Use a 40-second HTTP timeout so the request timeout exceeds the long-poll wait with network overhead.
-- Use a cancellable \`tokio::select!\` around the long-poll request.
+- Use a cancellable `tokio::select!` around the long-poll request.
 - Skip duplicate/out-of-order event IDs at or below the committed cursor.
 - Never advance the cursor after a failed poll.
 - Do not poll again until the current response batch has been admitted to the dispatcher.
-- Respect the page-level \`last\` cursor only after all events in that response have been admitted/settled according to the documented response semantics. Keep the cursor logic isolated and contract-tested because the raw OpenAPI response schema still needs final verification.
+- Respect the page-level `last` cursor only after all events in that response have been admitted/settled according to the documented response semantics. Keep the cursor logic isolated and contract-tested because the raw OpenAPI response schema still needs final verification.
 
 ### Startup cursor policy
 
 Provide two explicit start modes:
 
-- \`Latest\` (default): call \`GET /events?after=0&wait=0\` and begin after the returned latest cursor. This matches the Python framework's clean-start behavior and avoids replaying the bot's historical backlog unexpectedly.
-- \`Resume(cursor)\`: begin after a caller-supplied saved cursor to catch up within the platform's one-day event retention.
+- `Latest` (default): call `GET /events?after=0&wait=0` and begin after the returned latest cursor. This matches the Python framework's clean-start behavior and avoids replaying the bot's historical backlog unexpectedly.
+- `Resume(cursor)`: begin after a caller-supplied saved cursor to catch up within the platform's one-day event retention.
 
 Expose the current cursor so applications can persist it. Do not require SQLite, Redis or any database. A built-in persistent cursor store can be designed later if demand justifies it.
 
@@ -248,7 +248,7 @@ The library cannot promise exactly-once side effects. If an application persists
 - Handler errors and panics are isolated, sent to the error-reporting hook and do not crash the entire poller by default.
 - Provide a way to choose strict sequential event processing for bots whose logic depends on global event order.
 
-Do not hold a Tokio mutex or standard-library lock across an \`.await\`. Clone the handler \`Arc\`s while holding a registry lock, release the lock, then invoke handlers.
+Do not hold a Tokio mutex or standard-library lock across an `.await`. Clone the handler `Arc`s while holding a registry lock, release the lock, then invoke handlers.
 
 ### Unknown events
 
@@ -264,11 +264,11 @@ Do not automatically retry an interaction callback after an ambiguous transport 
 
 ### Client ownership
 
-- Build one reusable \`reqwest::Client\` per bot.
+- Build one reusable `reqwest::Client` per bot.
 - Clone the client handle; do not create a new HTTP client per request.
 - Use the official base URL by default and allow a custom base URL for tests/compatible deployments.
 - Construct routes and query parameters centrally. Encode dynamic path segments and never concatenate untrusted user-supplied strings into route paths.
-- Set the \`Authorization: Bot ...\` header centrally.
+- Set the `Authorization: Bot ...` header centrally.
 - Set a Yapcore User-Agent with package version.
 - Disable automatic redirects for authenticated API requests. A redirect must not move a bot token to an unexpected host.
 - Do not store cookies.
@@ -283,7 +283,7 @@ Do not automatically retry an interaction callback after an ambiguous transport 
 
 ### Error model
 
-Expose a structured \`Error\` with distinct cases for:
+Expose a structured `Error` with distinct cases for:
 
 - Invalid/missing configuration or token.
 - Transport failure and timeout.
@@ -312,11 +312,11 @@ A client-generated nonce must not be introduced as an idempotency mechanism unle
 ## 8. Models, IDs and serialization
 
 - Use Serde structs for stable documented response shapes.
-- Use enums for known discriminants, with an \`Unknown(String)\`/raw-value path where forward compatibility is required.
-- Represent IDs as distinct transparent newtypes around \`String\` (for example \`UserId\`, \`ServerId\`, \`ChannelId\`, \`MessageId\`). This prevents mixing IDs without introducing a UUID parsing dependency.
+- Use enums for known discriminants, with an `Unknown(String)`/raw-value path where forward compatibility is required.
+- Represent IDs as distinct transparent newtypes around `String` (for example `UserId`, `ServerId`, `ChannelId`, `MessageId`). This prevents mixing IDs without introducing a UUID parsing dependency.
 - Keep timestamps as the platform's serialized ISO-8601 string in the first release. Add a typed time crate only if the public API needs date arithmetic or conversion.
-- Use \`Option<T>\` for fields that are legitimately absent or nullable.
-- Use \`serde_json::Value\` only at flexible extension boundaries and raw event payloads; prefer typed public fields elsewhere.
+- Use `Option<T>` for fields that are legitimately absent or nullable.
+- Use `serde_json::Value` only at flexible extension boundaries and raw event payloads; prefer typed public fields elsewhere.
 - Keep serialization builders separate from resource methods.
 
 Do not eagerly deserialize fields that are not stable in the current official contract. Unknown data should be retained or ignored safely rather than breaking the event loop.
@@ -325,9 +325,9 @@ Do not eagerly deserialize fields that are not stable in the current official co
 
 ### Commands
 
-- Register commands locally before \`run()\`.
+- Register commands locally before `run()`.
 - Validate command name and description lengths locally using the published limits.
-- Synchronize the entire command registry in one \`PUT /commands\` request.
+- Synchronize the entire command registry in one `PUT /commands` request.
 - Enforce the published 100-command maximum.
 - Implement prefix parsing with longest-prefix matching.
 - Keep the slash-command dispatch path distinct from normal message-prefix parsing.
@@ -348,7 +348,7 @@ The exact dependency decisions and Cargo manifest are recorded in [dependencies.
 
 The default graph stays intentionally small:
 
-- Tokio runtime, macros, time, synchronization and signal support for examples.
+- Tokio runtime, macros, time and synchronization; applications opt into process-signal support separately.
 - Reqwest using rustls and JSON only; no native OpenSSL dependency.
 - Serde and serde_json.
 - thiserror for structured errors.
@@ -383,9 +383,9 @@ No optional features are declared until there is a real, verified capability or 
 Use an isolated local mock HTTP server (Wiremock in dev-dependencies is the current choice). No live bot token is required in CI.
 
 Test:
-- Exact default base URL and \`Authorization\` header.
+- Exact default base URL and `Authorization` header.
 - Redirects do not forward credentials.
-- \`GET /me\`, \`PUT /commands\`, \`GET /events\`.
+- `GET /me`, `PUT /commands`, `GET /events`.
 - Message send/edit/delete and interaction callbacks.
 - Documented server/channel/member/role/moderation routes.
 - Empty success bodies and malformed JSON.
