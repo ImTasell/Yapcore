@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 
 use secrecy::SecretString;
 
@@ -10,14 +10,13 @@ use crate::models::InteractionResponseType;
 
 /// Shared credentials and response state for a slash-command interaction.
 ///
-/// The token's Debug output is redacted by secrecy. The atomic state prevents
-/// two concurrent handler paths from accidentally sending competing initial
-/// responses.
+/// The token's Debug output is redacted by secrecy. The atomic counter permits
+/// Yapper's documented multiple-response interaction lifecycle.
 #[derive(Debug, Clone)]
 struct InteractionCredentials {
     id: InteractionId,
     token: SecretString,
-    answered: Arc<AtomicBool>,
+    response_count: Arc<AtomicU8>,
 }
 
 /// Context passed to a registered prefix or slash-command handler.
@@ -69,7 +68,7 @@ impl CommandContext {
         let interaction = InteractionCredentials {
             id: interaction_id,
             token: SecretString::from(interaction_token),
-            answered: Arc::new(AtomicBool::new(false)),
+            response_count: Arc::new(AtomicU8::new(0)),
         };
 
         Self::build(
@@ -202,10 +201,10 @@ impl CommandContext {
             .await
     }
 
-    pub(crate) fn interaction_answered_state(&self) -> Option<Arc<AtomicBool>> {
+    pub(crate) fn interaction_response_count(&self) -> Option<Arc<AtomicU8>> {
         self.interaction
             .as_ref()
-            .map(|interaction| interaction.answered.clone())
+            .map(|interaction| interaction.response_count.clone())
     }
 
     async fn answer_interaction(
@@ -217,9 +216,14 @@ impl CommandContext {
             return Err(Error::InteractionRequired);
         };
 
-        if interaction.answered.swap(true, Ordering::AcqRel) {
-            return Err(Error::InteractionAlreadyAnswered);
-        }
+        // Claim the response slot before I/O. If the connection fails after
+        // Yapper has accepted the callback, retrying could duplicate it.
+        interaction
+            .response_count
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+                (count < 10).then_some(count + 1)
+            })
+            .map_err(|_| Error::InteractionAlreadyAnswered)?;
 
         self.api
             .respond_interaction(
