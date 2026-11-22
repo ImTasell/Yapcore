@@ -269,9 +269,7 @@ fn is_false(value: &bool) -> bool {
 }
 
 /// Validate the row count and custom-ID uniqueness for one message.
-pub(crate) fn validate_action_rows(
-    rows: &[ActionRow],
-) -> Result<(), ComponentValidationError> {
+pub(crate) fn validate_action_rows(rows: &[ActionRow]) -> Result<(), ComponentValidationError> {
     if rows.len() > 5 {
         return Err(ComponentValidationError::TooManyActionRows { actual: rows.len() });
     }
