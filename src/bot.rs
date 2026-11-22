@@ -11,6 +11,9 @@ use crate::commands::{CommandContext, CommandRegistry, HandlerResult, SlashComma
 use crate::config::{Config, ConfigBuilder, ConfigError};
 use crate::error::{Error, Result};
 use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
+use crate::interactions::{
+    ButtonRegistry, InteractionContext, InteractionInvocation, InteractionRegistrationError,
+};
 use crate::models::{BotProfile, CommandDefinition, InteractionResponseType, Message};
 
 /// Handle used to request a graceful stop of a running bot.
@@ -122,6 +125,7 @@ impl BotBuilder {
         Ok(Bot {
             api,
             commands: CommandRegistry::default(),
+            buttons: ButtonRegistry::default(),
             prefixes: self.prefixes,
             ignore_bots: self.ignore_bots,
             shutdown,
@@ -134,6 +138,7 @@ impl BotBuilder {
 pub struct Bot {
     api: ApiClient,
     commands: CommandRegistry,
+    buttons: ButtonRegistry,
     prefixes: Vec<String>,
     ignore_bots: bool,
     shutdown: watch::Sender<bool>,
@@ -173,6 +178,34 @@ impl Bot {
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
         self.commands.register(name, description, handler)?;
+        Ok(self)
+    }
+
+    /// Register a button handler for one exact component custom ID.
+    pub fn on_button<F, Fut>(
+        &mut self,
+        custom_id: impl Into<String>,
+        handler: F,
+    ) -> std::result::Result<&mut Self, InteractionRegistrationError>
+    where
+        F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        self.buttons.register_exact(custom_id, handler)?;
+        Ok(self)
+    }
+
+    /// Register a button handler for every custom ID beginning with prefix.
+    pub fn button<F, Fut>(
+        &mut self,
+        prefix: impl Into<String>,
+        handler: F,
+    ) -> std::result::Result<&mut Self, InteractionRegistrationError>
+    where
+        F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        self.buttons.register_prefix(prefix, handler)?;
         Ok(self)
     }
 
@@ -305,6 +338,7 @@ impl Bot {
         match event.event_type.as_str() {
             "message" => self.dispatch_message_event(event, bot_id).await,
             "command" => self.dispatch_command_event(event).await,
+            "interaction" => self.dispatch_interaction_event(event).await,
             _ => Ok(()),
         }
     }
@@ -558,6 +592,109 @@ impl Bot {
                     tracing::error!(command = %command, error = %error, "slash command handler failed after automatic acknowledgement");
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    async fn dispatch_interaction_event(
+        &self,
+        event: &crate::models::EventEnvelope,
+    ) -> Result<()> {
+        let data = &event.data;
+
+        let Some(interaction_id) = data.get("id").and_then(Value::as_str) else {
+            tracing::warn!(event_id = event.id, "interaction event has no interaction ID");
+            return Ok(());
+        };
+        let interaction_id = match InteractionId::new(interaction_id) {
+            Ok(id) => id,
+            Err(error) => {
+                tracing::warn!(event_id = event.id, %error, "interaction event has an invalid ID");
+                return Ok(());
+            }
+        };
+
+        let Some(token) = data.get("token").and_then(Value::as_str) else {
+            tracing::warn!(event_id = event.id, "interaction event has no callback token");
+            return Ok(());
+        };
+        let Some(custom_id) = data.get("custom_id").and_then(Value::as_str) else {
+            tracing::warn!(event_id = event.id, "interaction event has no custom ID");
+            return Ok(());
+        };
+
+        let kind = data
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("button")
+            .to_owned();
+
+        // The first interaction milestone handles button events. Select and
+        // modal submissions can reuse the same context/session in later slices.
+        if kind != "button" {
+            return Ok(());
+        }
+
+        let handlers = self.buttons.handlers_for(custom_id);
+        if handlers.is_empty() {
+            return Ok(());
+        }
+
+        let invocation = InteractionInvocation {
+            id: interaction_id,
+            token: SecretString::from(token.to_owned()),
+            kind,
+            custom_id: custom_id.to_owned(),
+            message_id: data
+                .get("message_id")
+                .and_then(Value::as_str)
+                .and_then(|value| MessageId::new(value).ok()),
+            channel_id: data
+                .get("channel_id")
+                .and_then(Value::as_str)
+                .and_then(|value| ChannelId::new(value).ok()),
+            user_id: data
+                .get("user_id")
+                .and_then(Value::as_str)
+                .and_then(|value| UserId::new(value).ok()),
+            username: data
+                .get("username")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+        };
+        let context = InteractionContext::new(self.api.clone(), invocation);
+        let response_count = context.response_count();
+        let fallback_context = context.clone();
+        let custom_id_for_log = custom_id.to_owned();
+
+        let dispatch = async {
+            for handler in handlers {
+                if let Err(error) = handler(context.clone()).await {
+                    tracing::error!(
+                        custom_id = %custom_id_for_log,
+                        error = %error,
+                        "button interaction handler failed"
+                    );
+                }
+            }
+        };
+        tokio::pin!(dispatch);
+
+        // Yapper requires the initial interaction response within three
+        // seconds. Acknowledge after two seconds if handlers are still busy.
+        let completed = tokio::select! {
+            _ = &mut dispatch => true,
+            _ = tokio::time::sleep(Duration::from_secs(2)) => false,
+        };
+
+        if !completed {
+            if response_count.load(Ordering::Acquire) == 0 {
+                fallback_context.ack().await?;
+            }
+            dispatch.await;
+        } else if response_count.load(Ordering::Acquire) == 0 {
+            fallback_context.ack().await?;
         }
 
         Ok(())
