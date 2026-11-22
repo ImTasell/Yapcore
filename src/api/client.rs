@@ -1,13 +1,13 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, RETRY_AFTER};
+use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue, RETRY_AFTER};
 use reqwest::redirect::Policy;
 use reqwest::{Client, Response};
 use secrecy::ExposeSecret;
 
 use crate::config::Config;
-use crate::error::{parse_retry_after, sanitize_transport_error, ApiError, Error, Result};
+use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
 use crate::models::BotProfile;
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
@@ -97,11 +97,7 @@ async fn read_limited_body(response: &mut Response, limit: usize) -> Result<Vec<
 
     // Response::chunk() works without Reqwest's optional streaming feature,
     // so we can enforce a hard body limit without stream helper dependencies.
-    while let Some(chunk) = response
-        .chunk()
-        .await
-        .map_err(sanitize_transport_error)?
-    {
+    while let Some(chunk) = response.chunk().await.map_err(sanitize_transport_error)? {
         if body.len().saturating_add(chunk.len()) > limit {
             return Err(Error::ResponseTooLarge { limit });
         }
@@ -174,10 +170,7 @@ mod tests {
         let client = test_client(&server, 32).await;
         let error = client.get_me().await.unwrap_err();
 
-        assert!(matches!(
-            error,
-            Error::ResponseTooLarge { limit: 32 }
-        ));
+        assert!(matches!(error, Error::ResponseTooLarge { limit: 32 }));
     }
 
     #[tokio::test]
@@ -205,7 +198,10 @@ mod tests {
                 assert_eq!(api_error.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
                 assert_eq!(api_error.message(), "slow down");
                 assert_eq!(api_error.code(), Some("rate_limited"));
-                assert_eq!(api_error.retry_after(), Some(std::time::Duration::from_secs(7)));
+                assert_eq!(
+                    api_error.retry_after(),
+                    Some(std::time::Duration::from_secs(7))
+                );
             }
             other => panic!("expected an API error, got {other:?}"),
         }
