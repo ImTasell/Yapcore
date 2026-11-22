@@ -189,6 +189,13 @@ pub enum Error {
         actual: usize,
     },
 
+    /// A member page size must be between 1 and 500.
+    #[error("member page limit must be between 1 and 500; received {actual}")]
+    InvalidMemberPageLimit {
+        /// Requested member page size.
+        actual: usize,
+    },
+
     /// The request failed before a usable HTTP response was received.
     ///
     /// The underlying Reqwest error has its URL removed to avoid accidental
