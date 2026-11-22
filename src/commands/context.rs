@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::sync::atomic::AtomicU8;
 
 use secrecy::SecretString;
