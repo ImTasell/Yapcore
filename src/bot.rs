@@ -1169,5 +1169,4 @@ mod tests {
 
         assert_eq!(*observed.lock().unwrap(), ["new-member"]);
     }
-
 }
