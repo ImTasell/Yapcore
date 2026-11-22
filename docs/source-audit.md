@@ -80,7 +80,7 @@ The dispatcher converts raw JSON into message/command/interaction wrappers, chec
 The command system supports:
 
 - Prefix commands and server-registered slash commands.
-- Up to 100 commands in the current framework.
+- Up to 50 commands in the current framework.
 - Names containing lowercase letters, digits, hyphens and underscores, 1–32 characters.
 - Optional descriptions and up to 10 typed options.
 - Option types: string, integer, number, boolean, user, channel and role.
