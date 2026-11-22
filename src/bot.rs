@@ -1,6 +1,8 @@
 use std::future::Future;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
+use secrecy::SecretString;
 use serde_json::Value;
 use tokio::sync::watch;
 
@@ -8,8 +10,10 @@ use crate::api::ApiClient;
 use crate::commands::{CommandContext, CommandRegistry, HandlerResult};
 use crate::config::{Config, ConfigBuilder, ConfigError};
 use crate::error::{Error, Result};
-use crate::ids::{ChannelId, MessageId, UserId};
-use crate::models::{BotProfile, CommandDefinition, Message};
+use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
+use crate::models::{
+    BotProfile, CommandDefinition, InteractionResponseType, Message,
+};
 
 /// Handle used to request a graceful stop of a running bot.
 #[derive(Debug, Clone)]
@@ -300,10 +304,18 @@ impl Bot {
         event: &crate::models::EventEnvelope,
         bot_id: Option<&UserId>,
     ) -> Result<()> {
-        if event.event_type != "message" {
-            return Ok(());
+        match event.event_type.as_str() {
+            "message" => self.dispatch_message_event(event, bot_id).await,
+            "command" => self.dispatch_command_event(event).await,
+            _ => Ok(()),
         }
+    }
 
+    async fn dispatch_message_event(
+        &self,
+        event: &crate::models::EventEnvelope,
+        bot_id: Option<&UserId>,
+    ) -> Result<()> {
         let data = &event.data;
 
         if self.ignore_bots && data.get("author_bot").and_then(Value::as_bool) == Some(true) {
@@ -390,6 +402,162 @@ impl Bot {
 
         if let Some(Err(error)) = self.commands.dispatch(&command, context).await {
             tracing::error!(command = %command, error = %error, "command handler returned an error");
+        }
+
+        Ok(())
+    }
+
+    async fn dispatch_command_event(
+        &self,
+        event: &crate::models::EventEnvelope,
+    ) -> Result<()> {
+        let data = &event.data;
+
+        let Some(interaction_id) = data.get("id").and_then(Value::as_str) else {
+            tracing::warn!(event_id = event.id, "command event has no interaction ID");
+            return Ok(());
+        };
+        let interaction_id = match InteractionId::new(interaction_id) {
+            Ok(id) => id,
+            Err(error) => {
+                tracing::warn!(event_id = event.id, %error, "command event has an invalid interaction ID");
+                return Ok(());
+            }
+        };
+
+        let Some(token) = data.get("token").and_then(Value::as_str) else {
+            tracing::warn!(event_id = event.id, "command event has no interaction token");
+            return Ok(());
+        };
+        let token = SecretString::from(token.to_owned());
+
+        let command = data
+            .get("command")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        if command.is_empty() {
+            self.api
+                .respond_interaction(
+                    &interaction_id,
+                    &token,
+                    InteractionResponseType::Ephemeral,
+                    Some("This command could not be recognized."),
+                )
+                .await?;
+            return Ok(());
+        }
+
+        if !self.commands.contains(&command) {
+            self.api
+                .respond_interaction(
+                    &interaction_id,
+                    &token,
+                    InteractionResponseType::Ephemeral,
+                    Some("This command is not registered by this bot."),
+                )
+                .await?;
+            return Ok(());
+        }
+
+        let Some(channel_id) = data.get("channel_id").and_then(Value::as_str) else {
+            self.api
+                .respond_interaction(
+                    &interaction_id,
+                    &token,
+                    InteractionResponseType::Ephemeral,
+                    Some("This command has no channel context."),
+                )
+                .await?;
+            return Ok(());
+        };
+        let channel_id = match ChannelId::new(channel_id) {
+            Ok(id) => id,
+            Err(error) => {
+                tracing::warn!(event_id = event.id, %error, "command event has an invalid channel ID");
+                self.api
+                    .respond_interaction(
+                        &interaction_id,
+                        &token,
+                        InteractionResponseType::Ephemeral,
+                        Some("This command has an invalid channel context."),
+                    )
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let args = data
+            .get("args")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        let content = if args.is_empty() {
+            format!("/{command}")
+        } else {
+            format!("/{command} {args}")
+        };
+        let author_id = data
+            .get("user_id")
+            .and_then(Value::as_str)
+            .and_then(|id| UserId::new(id).ok());
+
+        let context = CommandContext::new_interaction(
+            self.api.clone(),
+            command.clone(),
+            content,
+            args,
+            interaction_id,
+            token.expose_secret().to_owned(),
+            channel_id,
+            author_id,
+        );
+        let response_count = context
+            .interaction_response_count()
+            .expect("slash command context always has interaction state");
+        let fallback_context = context.clone();
+
+        let handler = self.commands.dispatch(&command, context);
+        tokio::pin!(handler);
+
+        // Leave a one-second safety margin before the platform's 3-second
+        // interaction deadline. If the handler hasn't answered, acknowledge
+        // now and let the handler continue; subsequent replies remain valid.
+        let outcome = tokio::select! {
+            result = &mut handler => Some(result),
+            _ = tokio::time::sleep(Duration::from_secs(2)) => None,
+        };
+
+        match outcome {
+            Some(Some(Ok(()))) => {
+                if response_count.load(Ordering::Acquire) == 0 {
+                    fallback_context.ack().await?;
+                }
+            }
+            Some(Some(Err(error))) => {
+                tracing::error!(command = %command, error = %error, "slash command handler returned an error");
+                if response_count.load(Ordering::Acquire) == 0 {
+                    fallback_context
+                        .ephemeral(format!("Something went wrong running /{command}"))
+                        .await?;
+                }
+            }
+            Some(None) => {
+                if response_count.load(Ordering::Acquire) == 0 {
+                    fallback_context
+                        .ephemeral("This command is no longer registered.")
+                        .await?;
+                }
+            }
+            None => {
+                if response_count.load(Ordering::Acquire) == 0 {
+                    fallback_context.ack().await?;
+                }
+
+                if let Some(Err(error)) = handler.await {
+                    tracing::error!(command = %command, error = %error, "slash command handler failed after automatic acknowledgement");
+                }
+            }
         }
 
         Ok(())
