@@ -153,6 +153,8 @@ fn truncate_message(message: &str, maximum_characters: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
