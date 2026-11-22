@@ -4,6 +4,11 @@ mod bot;
 
 pub use bot::BotProfile;
 
+mod component;
+
+pub(crate) use component::validate_action_rows;
+pub use component::{ActionRow, Button, ButtonStyle, ComponentValidationError};
+
 mod command;
 
 pub(crate) use command::validate_command_list;
