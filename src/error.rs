@@ -1,0 +1,210 @@
+use std::time::{Duration, SystemTime};
+
+use reqwest::header::HeaderValue;
+use reqwest::StatusCode;
+use serde_json::Value;
+use thiserror::Error;
+
+use crate::config::ConfigError;
+
+/// Result type used by Yapcore's public API.
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+/// A structured error returned by the Yapper API.
+#[derive(Debug, Clone, Error)]
+#[error("Yapper API returned HTTP {status}: {message}")]
+pub struct ApiError {
+    status: StatusCode,
+    message: String,
+    code: Option<String>,
+    permission: Option<String>,
+    retry_after: Option<Duration>,
+}
+
+impl ApiError {
+    pub(crate) fn from_response(
+        status: StatusCode,
+        retry_after: Option<Duration>,
+        body: &[u8],
+    ) -> Self {
+        let value = serde_json::from_slice::<Value>(body).unwrap_or(Value::Null);
+        let error_value = value.get("error");
+
+        let message = error_value
+            .and_then(Value::as_str)
+            .or_else(|| value.get("message").and_then(Value::as_str))
+            .or_else(|| error_value.and_then(|error| error.get("message")).and_then(Value::as_str))
+            .unwrap_or_else(|| status.canonical_reason().unwrap_or("request failed"));
+
+        let code = value
+            .get("code")
+            .and_then(Value::as_str)
+            .or_else(|| error_value.and_then(|error| error.get("code")).and_then(Value::as_str))
+            .map(str::to_owned);
+
+        let permission = value
+            .get("permission")
+            .and_then(Value::as_str)
+            .or_else(|| {
+                error_value
+                    .and_then(|error| error.get("permission"))
+                    .and_then(Value::as_str)
+            })
+            .map(str::to_owned);
+
+        Self {
+            status,
+            message: truncate_message(message, 2_048),
+            code,
+            permission,
+            retry_after,
+        }
+    }
+
+    /// HTTP status returned by Yapper.
+    pub fn status(&self) -> StatusCode {
+        self.status
+    }
+
+    /// Human-readable API error message.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    /// Optional stable API error code, when supplied by the server.
+    pub fn code(&self) -> Option<&str> {
+        self.code.as_deref()
+    }
+
+    /// Optional permission name associated with a permission failure.
+    pub fn permission(&self) -> Option<&str> {
+        self.permission.as_deref()
+    }
+
+    /// Server-provided retry delay, when present and valid.
+    pub fn retry_after(&self) -> Option<Duration> {
+        self.retry_after
+    }
+}
+
+/// Errors produced by Yapcore.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum Error {
+    /// Invalid or incomplete local configuration.
+    #[error(transparent)]
+    Configuration(#[from] ConfigError),
+
+    /// The request failed before a usable HTTP response was received.
+    ///
+    /// The underlying Reqwest error has its URL removed to avoid accidental
+    /// leakage of sensitive query strings in logs.
+    #[error("HTTP transport failed: {0}")]
+    Transport(#[source] reqwest::Error),
+
+    /// The API response exceeded the configured body-size limit.
+    #[error("API response exceeded the configured limit of {limit} bytes")]
+    ResponseTooLarge {
+        /// Maximum number of bytes allowed.
+        limit: usize,
+    },
+
+    /// The server returned a non-success HTTP response.
+    #[error(transparent)]
+    Api(#[from] ApiError),
+
+    /// The successful API response was not valid JSON for the expected type.
+    #[error("could not decode the Yapper API response: {0}")]
+    Json(#[from] serde_json::Error),
+
+    /// Yapcore could not safely construct the requested API URL.
+    #[error("invalid API route: {0}")]
+    InvalidApiRoute(String),
+
+    /// A validated token could not be converted to an HTTP header.
+    #[error("the bot token could not be encoded as an HTTP authorization header")]
+    InvalidAuthorizationHeader,
+}
+
+pub(crate) fn sanitize_transport_error(error: reqwest::Error) -> Error {
+    Error::Transport(error.without_url())
+}
+
+pub(crate) fn parse_retry_after(header: Option<&HeaderValue>) -> Option<Duration> {
+    let value = header?.to_str().ok()?.trim();
+
+    if let Ok(seconds) = value.parse::<u64>() {
+        return Some(Duration::from_secs(seconds));
+    }
+
+    let retry_at = httpdate::parse_http_date(value).ok()?;
+    retry_at.duration_since(SystemTime::now()).ok()
+}
+
+fn truncate_message(message: &str, maximum_characters: usize) -> String {
+    let mut result: String = message.chars().take(maximum_characters).collect();
+
+    if message.chars().count() > maximum_characters {
+        result.push_str("…");
+    }
+
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_retry_after_seconds() {
+        let header = HeaderValue::from_static("12");
+        assert_eq!(parse_retry_after(Some(&header)), Some(Duration::from_secs(12)));
+    }
+
+    #[test]
+    fn parses_retry_after_http_date() {
+        let target = SystemTime::now() + Duration::from_secs(10);
+        let header = HeaderValue::from_str(&httpdate::fmt_http_date(target)).unwrap();
+        let delay = parse_retry_after(Some(&header)).unwrap();
+
+        assert!(delay <= Duration::from_secs(10));
+        assert!(delay >= Duration::from_secs(8));
+    }
+
+    #[test]
+    fn rejects_invalid_retry_after_values() {
+        let header = HeaderValue::from_static("not-a-date");
+        assert_eq!(parse_retry_after(Some(&header)), None);
+    }
+
+    #[test]
+    fn extracts_structured_api_error_fields() {
+        let error = ApiError::from_response(
+            StatusCode::FORBIDDEN,
+            None,
+            br#"{"error":"missing permission","code":"missing_permission","permission":"manage_roles"}"#,
+        );
+
+        assert_eq!(error.status(), StatusCode::FORBIDDEN);
+        assert_eq!(error.message(), "missing permission");
+        assert_eq!(error.code(), Some("missing_permission"));
+        assert_eq!(error.permission(), Some("manage_roles"));
+    }
+
+    #[test]
+    fn falls_back_to_status_for_non_json_error_bodies() {
+        let error = ApiError::from_response(StatusCode::BAD_GATEWAY, None, b"proxy failure");
+        assert_eq!(error.message(), "Bad Gateway");
+    }
+
+    #[test]
+    fn bounds_server_error_messages() {
+        let long_message = "x".repeat(3_000);
+        let body = serde_json::json!({ "error": long_message });
+        let bytes = serde_json::to_vec(&body).unwrap();
+
+        let error = ApiError::from_response(StatusCode::BAD_REQUEST, None, &bytes);
+        assert!(error.message().chars().count() <= 2_049);
+        assert!(error.message().ends_with('…'));
+    }
+}
