@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use std::sync::Arc;
 
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue, RETRY_AFTER};
