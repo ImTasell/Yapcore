@@ -8,3 +8,7 @@ mod command;
 
 pub(crate) use command::validate_command_list;
 pub use command::{CommandDefinition, CommandDefinitionError};
+
+mod event;
+
+pub use event::{EventBatch, EventEnvelope};
