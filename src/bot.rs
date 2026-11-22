@@ -229,6 +229,27 @@ impl Bot {
         Ok(self)
     }
 
+    /// Fetch recent channel messages in oldest-first order.
+    pub async fn get_recent_messages(
+        &self,
+        channel_id: &ChannelId,
+        limit: Option<usize>,
+        before: Option<&str>,
+    ) -> Result<Vec<Message>> {
+        self.api
+            .get_recent_messages(channel_id, limit, before)
+            .await
+    }
+
+    /// Fetch messages newer than an ISO-8601 timestamp, oldest first.
+    pub async fn get_messages_after(
+        &self,
+        channel_id: &ChannelId,
+        after: &str,
+    ) -> Result<Vec<Message>> {
+        self.api.get_messages_after(channel_id, after).await
+    }
+
     /// Fetch one message from a channel.
     pub async fn get_message(
         &self,
