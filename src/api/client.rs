@@ -171,6 +171,16 @@ impl ApiClient {
         Ok(())
     }
 
+    /// List reactions attached to a message.
+    pub async fn get_reactions(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        message_id: &crate::ids::MessageId,
+    ) -> Result<Value> {
+        let route = format!("channels/{channel_id}/messages/{message_id}/reactions");
+        self.request_json(Method::GET, &route, None).await
+    }
+
     /// Add the bot's reaction to a message.
     pub async fn add_reaction(
         &self,
@@ -713,6 +723,35 @@ mod tests {
         let payload: Value = serde_json::from_str(body).unwrap();
         assert_eq!(payload["content"], "edited");
         assert_eq!(message.content.as_deref(), Some("edited"));
+    }
+
+    #[tokio::test]
+    async fn lists_reactions_for_a_message() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "reactions": [{
+                    "emoji": "🔥",
+                    "count": 2
+                }]
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let message_id = crate::ids::MessageId::new(MESSAGE_ID).unwrap();
+
+        let reactions = client.get_reactions(&channel_id, &message_id).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "GET /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174002/messages/123e4567-e89b-12d3-a456-426614174001/reactions HTTP/1.1"
+        ));
+        assert_eq!(reactions["reactions"][0]["count"], 2);
     }
 
     #[tokio::test]
