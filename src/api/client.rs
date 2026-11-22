@@ -121,6 +121,65 @@ impl ApiClient {
         serde_json::from_value(message).map_err(Error::from)
     }
 
+    /// Fetch recent channel messages in oldest-first order.
+    ///
+    /// The server defaults to 50 messages when limit is None and caps pages
+    /// at 100. The optional before cursor is an ISO-8601 timestamp.
+    pub async fn get_recent_messages(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        limit: Option<usize>,
+        before: Option<&str>,
+    ) -> Result<Vec<Message>> {
+        if let Some(limit) = limit {
+            if !(1..=100).contains(&limit) {
+                return Err(Error::InvalidMessagePageLimit { actual: limit });
+            }
+        }
+
+        let mut url = self
+            .config
+            .api_base_url()
+            .join(&format!("channels/{channel_id}/messages"))
+            .map_err(|_| Error::InvalidApiRoute("messages".to_owned()))?;
+
+        {
+            let mut query = url.query_pairs_mut();
+            if let Some(limit) = limit {
+                query.append_pair("limit", &limit.to_string());
+            }
+            if let Some(before) = before {
+                query.append_pair("before", before);
+            }
+        }
+
+        let response = self.request_json_url(Method::GET, url, None).await?;
+        let messages = response.get("messages").cloned().unwrap_or(response);
+        serde_json::from_value(messages).map_err(Error::from)
+    }
+
+    /// Fetch messages newer than the supplied ISO-8601 timestamp, oldest first.
+    pub async fn get_messages_after(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        after: &str,
+    ) -> Result<Vec<Message>> {
+        if after.is_empty() {
+            return Err(Error::EmptyMessageCursor);
+        }
+
+        let mut url = self
+            .config
+            .api_base_url()
+            .join(&format!("channels/{channel_id}/messages"))
+            .map_err(|_| Error::InvalidApiRoute("messages".to_owned()))?;
+        url.query_pairs_mut().append_pair("after", after);
+
+        let response = self.request_json_url(Method::GET, url, None).await?;
+        let messages = response.get("messages").cloned().unwrap_or(response);
+        serde_json::from_value(messages).map_err(Error::from)
+    }
+
     /// Fetch one message from a channel.
     pub async fn get_message(
         &self,
