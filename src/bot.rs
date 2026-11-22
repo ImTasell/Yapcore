@@ -11,9 +11,7 @@ use crate::commands::{CommandContext, CommandRegistry, HandlerResult};
 use crate::config::{Config, ConfigBuilder, ConfigError};
 use crate::error::{Error, Result};
 use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
-use crate::models::{
-    BotProfile, CommandDefinition, InteractionResponseType, Message,
-};
+use crate::models::{BotProfile, CommandDefinition, InteractionResponseType, Message};
 
 /// Handle used to request a graceful stop of a running bot.
 #[derive(Debug, Clone)]
@@ -407,10 +405,7 @@ impl Bot {
         Ok(())
     }
 
-    async fn dispatch_command_event(
-        &self,
-        event: &crate::models::EventEnvelope,
-    ) -> Result<()> {
+    async fn dispatch_command_event(&self, event: &crate::models::EventEnvelope) -> Result<()> {
         let data = &event.data;
 
         let Some(interaction_id) = data.get("id").and_then(Value::as_str) else {
@@ -426,7 +421,10 @@ impl Bot {
         };
 
         let Some(token) = data.get("token").and_then(Value::as_str) else {
-            tracing::warn!(event_id = event.id, "command event has no interaction token");
+            tracing::warn!(
+                event_id = event.id,
+                "command event has no interaction token"
+            );
             return Ok(());
         };
         let token = SecretString::from(token.to_owned());
@@ -508,7 +506,7 @@ impl Bot {
             content,
             args,
             interaction_id,
-            token.expose_secret().to_owned(),
+            token,
             channel_id,
             author_id,
         );
