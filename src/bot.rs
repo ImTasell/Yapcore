@@ -229,6 +229,60 @@ impl Bot {
         Ok(self)
     }
 
+    /// Fetch one message from a channel.
+    pub async fn get_message(
+        &self,
+        channel_id: &ChannelId,
+        message_id: &MessageId,
+    ) -> Result<Message> {
+        self.api.get_message(channel_id, message_id).await
+    }
+
+    /// Edit the text content of a message.
+    pub async fn edit_message(
+        &self,
+        channel_id: &ChannelId,
+        message_id: &MessageId,
+        content: impl AsRef<str>,
+    ) -> Result<Message> {
+        self.api
+            .edit_message(channel_id, message_id, content.as_ref())
+            .await
+    }
+
+    /// Delete a message.
+    pub async fn delete_message(
+        &self,
+        channel_id: &ChannelId,
+        message_id: &MessageId,
+    ) -> Result<()> {
+        self.api.delete_message(channel_id, message_id).await
+    }
+
+    /// Add the bot's reaction to a message.
+    pub async fn add_reaction(
+        &self,
+        channel_id: &ChannelId,
+        message_id: &MessageId,
+        emoji: impl AsRef<str>,
+    ) -> Result<()> {
+        self.api
+            .add_reaction(channel_id, message_id, emoji.as_ref())
+            .await
+    }
+
+    /// Remove the bot's reaction from a message.
+    pub async fn remove_reaction(
+        &self,
+        channel_id: &ChannelId,
+        message_id: &MessageId,
+        emoji: impl AsRef<str>,
+    ) -> Result<()> {
+        self.api
+            .remove_reaction(channel_id, message_id, emoji.as_ref())
+            .await
+    }
+
     /// Return the currently registered command definitions in name order.
     ///
     /// This is useful for inspection and for synchronizing the registry once
