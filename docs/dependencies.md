@@ -66,13 +66,9 @@ Secrecy's zeroization support reduces accidental retention but is not a promise 
 - Retry jitter will use a small time-derived variation only if/when the retry layer needs it; no random-number crate is included in the first client milestone.
 - No retry framework is needed. The policy is short, method-aware and should stay in Yapcore's own code with explicit unit tests.
 
-## 2. Development/test-only dependency
+## 2. Development/test-only dependencies
 
-| Crate | Requirement | Used for | Normal user build? |
-| --- | --- | --- | --- |
-| wiremock | `0.6.5` | Isolated mock HTTP API server for contract tests | No; dev-dependency only |
-
-Wiremock supports Tokio and isolated per-test mock servers. Its dependency graph is larger than the production graph, but it is compiled only for tests and gives deterministic HTTP contract coverage without a real Yapper token.
+No third-party dev-dependencies are required for the initial API-client tests. A small one-request loopback HTTP server in the test module uses `std::net::TcpListener` and standard-library threads. This avoids a third-party mock-server dependency and keeps the MSRV check independent of test-server crate requirements.
 
 ## 3. Cargo.toml baseline
 
@@ -106,7 +102,7 @@ tokio = { version = "1.54", features = ["macros", "rt", "sync", "time"] }
 tracing = "0.1"
 ~~~
 
-Do not commit an artificially exact Cargo.lock generated from a different Rust target. Generate and commit the lockfile when the first Cargo foundation is created and run the lockfile tests in CI.
+This is a library crate, so no lockfile is required for consumers. CI resolves the manifest on each run; when contributors use a local Cargo.lock for reproducibility, it may be committed as a repository development artifact.
 
 ## 4. Deliberately not included
 
@@ -119,7 +115,7 @@ Do not commit an artificially exact Cargo.lock generated from a different Rust t
 | url | Reqwest re-exports URL handling; use its Url type and query builder | A public URL abstraction needs an independent direct dependency |
 | uuid | IDs are transparent string newtypes; strict UUID parsing is not needed for type separation | Protocol validation proves useful and accepted IDs are all canonical UUIDs |
 | chrono / time | Keep ISO timestamps as strings; avoid pulling in a date/time ecosystem prematurely | API consumers need arithmetic, parsing or timezone conversions |
-| rand | A full general-purpose RNG is unnecessary for retry jitter | A non-security random feature becomes a first-class product capability |
+| rand | Random-number generation is not needed by the current client foundation | A non-security random feature becomes a first-class product capability |
 | dotenvy / dotenv-ng | Avoid implicit filesystem/environment mutation in the core library; use process environment variables | A documented, opt-in dotenv feature is requested |
 | tracing-subscriber | Libraries should not choose a global subscriber or formatting policy | An example application needs a logger |
 | clap | Yapcore is a library, not a CLI | A separate CLI is designed |
