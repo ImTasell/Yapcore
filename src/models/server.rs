@@ -161,9 +161,87 @@ pub struct Role {
     /// Position in the server role hierarchy.
     #[serde(default)]
     pub position: Option<i64>,
-    /// Additional role fields, including permissions not yet modelled.
+    /// Optional role color, usually a CSS-style hexadecimal string.
+    #[serde(default)]
+    pub color: Option<String>,
+    /// Whether the role may be mentioned by members.
+    #[serde(default)]
+    pub mentionable: Option<bool>,
+    /// Permission map returned by Yapper.
+    #[serde(default)]
+    pub permissions: Option<Value>,
+    /// Additional role fields not yet modelled by Yapcore.
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+/// Optional fields for editing a role.
+///
+/// Fields left unset are omitted from the PATCH payload. Use clear_color()
+/// to explicitly remove an existing color.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct RoleEditOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mentionable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    permissions: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    position: Option<i64>,
+}
+
+impl RoleEditOptions {
+    /// Start an empty role edit.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Change the role name.
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Set the role color.
+    pub fn color(mut self, color: impl Into<String>) -> Self {
+        self.color = Some(color.into());
+        self
+    }
+
+    /// Remove the current role color.
+    pub fn clear_color(mut self) -> Self {
+        self.color = Some(String::new());
+        self
+    }
+
+    /// Change whether the role is mentionable.
+    pub fn mentionable(mut self, mentionable: bool) -> Self {
+        self.mentionable = Some(mentionable);
+        self
+    }
+
+    /// Replace the supplied permission keys.
+    pub fn permissions(mut self, permissions: Value) -> Self {
+        self.permissions = Some(permissions);
+        self
+    }
+
+    /// Set the role's requested hierarchy position.
+    pub fn position(mut self, position: i64) -> Self {
+        self.position = Some(position);
+        self
+    }
+
+    /// Whether this edit contains any fields.
+    pub fn is_empty(&self) -> bool {
+        self.name.is_none()
+            && self.color.is_none()
+            && self.mentionable.is_none()
+            && self.permissions.is_none()
+            && self.position.is_none()
+    }
 }
 
 /// A public user profile.
