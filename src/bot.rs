@@ -1129,4 +1129,45 @@ mod tests {
             ))
         );
     }
+    #[tokio::test]
+    async fn dispatches_general_event_listeners_in_order_and_isolates_failures() {
+        use std::sync::{Arc, Mutex};
+
+        let mut bot = Bot::builder().token("yb_test-token").build().unwrap();
+        let observed = Arc::new(Mutex::new(Vec::new()));
+
+        bot.on_event("member_join", |_event| async {
+            Err(Box::new(std::io::Error::other("listener failed")) as crate::HandlerError)
+        })
+        .unwrap();
+
+        let observed_by_handler = observed.clone();
+        bot.on_event("member_join", move |event| {
+            let observed = observed_by_handler.clone();
+            async move {
+                observed
+                    .lock()
+                    .unwrap()
+                    .push(event.data["username"].as_str().unwrap().to_owned());
+                Ok(())
+            }
+        })
+        .unwrap();
+
+        let event = crate::models::EventEnvelope {
+            id: 25,
+            event_type: "member_join".to_owned(),
+            data: serde_json::json!({
+                "user_id": "123e4567-e89b-12d3-a456-426614174003",
+                "username": "new-member",
+                "future_field": { "preserved": true }
+            }),
+            created_at: None,
+        };
+
+        bot.dispatch_event(&event, None).await.unwrap();
+
+        assert_eq!(*observed.lock().unwrap(), ["new-member"]);
+    }
+
 }
