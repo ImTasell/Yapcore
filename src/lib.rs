@@ -32,5 +32,5 @@ pub use models::{
     ActionRow, Ban, BotProfile, Button, ButtonStyle, Channel, ChannelCategory, ChannelListing,
     ChannelType, CommandDefinition, CommandDefinitionError, ComponentValidationError, Embed,
     EmbedAuthor, EmbedBuilder, EmbedField, EmbedFooter, EmbedValidationError, EventBatch,
-    EventEnvelope, InteractionResponseType, Member, Message, Role, Server, UserProfile,
+    EventEnvelope, InteractionResponseType, Member, Message, Role, RoleEditOptions, Server, UserProfile,
 };
