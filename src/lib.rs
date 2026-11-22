@@ -14,7 +14,7 @@ pub mod config;
 pub mod error;
 pub mod ids;
 pub mod models;
-pub(crate) mod interactions;
+pub mod interactions;
 
 pub use api::ApiClient;
 pub use bot::{Bot, BotBuilder, ShutdownHandle};
@@ -25,6 +25,7 @@ pub use ids::{
     CategoryId, ChannelId, EmojiId, IdError, InteractionId, MessageId, RoleId, ServerId, ThreadId,
     UserId, WebhookId,
 };
+pub use interactions::{InteractionContext, InteractionRegistrationError};
 pub use models::{
     BotProfile, CommandDefinition, CommandDefinitionError, EventBatch, EventEnvelope,
     InteractionResponseType, Message,
