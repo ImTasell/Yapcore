@@ -355,12 +355,32 @@ impl Bot {
         event: &crate::models::EventEnvelope,
         bot_id: Option<&UserId>,
     ) -> Result<()> {
-        match event.event_type.as_str() {
+        if event.event_type == "message"
+            && self.ignore_bots
+            && event.data.get("author_bot").and_then(Value::as_bool) == Some(true)
+        {
+            return Ok(());
+        }
+
+        let built_in_result = match event.event_type.as_str() {
             "message" => self.dispatch_message_event(event, bot_id).await,
             "command" => self.dispatch_command_event(event).await,
             "interaction" => self.dispatch_interaction_event(event).await,
             _ => Ok(()),
+        };
+
+        for handler in self.events.handlers_for(&event.event_type) {
+            if let Err(error) = handler(event.clone()).await {
+                tracing::error!(
+                    event_type = %event.event_type,
+                    event_id = event.id,
+                    error = %error,
+                    "event listener failed"
+                );
+            }
         }
+
+        built_in_result
     }
 
     async fn dispatch_message_event(
