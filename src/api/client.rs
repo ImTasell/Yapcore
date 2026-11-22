@@ -754,6 +754,52 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn fetches_one_message_with_get() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "id": MESSAGE_ID,
+                "channel_id": CHANNEL_ID,
+                "content": "fetched"
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let message_id = crate::ids::MessageId::new(MESSAGE_ID).unwrap();
+
+        let message = client.get_message(&channel_id, &message_id).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "GET /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174002/messages/123e4567-e89b-12d3-a456-426614174001 HTTP/1.1"
+        ));
+        assert_eq!(message.content.as_deref(), Some("fetched"));
+    }
+
+    #[tokio::test]
+    async fn deletes_one_message_with_empty_success_response() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+
+        let server = LocalMockServer::start(204, &[], String::new());
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let message_id = crate::ids::MessageId::new(MESSAGE_ID).unwrap();
+
+        client.delete_message(&channel_id, &message_id).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "DELETE /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174002/messages/123e4567-e89b-12d3-a456-426614174001 HTTP/1.1"
+        ));
+    }
+
+    #[tokio::test]
     async fn poll_events_uses_cursor_wait_and_max_age_query_parameters() {
         let server = LocalMockServer::start(
             200,
