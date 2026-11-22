@@ -1452,6 +1452,154 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn fetches_server_details_from_wrapped_response() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "server": {
+                    "id": SERVER_ID,
+                    "name": "Example server",
+                    "member_count": 42
+                }
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+
+        let details = client.get_server(&server_id).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "GET /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020 HTTP/1.1"
+        ));
+        assert_eq!(details.name.as_deref(), Some("Example server"));
+    }
+
+    #[tokio::test]
+    async fn fetches_one_channel_from_wrapped_response() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174021";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "channel": {
+                    "id": CHANNEL_ID,
+                    "name": "general",
+                    "type": "text"
+                }
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+
+        let channel = client.get_channel(&channel_id).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "GET /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174021 HTTP/1.1"
+        ));
+        assert_eq!(channel.name.as_deref(), Some("general"));
+    }
+
+    #[tokio::test]
+    async fn fetches_one_member_with_roles_and_nickname() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
+        const ROLE_ID: &str = "123e4567-e89b-12d3-a456-426614174023";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "member": {
+                    "user_id": USER_ID,
+                    "username": "member",
+                    "nickname": "Member",
+                    "role_ids": [ROLE_ID]
+                }
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+        let user_id = crate::ids::UserId::new(USER_ID).unwrap();
+
+        let member = client.get_member(&server_id, &user_id).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "GET /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/members/123e4567-e89b-12d3-a456-426614174022 HTTP/1.1"
+        ));
+        assert_eq!(member.nickname.as_deref(), Some("Member"));
+        assert_eq!(member.role_ids.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn lists_server_roles() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const ROLE_ID: &str = "123e4567-e89b-12d3-a456-426614174023";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "roles": [{
+                    "id": ROLE_ID,
+                    "name": "Moderator",
+                    "position": 3
+                }]
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+
+        let roles = client.list_roles(&server_id).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "GET /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/roles HTTP/1.1"
+        ));
+        assert_eq!(roles[0].name.as_deref(), Some("Moderator"));
+        assert_eq!(roles[0].position, Some(3));
+    }
+
+    #[tokio::test]
+    async fn fetches_public_user_profile() {
+        const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "user": {
+                    "id": USER_ID,
+                    "username": "example-user",
+                    "display_name": "Example"
+                }
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let user_id = crate::ids::UserId::new(USER_ID).unwrap();
+
+        let user = client.get_user(&user_id).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "GET /api/bot/v1/users/123e4567-e89b-12d3-a456-426614174022 HTTP/1.1"
+        ));
+        assert_eq!(user.username.as_deref(), Some("example-user"));
+        assert_eq!(user.display_name.as_deref(), Some("Example"));
+    }
+
+    #[tokio::test]
     async fn lists_servers_from_the_documented_response_wrapper() {
         const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
 
