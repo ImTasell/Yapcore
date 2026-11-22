@@ -121,6 +121,114 @@ impl ApiClient {
         serde_json::from_value(message).map_err(Error::from)
     }
 
+    /// Fetch one message from a channel.
+    pub async fn get_message(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        message_id: &crate::ids::MessageId,
+    ) -> Result<Message> {
+        let route = format!("channels/{channel_id}/messages/{message_id}");
+        let response = self.request_json(Method::GET, &route, None).await?;
+        let message = response.get("message").cloned().unwrap_or(response);
+        serde_json::from_value(message).map_err(Error::from)
+    }
+
+    /// Edit the text content of a message.
+    ///
+    /// The method intentionally edits only content; omitted embed/component
+    /// fields remain untouched on the server.
+    pub async fn edit_message(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        message_id: &crate::ids::MessageId,
+        content: &str,
+    ) -> Result<Message> {
+        let character_count = content.chars().count();
+        if character_count > 2_000 {
+            return Err(Error::MessageContentTooLong {
+                actual: character_count,
+                max: 2_000,
+            });
+        }
+
+        let route = format!("channels/{channel_id}/messages/{message_id}");
+        let body = serde_json::json!({ "content": content });
+        let response = self
+            .request_json(Method::PATCH, &route, Some(body))
+            .await?;
+        let message = response.get("message").cloned().unwrap_or(response);
+        serde_json::from_value(message).map_err(Error::from)
+    }
+
+    /// Delete a message.
+    ///
+    /// Deleting another user's message requires Manage Messages permission.
+    pub async fn delete_message(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        message_id: &crate::ids::MessageId,
+    ) -> Result<()> {
+        let route = format!("channels/{channel_id}/messages/{message_id}");
+        self.request_json(Method::DELETE, &route, None).await?;
+        Ok(())
+    }
+
+    /// Add the bot's reaction to a message.
+    pub async fn add_reaction(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        message_id: &crate::ids::MessageId,
+        emoji: &str,
+    ) -> Result<()> {
+        self.set_reaction(Method::PUT, channel_id, message_id, emoji)
+            .await
+    }
+
+    /// Remove the bot's reaction from a message.
+    pub async fn remove_reaction(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        message_id: &crate::ids::MessageId,
+        emoji: &str,
+    ) -> Result<()> {
+        self.set_reaction(Method::DELETE, channel_id, message_id, emoji)
+            .await
+    }
+
+    async fn set_reaction(
+        &self,
+        method: Method,
+        channel_id: &crate::ids::ChannelId,
+        message_id: &crate::ids::MessageId,
+        emoji: &str,
+    ) -> Result<()> {
+        if emoji.is_empty() {
+            return Err(Error::InvalidEmoji);
+        }
+
+        let mut url = self
+            .config
+            .api_base_url()
+            .join("channels/")
+            .map_err(|_| Error::InvalidApiRoute("channels".to_owned()))?;
+
+        {
+            let mut segments = url
+                .path_segments_mut()
+                .map_err(|_| Error::InvalidApiRoute("channels".to_owned()))?;
+            segments
+                .pop_if_empty()
+                .push(channel_id.as_str())
+                .push("messages")
+                .push(message_id.as_str())
+                .push("reactions")
+                .push(emoji);
+        }
+
+        self.request_json_url(method, url, None).await?;
+        Ok(())
+    }
+
     /// Fetch one page of events using Yapper's documented long-poll endpoint.
     ///
     /// wait_seconds is capped at 25 seconds. Optional max_age_seconds
@@ -572,6 +680,78 @@ mod tests {
                 actual: 2_001,
                 max: 2_000
             })
+        ));
+    }
+
+    #[tokio::test]
+    async fn edits_message_content_with_patch() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "id": MESSAGE_ID,
+                "channel_id": CHANNEL_ID,
+                "content": "edited"
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let message_id = crate::ids::MessageId::new(MESSAGE_ID).unwrap();
+
+        let message = client
+            .edit_message(&channel_id, &message_id, "edited")
+            .await
+            .unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "PATCH /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174002/messages/123e4567-e89b-12d3-a456-426614174001 HTTP/1.1"
+        ));
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["content"], "edited");
+        assert_eq!(message.content.as_deref(), Some("edited"));
+    }
+
+    #[tokio::test]
+    async fn adds_reactions_using_one_encoded_emoji_path_segment() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+
+        let server = LocalMockServer::start(204, &[], String::new());
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let message_id = crate::ids::MessageId::new(MESSAGE_ID).unwrap();
+
+        client
+            .add_reaction(&channel_id, &message_id, "🔥/up")
+            .await
+            .unwrap();
+        let request = server.finish();
+
+        let request_line = request.lines().next().unwrap();
+        assert!(request_line.starts_with("PUT /api/bot/v1/channels/"));
+        assert!(request_line.contains("/reactions/"));
+        assert!(request_line.contains("%2Fup"));
+        assert!(!request_line.contains("🔥/up"));
+    }
+
+    #[tokio::test]
+    async fn rejects_empty_reaction_identifiers_before_networking() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        let channel_id =
+            crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174002").unwrap();
+        let message_id =
+            crate::ids::MessageId::new("123e4567-e89b-12d3-a456-426614174001").unwrap();
+
+        assert!(matches!(
+            client.add_reaction(&channel_id, &message_id, "").await,
+            Err(Error::InvalidEmoji)
         ));
     }
 
