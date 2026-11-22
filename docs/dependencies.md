@@ -14,7 +14,7 @@ The goal is a small, boring, well-supported dependency graph. The current releas
 | --- | --- | --- | --- | --- |
 | tokio | 1.54.1 | \`1.54\` | Async runtime, macros, timers, sync and signal support | Required |
 | reqwest | 0.13.5 | \`0.13.5\` | HTTPS REST client | Required |
-| serde | 1.0.x | \`1.0\` | Typed serialization/deserialization | Required |
+| serde | 1.0.229 | \`1.0\` | Typed serialization/deserialization | Required |
 | serde_json | 1.0.154 | \`1.0\` | JSON bodies and flexible raw event payloads | Required |
 | thiserror | 2.0.18 | \`2.0\` | Public structured errors | Required |
 | secrecy | 0.10.3 | \`0.10\` | Redacted secret wrapper and zeroization support | Required |
@@ -106,7 +106,7 @@ secrecy = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
-tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "sync", "time"] }
 tracing = "0.1"
 
 [dev-dependencies]
