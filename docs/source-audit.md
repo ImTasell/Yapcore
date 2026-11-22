@@ -80,7 +80,7 @@ The dispatcher converts raw JSON into message/command/interaction wrappers, chec
 The command system supports:
 
 - Prefix commands and server-registered slash commands.
-- Up to 50 commands in the current framework.
+- Up to 100 commands in the Python framework (`COMMAND_LIMIT = 100`); the current official platform guide documents a 50-command server cap. Yapcore validates against the stricter documented platform cap of 50.
 - Names containing lowercase letters, digits, hyphens and underscores, 1–32 characters.
 - Optional descriptions and up to 10 typed options.
 - Option types: string, integer, number, boolean, user, channel and role.
@@ -176,6 +176,7 @@ The visible tests do not amount to an end-to-end contract suite for every REST e
 | Official docs describe polling/webhooks, not the Python module's WebSocket gateway | Gateway behavior may be private, experimental or version-specific | Make polling the baseline; verify gateway support before implementation |
 | Official docs state bots do not join voice calls; Python package has LiveKit voice connection code | This is a direct support/contract conflict | Defer `connect_voice` and `VoiceCall` pending confirmation |
 | Official docs do not list several package event types and API method families | The Python package may contain undocumented endpoints/features | Label these as experimental/undocumented and verify against the live API |
+| Python framework allows 100 local commands, while the current official developer guide documents a 50-command server cap | A full Python registry may be rejected by the server; the SDK-side cap is not the server contract | Yapcore enforces 50 before PUT /commands |
 | `pyproject.toml` says package version 1.8.5, while `main.py` currently declares `__version__ = "1.8.0"` | Version/user-agent/update checks may report inconsistent values | Read version from one generated source in Yapcore |
 | Main module header says Python 3.9+, package metadata says Python 3.10+ | Distribution metadata is stricter than the source header | Do not infer runtime compatibility from the header alone |
 | README describes the single-file version as standard-library-only, package metadata depends on python-dotenv | Package and single-file distribution requirements differ | Make .env loading optional in Rust or document its dependency clearly |
