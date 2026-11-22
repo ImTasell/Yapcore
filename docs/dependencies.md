@@ -20,7 +20,6 @@ The goal is a small, boring, well-supported dependency graph. The current releas
 | secrecy | 0.10.3 | `0.10` | Redacted secret wrapper and zeroization support | Required |
 | tracing | 0.1.44 | `0.1` | Structured diagnostics/instrumentation | Required |
 | httpdate | 1.0.3 | `1.0` | Parse the HTTP-date form of Retry-After | Required |
-| fastrand | 2.5.0 | `2.5` | Non-cryptographic jitter for retry backoff only | Required |
 
 ### Tokio features
 
@@ -64,8 +63,7 @@ Secrecy's zeroization support reduces accidental retention but is not a promise 
 ### Retry utilities
 
 - httpdate parses both Retry-After delta-seconds and HTTP-date values.
-- fastrand provides non-cryptographic jitter for transport backoff only.
-- Never use fastrand for bot tokens, interaction tokens, webhook secrets or security-sensitive identifiers.
+- Retry jitter will use a small time-derived variation only if/when the retry layer needs it; no random-number crate is included in the first client milestone.
 - No retry framework is needed. The policy is short, method-aware and should stay in Yapcore's own code with explicit unit tests.
 
 ## 2. Development/test-only dependency
@@ -98,7 +96,6 @@ path = "src/lib.rs"
 default = []
 
 [dependencies]
-fastrand = "2.5"
 httpdate = "1.0"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json"] }
 secrecy = "0.10"
@@ -107,9 +104,6 @@ serde_json = "1.0"
 thiserror = "2.0"
 tokio = { version = "1.54", features = ["macros", "rt", "sync", "time"] }
 tracing = "0.1"
-
-[dev-dependencies]
-wiremock = "0.6.5"
 ~~~
 
 Do not commit an artificially exact Cargo.lock generated from a different Rust target. Generate and commit the lockfile when the first Cargo foundation is created and run the lockfile tests in CI.
@@ -158,5 +152,3 @@ Do not commit an artificially exact Cargo.lock generated from a different Rust t
 - secrecy 0.10.3: <https://docs.rs/crate/secrecy/0.10.3>
 - tracing 0.1.44: <https://docs.rs/crate/tracing/0.1.44>
 - httpdate 1.0.3: <https://docs.rs/crate/httpdate/1.0.3>
-- fastrand 2.5.0: <https://docs.rs/crate/fastrand/2.5.0>
-- wiremock 0.6.5: <https://docs.rs/crate/wiremock/0.6.5>
