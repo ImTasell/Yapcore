@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
-use crate::models::{BotProfile, CommandDefinition, EventBatch, validate_command_list};
+use crate::models::{BotProfile, CommandDefinition, EventBatch, Message, validate_command_list};
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
 #[derive(Clone)]
@@ -61,6 +61,37 @@ impl ApiClient {
     pub async fn get_me(&self) -> Result<BotProfile> {
         let value = self.request_json(Method::GET, "me", None).await?;
         serde_json::from_value(value).map_err(Error::from)
+    }
+
+    /// Send a plain-text message to a channel.
+    ///
+    /// Message content is validated against Yapper's 2,000-character limit.
+    /// This operation is not automatically retried because it is a side effect.
+    pub async fn send_message(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        content: &str,
+    ) -> Result<Message> {
+        if content.is_empty() {
+            return Err(Error::EmptyMessageContent);
+        }
+
+        let character_count = content.chars().count();
+        if character_count > 2_000 {
+            return Err(Error::MessageContentTooLong {
+                actual: character_count,
+                max: 2_000,
+            });
+        }
+
+        let route = format!("channels/{channel_id}/messages");
+        let body = serde_json::json!({ "content": content });
+        let response = self
+            .request_json(Method::POST, &route, Some(body))
+            .await?;
+
+        let message = response.get("message").cloned().unwrap_or(response);
+        serde_json::from_value(message).map_err(Error::from)
     }
 
     /// Fetch one page of events using Yapper's documented long-poll endpoint.
@@ -395,6 +426,61 @@ mod tests {
             }
             other => panic!("expected an API error, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn send_message_posts_content_and_deserializes_the_returned_message() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "message": {
+                    "id": MESSAGE_ID,
+                    "channel_id": CHANNEL_ID,
+                    "content": "pong"
+                }
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+
+        let message = client.send_message(&channel_id, "pong").await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "POST /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174002/messages HTTP/1.1"
+        ));
+        let request_body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(request_body).unwrap();
+
+        assert_eq!(payload["content"], "pong");
+        assert_eq!(message.id.as_str(), MESSAGE_ID);
+        assert_eq!(message.channel_id.as_str(), CHANNEL_ID);
+        assert_eq!(message.content.as_deref(), Some("pong"));
+    }
+
+    #[tokio::test]
+    async fn send_message_rejects_empty_or_oversized_content_before_networking() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        let channel_id =
+            crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174002").unwrap();
+
+        assert!(matches!(
+            client.send_message(&channel_id, "").await,
+            Err(Error::EmptyMessageContent)
+        ));
+        assert!(matches!(
+            client.send_message(&channel_id, &"x".repeat(2_001)).await,
+            Err(Error::MessageContentTooLong {
+                actual: 2_001,
+                max: 2_000
+            })
+        ));
     }
 
     #[tokio::test]
