@@ -851,6 +851,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn send_message_with_embeds_enforces_message_wide_text_limit() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        let channel_id =
+            crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174002").unwrap();
+        let embed = Embed::builder()
+            .description("x".repeat(4_000))
+            .build()
+            .unwrap();
+        let embeds = [embed.clone(), embed];
+
+        assert!(matches!(
+            client
+                .send_message_with_embeds(&channel_id, None, &embeds)
+                .await,
+            Err(Error::MessageEmbedsTooLong { actual: 8_000 })
+        ));
+    }
+
+    #[tokio::test]
     async fn send_message_with_embeds_rejects_more_than_five_embeds() {
         let config = Config::builder().token("yb_test-token").build().unwrap();
         let client = ApiClient::new(config).unwrap();
