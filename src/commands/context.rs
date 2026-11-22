@@ -19,6 +19,18 @@ struct InteractionCredentials {
     response_count: Arc<AtomicU8>,
 }
 
+/// Inputs required to create a slash-command context.
+#[derive(Debug, Clone)]
+pub(crate) struct SlashCommandInvocation {
+    pub(crate) command: String,
+    pub(crate) content: String,
+    pub(crate) args: String,
+    pub(crate) interaction_id: InteractionId,
+    pub(crate) interaction_token: SecretString,
+    pub(crate) channel_id: ChannelId,
+    pub(crate) author_id: Option<UserId>,
+}
+
 /// Context passed to a registered prefix or slash-command handler.
 #[derive(Debug, Clone)]
 pub struct CommandContext {
@@ -60,31 +72,25 @@ impl CommandContext {
 
     pub(crate) fn new_interaction(
         api: ApiClient,
-        command: String,
-        content: String,
-        args: String,
-        interaction_id: InteractionId,
-        interaction_token: SecretString,
-        channel_id: ChannelId,
-        author_id: Option<UserId>,
+        invocation: SlashCommandInvocation,
     ) -> Self {
         let interaction = InteractionCredentials {
-            id: interaction_id,
-            token: interaction_token,
+            id: invocation.interaction_id,
+            token: invocation.interaction_token,
             response_count: Arc::new(AtomicU8::new(0)),
         };
 
-        let argv = args.split_whitespace().map(str::to_owned).collect();
+        let argv = invocation.args.split_whitespace().map(str::to_owned).collect();
 
         Self {
             api,
-            command,
-            content,
-            args,
+            command: invocation.command,
+            content: invocation.content,
+            args: invocation.args,
             argv,
             message_id: None,
-            channel_id,
-            author_id,
+            channel_id: invocation.channel_id,
+            author_id: invocation.author_id,
             interaction: Some(interaction),
         }
     }
