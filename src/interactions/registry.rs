@@ -122,10 +122,6 @@ impl ButtonRegistry {
             .map(|entry| entry.handler.clone())
             .collect()
     }
-
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
 }
 
 #[cfg(test)]
