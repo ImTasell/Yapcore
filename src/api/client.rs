@@ -1782,6 +1782,164 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn gets_and_creates_roles_with_source_api_shapes() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const ROLE_ID: &str = "123e4567-e89b-12d3-a456-426614174023";
+
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+        let role_id = crate::ids::RoleId::new(ROLE_ID).unwrap();
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "role": {
+                    "id": ROLE_ID,
+                    "name": "Moderator",
+                    "position": 2
+                }
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let role = client.get_role(&server_id, &role_id).await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "GET /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/roles/123e4567-e89b-12d3-a456-426614174023 HTTP/1.1"
+        ));
+        assert_eq!(role.name.as_deref(), Some("Moderator"));
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "role": {
+                    "id": ROLE_ID,
+                    "name": "Moderator",
+                    "position": 2
+                }
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let permissions = serde_json::json!({ "kick_members": true });
+        let role = client
+            .create_role(
+                &server_id,
+                "Moderator",
+                Some("#5865f2"),
+                true,
+                Some(&permissions),
+            )
+            .await
+            .unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "POST /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/roles HTTP/1.1"
+        ));
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["name"], "Moderator");
+        assert_eq!(payload["color"], "#5865f2");
+        assert_eq!(payload["mentionable"], true);
+        assert_eq!(payload["permissions"]["kick_members"], true);
+        assert_eq!(role.position, Some(2));
+    }
+
+    #[tokio::test]
+    async fn edits_and_deletes_roles() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const ROLE_ID: &str = "123e4567-e89b-12d3-a456-426614174023";
+
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+        let role_id = crate::ids::RoleId::new(ROLE_ID).unwrap();
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "role": {
+                    "id": ROLE_ID,
+                    "name": "Senior Moderator",
+                    "position": 4,
+                    "mentionable": false
+                }
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let role = client
+            .edit_role(
+                &server_id,
+                &role_id,
+                Some("Senior Moderator"),
+                Some(""),
+                Some(false),
+                None,
+                Some(4),
+            )
+            .await
+            .unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "PATCH /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/roles/123e4567-e89b-12d3-a456-426614174023 HTTP/1.1"
+        ));
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["name"], "Senior Moderator");
+        assert_eq!(payload["color"], "");
+        assert_eq!(payload["mentionable"], false);
+        assert_eq!(payload["position"], 4);
+        assert!(payload.get("permissions").is_none());
+        assert_eq!(role.position, Some(4));
+
+        let server = LocalMockServer::start(204, &[], String::new());
+        let client = test_client(&server, 1024).await;
+        client.delete_role(&server_id, &role_id).await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "DELETE /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/roles/123e4567-e89b-12d3-a456-426614174023 HTTP/1.1"
+        ));
+    }
+
+    #[tokio::test]
+    async fn reorders_roles_with_ids_and_decodes_returned_order() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const ROLE_ONE: &str = "123e4567-e89b-12d3-a456-426614174023";
+        const ROLE_TWO: &str = "123e4567-e89b-12d3-a456-426614174025";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "roles": [
+                    { "id": ROLE_TWO, "name": "Admin", "position": 1 },
+                    { "id": ROLE_ONE, "name": "Mod", "position": 2 }
+                ]
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+        let role_ids = [
+            crate::ids::RoleId::new(ROLE_TWO).unwrap(),
+            crate::ids::RoleId::new(ROLE_ONE).unwrap(),
+        ];
+
+        let roles = client.reorder_roles(&server_id, &role_ids).await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "PATCH /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/roles HTTP/1.1"
+        ));
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["ids"][0], ROLE_TWO);
+        assert_eq!(payload["ids"][1], ROLE_ONE);
+        assert_eq!(roles[0].name.as_deref(), Some("Admin"));
+        assert_eq!(roles[1].name.as_deref(), Some("Mod"));
+    }
+
+    #[tokio::test]
     async fn lists_server_roles() {
         const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
         const ROLE_ID: &str = "123e4567-e89b-12d3-a456-426614174023";
