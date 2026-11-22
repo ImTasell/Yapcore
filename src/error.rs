@@ -120,6 +120,10 @@ pub enum Error {
     #[error("this response is only available for an interaction")]
     InteractionRequired,
 
+    /// A message reply was attempted without a source message ID.
+    #[error("this command context has no source message to reply to")]
+    MessageContextRequired,
+
     /// The interaction already received a response attempt.
     #[error("this interaction has already been answered")]
     InteractionAlreadyAnswered,
