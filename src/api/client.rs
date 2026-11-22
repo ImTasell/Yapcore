@@ -993,6 +993,94 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn fetches_recent_messages_with_limit_and_before_cursor() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "messages": [{
+                    "id": MESSAGE_ID,
+                    "channel_id": CHANNEL_ID,
+                    "content": "recent"
+                }]
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+
+        let messages = client
+            .get_recent_messages(
+                &channel_id,
+                Some(50),
+                Some("2026-11-21T12:00:00Z"),
+            )
+            .await
+            .unwrap();
+        let request = server.finish();
+        let request_line = request.lines().next().unwrap();
+
+        assert!(request_line.starts_with("GET /api/bot/v1/channels/"));
+        assert!(request_line.contains("/messages?limit=50&before=2026-11-21T12%3A00%3A00Z"));
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].content.as_deref(), Some("recent"));
+    }
+
+    #[tokio::test]
+    async fn fetches_messages_after_timestamp_cursor() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!([{
+                "id": MESSAGE_ID,
+                "channel_id": CHANNEL_ID,
+                "content": "forward"
+            }])
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+
+        let messages = client
+            .get_messages_after(&channel_id, "2026-11-21T12:00:00Z")
+            .await
+            .unwrap();
+        let request = server.finish();
+        let request_line = request.lines().next().unwrap();
+
+        assert!(request_line.contains("/messages?after=2026-11-21T12%3A00%3A00Z"));
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].content.as_deref(), Some("forward"));
+    }
+
+    #[tokio::test]
+    async fn validates_message_page_sizes_and_forward_cursors() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        let channel_id =
+            crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174002").unwrap();
+
+        assert!(matches!(
+            client.get_recent_messages(&channel_id, Some(0), None).await,
+            Err(Error::InvalidMessagePageLimit { actual: 0 })
+        ));
+        assert!(matches!(
+            client.get_recent_messages(&channel_id, Some(101), None).await,
+            Err(Error::InvalidMessagePageLimit { actual: 101 })
+        ));
+        assert!(matches!(
+            client.get_messages_after(&channel_id, "").await,
+            Err(Error::EmptyMessageCursor)
+        ));
+    }
+
+    #[tokio::test]
     async fn fetches_one_message_with_get() {
         const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
         const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
