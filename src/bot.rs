@@ -768,14 +768,20 @@ mod tests {
         let server = CallbackServer::start();
         let mut bot = test_bot(&server);
 
-        bot.command("ping", "Check whether the bot is alive", |context| async move {
-            assert!(context.is_interaction());
-            assert_eq!(context.command(), "ping");
-            assert_eq!(context.args(), "hello there");
-            context.reply("Pong from slash!").await
-                .map_err(|error| -> crate::HandlerError { Box::new(error) })?;
-            Ok(())
-        })
+        bot.command(
+            "ping",
+            "Check whether the bot is alive",
+            |context| async move {
+                assert!(context.is_interaction());
+                assert_eq!(context.command(), "ping");
+                assert_eq!(context.args(), "hello there");
+                context
+                    .reply("Pong from slash!")
+                    .await
+                    .map_err(|error| -> crate::HandlerError { Box::new(error) })?;
+                Ok(())
+            },
+        )
         .unwrap();
 
         bot.dispatch_event(&slash_command_event(), None)
