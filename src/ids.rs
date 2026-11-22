@@ -109,6 +109,7 @@ define_id!(UserId, "A Yapper user or bot identifier.");
 define_id!(ServerId, "A Yapper server identifier.");
 define_id!(ChannelId, "A Yapper channel identifier.");
 define_id!(MessageId, "A Yapper message identifier.");
+define_id!(InteractionId, "A Yapper interaction identifier.");
 define_id!(RoleId, "A Yapper role identifier.");
 define_id!(ThreadId, "A Yapper thread identifier.");
 define_id!(CategoryId, "A Yapper channel-category identifier.");
