@@ -14,19 +14,19 @@ This matrix separates the Python framework's API surface from what the current o
 - **Verify**: Python source supports it, but official docs do not clearly guarantee it
 - **Defer**: requires clarification, platform support or a separate design decision
 
-No feature is marked implemented yet. This is the initial porting checklist.
+Implementation status updated 2026-11-22. Stable REST primitives, prefix-command dispatch and the initial polling runtime now exist; parity remains partial and unverified API families stay deferred.
 
 ## 1. Configuration and lifecycle
 
 | Status | Python feature | Rust target |
 | --- | --- | --- |
-| [ ] Documented | Construct bot with explicit token | `Bot::builder().token(...)` |
-| [ ] Documented | Read `YAPPER_BOT_TOKEN` | Builder helper with clear missing/invalid-token error |
-| [ ] Documented | Configurable API base URL | `Config.api_base_url`, defaulting to official documented base |
-| [ ] Documented | Prefix list, default `/` and `!` | `Config.prefixes` |
+| [x] Documented | Construct bot with explicit token | `Bot::builder().token(...)` |
+| [x] Documented | Read `YAPPER_BOT_TOKEN` | `token_from_env` with missing/invalid-token error |
+| [x] Documented | Configurable API base URL | `Config.api_base_url`, defaulting to official documented base |
+| [x] Documented | Prefix list, default `/` and `!` | `BotBuilder::prefixes`, longest prefix first |
 | [ ] Documented | Logging toggle | Integrate with optional `tracing`; no mandatory logger |
-| [ ] Documented | Ignore bot/webhook messages by default | Configurable message filter |
-| [ ] Documented | Start, stop and graceful shutdown | Async `start().await` plus cancellation/shutdown handle |
+| [x] Documented | Ignore bot-authored messages by default | `BotBuilder::ignore_bots`, default true |
+| [~] Documented | Start, stop and graceful shutdown | Async `start().await` plus cancellation handle; bounded drain and service-signal helpers remain |
 | [ ] Verify | Automatic version check | Optional, non-blocking and opt-out; decide whether it is desirable |
 | [ ] Verify | Alternate API hostname fallback | Do not add until host equivalence and retry safety are confirmed |
 
@@ -34,13 +34,13 @@ No feature is marked implemented yet. This is the initial porting checklist.
 
 | Status | Python feature | Rust target |
 | --- | --- | --- |
-| [ ] Documented | Auth header `Authorization: Bot <token>` | Central request middleware |
-| [ ] Documented | JSON request/response handling | Typed Serde models plus raw JSON escape hatch |
-| [ ] Documented | Error status and message | Structured `YapcoreError` |
-| [ ] Verify | Error code and permission fields | Preserve if present in server response |
+| [x] Documented | Auth header `Authorization: Bot <token>` | Central request middleware; sensitive header and redirects disabled |
+| [x] Documented | JSON request/response handling | Typed Serde models plus raw JSON extension boundaries |
+| [x] Documented | Error status and message | Structured `Error` / `ApiError` |
+| [x] Verify | Error code and permission fields | Preserve when present in server response |
 | [ ] Documented | 429 / 503 Retry-After handling | Shared retry policy; respect server-provided wait |
 | [ ] Verify | Proxy retry/fallback behavior | Retry only when safe; never duplicate a message send |
-| [ ] Documented | Configurable request timeout | Builder/config option with sane default |
+| [x] Documented | Configurable request timeout | Builder/config option; 40-second default |
 | [ ] Documented | Multipart/file sending | Bounded streaming upload; verify current per-file/total limits |
 
 Retry safety rules:
@@ -53,18 +53,18 @@ Retry safety rules:
 
 | Status | Python feature | Rust target |
 | --- | --- | --- |
-| [ ] Documented | Long poll `GET /events?after=&wait=` | Primary event transport |
+| [x] Documented | Long poll `GET /events?after=&wait=` | `ApiClient::poll_events` and `Bot::run` |
 | [ ] Documented | Cursor-based ordered event delivery | Track monotonically increasing event ID |
-| [ ] Documented | Up to 100 events per poll, up to 25-second wait | Honor documented server limits |
+| [x] Documented | Up to 100 events per poll, up to 25-second wait | Wait capped at 25 seconds; response body limit enforced |
 | [ ] Documented | One-day event retention | Explain restart/cursor implications |
-| [ ] Documented | Optional `max_age` catch-up filter | Expose as polling configuration |
+| [x] Documented | Optional `max_age` catch-up filter | `poll_events` validates one-day maximum |
 | [ ] Documented | Ready/error lifecycle callbacks | Typed lifecycle events |
 | [ ] Documented | Event webhooks as a server-side delivery option | Not needed for normal outbound-only client; document as deployment mode |
 | [ ] Verify | WebSocket gateway `wss://rt.yapper.website/bot` | Defer; current public guide does not document its protocol |
 | [ ] Verify | Invite/channel/thread/category/message/server extra event kinds | Preserve unknown event payloads; add typed events only after endpoint confirmation |
 | [ ] Verify | DM message event | Official docs say ordinary DMs are not delivered as bot events |
-| [ ] Documented | Filter bot-authored messages | Optional dispatcher filter |
-| [ ] Documented | Ignore duplicate/out-of-order event IDs | Cursor and deduplication in poll loop |
+| [x] Documented | Filter bot-authored messages | Configurable bot-message filter, default on |
+| [~] Documented | Ignore duplicate/out-of-order event IDs | Deduplicates against the in-memory cursor; persisted cursor/recovery is not implemented |
 
 The official docs say event history is retained for one day. A persistent cursor store is useful for catch-up across restarts, but users must be able to choose a clean-start policy too.
 
@@ -72,11 +72,11 @@ The official docs say event history is retained for one day. A persistent cursor
 
 | Status | Python feature | Rust target |
 | --- | --- | --- |
-| [ ] Documented | Register command names/descriptions | Command registry |
-| [ ] Documented | Slash command synchronization | Sync full command list before dispatch |
-| [ ] Documented | Prefix-command parsing | Longest matching prefix, case-insensitive name handling |
-| [ ] Documented | `args` and `argv` | Typed `CommandContext` argument access |
-| [ ] Verify | 100 command maximum in current framework | Use current documented API limit; validate on registration |
+| [x] Documented | Register command names/descriptions | Validated local command registry |
+| [~] Documented | Slash command synchronization | `ApiClient::sync_commands` exists; runtime slash handling/automatic sync awaits interaction support |
+| [x] Documented | Prefix-command parsing | Longest matching prefix, case-insensitive name handling |
+| [x] Documented | `args` and `argv` | Typed `CommandContext` argument access |
+| [x] Verify | 100 command maximum in current framework | Enforced when preparing a full command list for sync |
 | [ ] Documented | Per-command permission/check callback | Async check hook |
 | [ ] Verify | Typed options: string/integer/number/boolean/user/channel/role | Typed option schema and parser |
 | [ ] Verify | Choices and named `key=value` input | Parser compatibility tests |
@@ -90,8 +90,8 @@ Rust API should favor explicit typed command registration and async handlers. It
 
 | Status | Python feature | Rust target |
 | --- | --- | --- |
-| [ ] Documented | Send message | `send_message` |
-| [ ] Documented | Reply to message | `Message::reply` |
+| [x] Documented | Send plain-text message | `ApiClient::send_message` / `Bot::send_message` |
+| [x] Documented | Reply to message | `ApiClient::reply_message`; `CommandContext::reply` |
 | [ ] Documented | Send embed(s) | Embed builder and Serde serialization |
 | [ ] Documented | Edit/delete own message | Typed API methods |
 | [ ] Documented | Fetch one/recent/forward messages | Pagination and time cursor |
@@ -104,7 +104,7 @@ Rust API should favor explicit typed command registration and async handlers. It
 | [ ] Verify | Select menu handlers | Python package supports selects; official page's interaction examples focus on buttons |
 | [ ] Verify | Modal and text-input components | Present in Python source; confirm current server payload schema |
 | [ ] Verify | Components V2 layouts | Present in Python source; confirm official schema before finalizing |
-| [ ] Documented | Unknown message/event JSON fields | Keep forward-compatible raw fields where practical |
+| [x] Documented | Unknown message/event JSON fields | Preserve unknown fields in message models and raw event payloads |
 
 ## 6. Embeds, buttons and component builders
 
