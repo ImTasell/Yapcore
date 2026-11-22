@@ -390,10 +390,7 @@ impl ApiClient {
     }
 
     /// List bans in a server. Requires Ban Members permission.
-    pub async fn list_bans(
-        &self,
-        server_id: &crate::ids::ServerId,
-    ) -> Result<Vec<Ban>> {
+    pub async fn list_bans(&self, server_id: &crate::ids::ServerId) -> Result<Vec<Ban>> {
         let route = format!("servers/{server_id}/bans");
         let response = self.request_json(Method::GET, &route, None).await?;
         let bans = response.get("bans").cloned().unwrap_or(response);
@@ -1742,7 +1739,10 @@ mod tests {
         let user_id = crate::ids::UserId::new(USER_ID).unwrap();
         let role_id = crate::ids::RoleId::new(ROLE_ID).unwrap();
 
-        client.add_role(&server_id, &user_id, &role_id).await.unwrap();
+        client
+            .add_role(&server_id, &user_id, &role_id)
+            .await
+            .unwrap();
         let request = server.finish();
         assert!(request.starts_with(
             "PUT /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/members/123e4567-e89b-12d3-a456-426614174022/roles/123e4567-e89b-12d3-a456-426614174023 HTTP/1.1"
@@ -1765,16 +1765,16 @@ mod tests {
         const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
         const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
 
-        let server = LocalMockServer::start(
-            200,
-            &[],
-            serde_json::json!({ "ok": true }).to_string(),
-        );
+        let server =
+            LocalMockServer::start(200, &[], serde_json::json!({ "ok": true }).to_string());
         let client = test_client(&server, 1024).await;
         let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
         let user_id = crate::ids::UserId::new(USER_ID).unwrap();
 
-        client.set_nickname(&server_id, &user_id, "Member").await.unwrap();
+        client
+            .set_nickname(&server_id, &user_id, "Member")
+            .await
+            .unwrap();
         let request = server.finish();
         assert!(request.starts_with(
             "PATCH /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/members/123e4567-e89b-12d3-a456-426614174022 HTTP/1.1"
@@ -1786,7 +1786,9 @@ mod tests {
         let config = Config::builder().token("yb_test-token").build().unwrap();
         let client = ApiClient::new(config).unwrap();
         assert!(matches!(
-            client.set_nickname(&server_id, &user_id, &"x".repeat(33)).await,
+            client
+                .set_nickname(&server_id, &user_id, &"x".repeat(33))
+                .await,
             Err(Error::NicknameTooLong { actual: 33 })
         ));
     }
@@ -1849,7 +1851,13 @@ mod tests {
             "GET /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/bans HTTP/1.1"
         ));
         assert_eq!(bans.len(), 1);
-        assert_eq!(bans[0].user.as_ref().and_then(|user| user.username.as_deref()), Some("banned-user"));
+        assert_eq!(
+            bans[0]
+                .user
+                .as_ref()
+                .and_then(|user| user.username.as_deref()),
+            Some("banned-user")
+        );
 
         let server = LocalMockServer::start(204, &[], String::new());
         let client = test_client(&server, 1024).await;
@@ -1888,11 +1896,15 @@ mod tests {
         let config = Config::builder().token("yb_test-token").build().unwrap();
         let client = ApiClient::new(config).unwrap();
         assert!(matches!(
-            client.timeout_member(&server_id, &user_id, Some(40_321), None).await,
+            client
+                .timeout_member(&server_id, &user_id, Some(40_321), None)
+                .await,
             Err(Error::TimeoutTooLong { actual: 40_321 })
         ));
         assert!(matches!(
-            client.timeout_member(&server_id, &user_id, Some(1), Some(&"x".repeat(201))).await,
+            client
+                .timeout_member(&server_id, &user_id, Some(1), Some(&"x".repeat(201)))
+                .await,
             Err(Error::ModerationReasonTooLong { actual: 201 })
         ));
     }
