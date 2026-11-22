@@ -1,3 +1,5 @@
+use std::fmt;
+
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -5,7 +7,7 @@ use serde_json::Value;
 ///
 /// The event name and payload remain open-ended so new platform event types
 /// do not break older versions of Yapcore.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Clone, PartialEq, Deserialize)]
 pub struct EventEnvelope {
     /// Monotonically increasing event sequence number.
     pub id: u64,
@@ -18,6 +20,45 @@ pub struct EventEnvelope {
     /// Event creation timestamp, when supplied by Yapper.
     #[serde(default)]
     pub created_at: Option<String>,
+}
+
+impl fmt::Debug for EventEnvelope {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("EventEnvelope")
+            .field("id", &self.id)
+            .field("event_type", &self.event_type)
+            .field("data", &redact_sensitive_fields(&self.data))
+            .field("created_at", &self.created_at)
+            .finish()
+    }
+}
+
+fn redact_sensitive_fields(value: &Value) -> Value {
+    match value {
+        Value::Object(fields) => {
+            let redacted = fields
+                .iter()
+                .map(|(key, field)| {
+                    let normalized = key.to_ascii_lowercase();
+                    let value = if matches!(
+                        normalized.as_str(),
+                        "token" | "interaction_token" | "webhook_secret" | "authorization"
+                    ) {
+                        Value::String("[REDACTED]".to_owned())
+                    } else {
+                        redact_sensitive_fields(field)
+                    };
+
+                    (key.clone(), value)
+                })
+                .collect();
+
+            Value::Object(redacted)
+        }
+        Value::Array(values) => Value::Array(values.iter().map(redact_sensitive_fields).collect()),
+        _ => value.clone(),
+    }
 }
 
 /// A page returned by GET /events.
@@ -75,6 +116,28 @@ mod tests {
             batch.events()[0].data["nested"]["value"],
             serde_json::json!(7)
         );
+    }
+
+    #[test]
+    fn debug_output_redacts_interaction_tokens_recursively() {
+        let event: EventEnvelope = serde_json::from_value(serde_json::json!({
+            "id": 43,
+            "type": "command",
+            "data": {
+                "command": "ping",
+                "token": "top-secret-token",
+                "nested": {
+                    "interaction_token": "nested-secret-token"
+                }
+            }
+        }))
+        .unwrap();
+
+        let debug = format!("{event:?}");
+        assert!(!debug.contains("top-secret-token"));
+        assert!(!debug.contains("nested-secret-token"));
+        assert!(debug.contains("[REDACTED]"));
+        assert!(debug.contains("ping"));
     }
 
     #[test]
