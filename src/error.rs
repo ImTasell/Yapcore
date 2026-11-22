@@ -116,6 +116,14 @@ pub enum Error {
     #[error("event max_age must not exceed 86,400 seconds")]
     InvalidEventMaxAge,
 
+    /// The requested response operation requires an interaction context.
+    #[error("this response is only available for an interaction")]
+    InteractionRequired,
+
+    /// The interaction already received a response attempt.
+    #[error("this interaction has already been answered")]
+    InteractionAlreadyAnswered,
+
     /// Plain-text messages cannot be empty.
     #[error("message content must not be empty")]
     EmptyMessageContent,
