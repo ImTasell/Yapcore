@@ -181,6 +181,48 @@ impl ApiClient {
         self.request_json(Method::GET, &route, None).await
     }
 
+    /// Pin a message. Requires Manage Messages permission.
+    pub async fn pin_message(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        message_id: &crate::ids::MessageId,
+    ) -> Result<()> {
+        let route = format!("channels/{channel_id}/messages/{message_id}/pin");
+        self.request_json(Method::PUT, &route, None).await?;
+        Ok(())
+    }
+
+    /// Unpin a message. Requires Manage Messages permission.
+    pub async fn unpin_message(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        message_id: &crate::ids::MessageId,
+    ) -> Result<()> {
+        let route = format!("channels/{channel_id}/messages/{message_id}/pin");
+        self.request_json(Method::DELETE, &route, None).await?;
+        Ok(())
+    }
+
+    /// Bulk-delete between 1 and 100 messages in a channel.
+    ///
+    /// The API may skip messages that are too old or otherwise ineligible;
+    /// its deleted/skipped result is returned as raw JSON.
+    pub async fn bulk_delete_messages(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        message_ids: &[crate::ids::MessageId],
+    ) -> Result<Value> {
+        if message_ids.is_empty() || message_ids.len() > 100 {
+            return Err(Error::InvalidBulkDeleteCount {
+                actual: message_ids.len(),
+            });
+        }
+
+        let route = format!("channels/{channel_id}/messages/bulk-delete");
+        let body = serde_json::json!({ "ids": message_ids });
+        self.request_json(Method::POST, &route, Some(body)).await
+    }
+
     /// Add the bot's reaction to a message.
     pub async fn add_reaction(
         &self,
