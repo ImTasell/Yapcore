@@ -6,7 +6,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::config::ConfigError;
-use crate::models::CommandDefinitionError;
+use crate::models::{CommandDefinitionError, EmbedValidationError};
 
 /// Result type used by Yapcore's public API.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -107,6 +107,28 @@ pub enum Error {
     /// A command definition or command list violates the documented local constraints.
     #[error(transparent)]
     CommandDefinition(#[from] CommandDefinitionError),
+
+    /// An embed or embed field violates a documented size or structure limit.
+    #[error(transparent)]
+    EmbedValidation(#[from] EmbedValidationError),
+
+    /// A message may contain no more than five embeds.
+    #[error("a message may contain at most 5 embeds; received {actual}")]
+    TooManyEmbeds {
+        /// Number of supplied embeds.
+        actual: usize,
+    },
+
+    /// The aggregate text across all embeds exceeded 6,000 characters.
+    #[error("combined embed text is {actual} characters; the maximum is 6000")]
+    MessageEmbedsTooLong {
+        /// Actual combined character count.
+        actual: usize,
+    },
+
+    /// A message must contain non-empty text or at least one embed.
+    #[error("a message must contain non-empty content or at least one embed")]
+    EmptyMessagePayload,
 
     /// The event poll wait exceeds Yapper's 25-second maximum.
     #[error("event poll wait must be between 0 and 25 seconds")]
