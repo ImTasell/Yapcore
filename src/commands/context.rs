@@ -216,7 +216,6 @@ impl CommandContext {
     }
 }
 
-
 fn claim_interaction_response(response_count: &AtomicU8) -> Result<()> {
     let mut count = response_count.load(Ordering::Acquire);
 
