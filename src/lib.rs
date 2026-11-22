@@ -31,6 +31,7 @@ pub use interactions::{InteractionContext, InteractionRegistrationError};
 pub use models::{
     ActionRow, BotProfile, Button, ButtonStyle, CommandDefinition, CommandDefinitionError,
     ComponentValidationError, Embed, EmbedAuthor, EmbedBuilder, EmbedField, EmbedFooter,
-    Channel, ChannelCategory, ChannelListing, EmbedValidationError, EventBatch, EventEnvelope,
+    Channel, ChannelCategory, ChannelListing, ChannelType, EmbedValidationError, EventBatch,
+    EventEnvelope,
     InteractionResponseType, Member, Message, Role, Server, UserProfile,
 };
