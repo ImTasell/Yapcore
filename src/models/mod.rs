@@ -33,6 +33,6 @@ pub use interaction::InteractionResponseType;
 mod server;
 
 pub use server::{
-    Ban, Channel, ChannelCategory, ChannelListing, ChannelType, Member, Role, RoleEditOptions, Server,
-    UserProfile,
+    Ban, Channel, ChannelCategory, ChannelListing, ChannelType, Member, Role, RoleEditOptions,
+    Server, UserProfile,
 };
