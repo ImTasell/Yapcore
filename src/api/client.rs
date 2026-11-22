@@ -10,7 +10,7 @@ use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
 use crate::ids::InteractionId;
 use crate::models::{
-    BotProfile, Channel, ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch,
+    Ban, BotProfile, Channel, ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch,
     InteractionResponseType, Member, Message, Role, Server, UserProfile, validate_action_rows,
     validate_command_list,
 };
@@ -321,6 +321,132 @@ impl ApiClient {
         let response = self.request_json(Method::GET, &route, None).await?;
         let user = response.get("user").cloned().unwrap_or(response);
         serde_json::from_value(user).map_err(Error::from)
+    }
+
+    /// Add a role to a server member. Requires Manage Roles permission.
+    pub async fn add_role(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &crate::ids::UserId,
+        role_id: &crate::ids::RoleId,
+    ) -> Result<()> {
+        let route = format!("servers/{server_id}/members/{user_id}/roles/{role_id}");
+        self.request_json(Method::PUT, &route, None).await?;
+        Ok(())
+    }
+
+    /// Remove a role from a server member. Requires Manage Roles permission.
+    pub async fn remove_role(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &crate::ids::UserId,
+        role_id: &crate::ids::RoleId,
+    ) -> Result<()> {
+        let route = format!("servers/{server_id}/members/{user_id}/roles/{role_id}");
+        self.request_json(Method::DELETE, &route, None).await?;
+        Ok(())
+    }
+
+    /// Set a server member's nickname; an empty string clears it.
+    ///
+    /// Returns the raw endpoint response because Yapper's response wrapper is
+    /// not consistently specified across API guide revisions.
+    pub async fn set_nickname(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &crate::ids::UserId,
+        nickname: &str,
+    ) -> Result<Value> {
+        let actual = nickname.chars().count();
+        if actual > 32 {
+            return Err(Error::NicknameTooLong { actual });
+        }
+
+        let route = format!("servers/{server_id}/members/{user_id}");
+        let body = serde_json::json!({ "nickname": nickname });
+        self.request_json(Method::PATCH, &route, Some(body)).await
+    }
+
+    /// Kick a member from a server. Requires Kick Members permission.
+    pub async fn kick_member(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &crate::ids::UserId,
+    ) -> Result<Value> {
+        let route = format!("servers/{server_id}/kick");
+        let body = serde_json::json!({ "user_id": user_id.as_str() });
+        self.request_json(Method::POST, &route, Some(body)).await
+    }
+
+    /// Ban a member from a server. Requires Ban Members permission.
+    pub async fn ban_member(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &crate::ids::UserId,
+    ) -> Result<Value> {
+        let route = format!("servers/{server_id}/bans");
+        let body = serde_json::json!({ "user_id": user_id.as_str() });
+        self.request_json(Method::POST, &route, Some(body)).await
+    }
+
+    /// List bans in a server. Requires Ban Members permission.
+    pub async fn list_bans(
+        &self,
+        server_id: &crate::ids::ServerId,
+    ) -> Result<Vec<Ban>> {
+        let route = format!("servers/{server_id}/bans");
+        let response = self.request_json(Method::GET, &route, None).await?;
+        let bans = response.get("bans").cloned().unwrap_or(response);
+        serde_json::from_value(bans).map_err(Error::from)
+    }
+
+    /// Remove a server ban. Requires Ban Members permission.
+    pub async fn unban_member(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &crate::ids::UserId,
+    ) -> Result<()> {
+        let route = format!("servers/{server_id}/bans/{user_id}");
+        self.request_json(Method::DELETE, &route, None).await?;
+        Ok(())
+    }
+
+    /// Set a member timeout. Use zero minutes to clear the timeout.
+    ///
+    /// Yapper defaults an omitted duration to ten minutes and allows up to
+    /// 40,320 minutes (28 days). A reason is optional and capped at 200 chars.
+    pub async fn timeout_member(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &crate::ids::UserId,
+        minutes: Option<u32>,
+        reason: Option<&str>,
+    ) -> Result<Value> {
+        if let Some(minutes) = minutes {
+            if minutes > 40_320 {
+                return Err(Error::TimeoutTooLong { actual: minutes });
+            }
+        }
+
+        if let Some(reason) = reason {
+            let actual = reason.chars().count();
+            if actual > 200 {
+                return Err(Error::ModerationReasonTooLong { actual });
+            }
+        }
+
+        let mut body = serde_json::Map::new();
+        body.insert("user_id".to_owned(), serde_json::json!(user_id.as_str()));
+        if let Some(minutes) = minutes {
+            body.insert("minutes".to_owned(), serde_json::json!(minutes));
+        }
+        if let Some(reason) = reason {
+            body.insert("reason".to_owned(), serde_json::json!(reason));
+        }
+
+        let route = format!("servers/{server_id}/timeouts");
+        self.request_json(Method::POST, &route, Some(Value::Object(body)))
+            .await
     }
 
     /// Fetch recent channel messages in oldest-first order.
