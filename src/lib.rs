@@ -13,8 +13,8 @@ pub mod commands;
 pub mod config;
 pub mod error;
 pub mod ids;
-pub mod models;
 pub mod interactions;
+pub mod models;
 
 pub use api::ApiClient;
 pub use bot::{Bot, BotBuilder, ShutdownHandle};
