@@ -196,6 +196,10 @@ pub enum Error {
         actual: usize,
     },
 
+    /// A role edit must include at least one changed field.
+    #[error("role edit options must contain at least one field")]
+    EmptyRoleEditOptions,
+
     /// A nickname is longer than Yapper's 32-character limit.
     #[error("nickname is {actual} characters; the maximum is 32")]
     NicknameTooLong {
