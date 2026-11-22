@@ -10,7 +10,7 @@ use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
 use crate::ids::InteractionId;
 use crate::models::{
-    BotProfile, CommandDefinition, EventBatch, InteractionResponseType, Message,
+    BotProfile, CommandDefinition, Embed, EventBatch, InteractionResponseType, Message,
     validate_command_list,
 };
 
@@ -77,6 +77,63 @@ impl ApiClient {
         content: &str,
     ) -> Result<Message> {
         self.send_message_inner(channel_id, content, None).await
+    }
+
+    /// Send a message with optional text content and up to five embeds.
+    ///
+    /// At least one non-empty content string or one embed is required. The
+    /// server remains authoritative for image-host allowlists and other
+    /// endpoint-specific validation.
+    pub async fn send_message_with_embeds(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        content: Option<&str>,
+        embeds: &[Embed],
+    ) -> Result<Message> {
+        if embeds.len() > 5 {
+            return Err(Error::TooManyEmbeds {
+                actual: embeds.len(),
+            });
+        }
+
+        let content = content.filter(|value| !value.is_empty());
+        if let Some(content) = content {
+            let actual = content.chars().count();
+            if actual > 2_000 {
+                return Err(Error::MessageContentTooLong { actual, max: 2_000 });
+            }
+        }
+
+        if content.is_none() && embeds.is_empty() {
+            return Err(Error::EmptyMessagePayload);
+        }
+
+        let mut embed_text = 0_usize;
+        for embed in embeds {
+            embed.validate()?;
+            embed_text += embed.text_characters();
+        }
+        if embed_text > 6_000 {
+            return Err(Error::MessageEmbedsTooLong {
+                actual: embed_text,
+            });
+        }
+
+        let mut body = serde_json::Map::new();
+        if let Some(content) = content {
+            body.insert("content".to_owned(), serde_json::json!(content));
+        }
+        if !embeds.is_empty() {
+            body.insert("embeds".to_owned(), serde_json::to_value(embeds)?);
+        }
+
+        let route = format!("channels/{channel_id}/messages");
+        let response = self
+            .request_json(Method::POST, &route, Some(Value::Object(body)))
+            .await?;
+
+        let message = response.get("message").cloned().unwrap_or(response);
+        serde_json::from_value(message).map_err(Error::from)
     }
 
     /// Reply to an existing message in a channel.
@@ -735,6 +792,79 @@ mod tests {
         assert_eq!(payload["type"], "ephemeral");
         assert_eq!(payload["content"], "Only you can see this");
         assert!(response["ok"].as_bool().unwrap());
+    }
+
+    #[tokio::test]
+    async fn send_message_with_embeds_serializes_builder_output() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "id": MESSAGE_ID,
+                "channel_id": CHANNEL_ID,
+                "content": "Look at this",
+                "embeds": [{ "title": "Yapcore" }]
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let embed = Embed::builder()
+            .title("Yapcore")
+            .description("Native Rust framework")
+            .color(0x5865_FF)
+            .field(EmbedField::new("Language", "Rust").unwrap())
+            .build()
+            .unwrap();
+
+        let message = client
+            .send_message_with_embeds(&channel_id, Some("Look at this"), &[embed])
+            .await
+            .unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "POST /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174002/messages HTTP/1.1"
+        ));
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["content"], "Look at this");
+        assert_eq!(payload["embeds"][0]["title"], "Yapcore");
+        assert_eq!(payload["embeds"][0]["fields"][0]["name"], "Language");
+        assert_eq!(message.content.as_deref(), Some("Look at this"));
+    }
+
+    #[tokio::test]
+    async fn send_message_with_embeds_rejects_missing_content_and_embeds() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        let channel_id =
+            crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174002").unwrap();
+
+        assert!(matches!(
+            client.send_message_with_embeds(&channel_id, None, &[]).await,
+            Err(Error::EmptyMessagePayload)
+        ));
+    }
+
+    #[tokio::test]
+    async fn send_message_with_embeds_rejects_more_than_five_embeds() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        let channel_id =
+            crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174002").unwrap();
+        let embed = Embed::builder().title("Yapcore").build().unwrap();
+        let embeds = vec![embed; 6];
+
+        assert!(matches!(
+            client
+                .send_message_with_embeds(&channel_id, Some("text"), &embeds)
+                .await,
+            Err(Error::TooManyEmbeds { actual: 6 })
+        ));
     }
 
     #[tokio::test]
