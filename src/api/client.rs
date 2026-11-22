@@ -745,7 +745,10 @@ mod tests {
         let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
         let message_id = crate::ids::MessageId::new(MESSAGE_ID).unwrap();
 
-        let reactions = client.get_reactions(&channel_id, &message_id).await.unwrap();
+        let reactions = client
+            .get_reactions(&channel_id, &message_id)
+            .await
+            .unwrap();
         let request = server.finish();
 
         assert!(request.starts_with(
