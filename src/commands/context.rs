@@ -206,12 +206,22 @@ impl CommandContext {
 
         // Claim the response slot before I/O. If the connection fails after
         // Yapper has accepted the callback, retrying could duplicate it.
-        interaction
-            .response_count
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
-                (count < 10).then_some(count + 1)
-            })
-            .map_err(|_| Error::InteractionAlreadyAnswered)?;
+        let mut count = interaction.response_count.load(Ordering::Acquire);
+        loop {
+            if count >= 10 {
+                return Err(Error::InteractionAlreadyAnswered);
+            }
+
+            match interaction.response_count.compare_exchange_weak(
+                count,
+                count + 1,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => break,
+                Err(actual) => count = actual,
+            }
+        }
 
         self.api
             .respond_interaction(&interaction.id, &interaction.token, response_type, content)
