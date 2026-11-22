@@ -12,7 +12,7 @@ The goal is a small, boring, well-supported dependency graph. The current releas
 
 | Crate | Current release checked | Cargo requirement | Used for | Decision |
 | --- | --- | --- | --- | --- |
-| tokio | 1.54.1 | `1.54` | Async runtime, macros, timers and synchronization | Required |
+| tokio | 1.54.1 | `1.54` | Runtime primitives, select macro, timers and synchronization | Required |
 | reqwest | 0.13.5 | `0.13.5` | HTTPS REST client | Required |
 | serde | 1.0.229 | `1.0` | Typed serialization/deserialization | Required |
 | serde_json | 1.0.154 | `1.0` | JSON bodies and flexible raw event payloads | Required |
@@ -26,12 +26,12 @@ The goal is a small, boring, well-supported dependency graph. The current releas
 
 Enable only:
 
-- `macros`: `#[tokio::main]` and `#[tokio::test]`.
-- `rt-multi-thread`: normal bot application runtime.
+- `macros`: `tokio::select!` in the library and `#[tokio::test]` in tests.
+- `rt`: task spawning and runtime-aware utilities used by the library.
 - `time`: request/backoff/shutdown deadlines.
 - `sync`: watch and bounded mpsc channels.
 
-Do not enable `full`. The v0.1 client uses Reqwest for network I/O and does not need Tokio's raw TCP/UDP, filesystem, process, io-util or signal features. An application that wants Tokio's Ctrl+C helper can enable `signal` on its own Tokio dependency.
+Do not enable `full`. The library uses Reqwest for network I/O and does not create a runtime. It does not need Tokio's raw TCP/UDP, filesystem, process, io-util, multi-thread runtime or signal features. An application that uses `#[tokio::main]` with the default multi-thread flavor should enable `rt-multi-thread` in its own Tokio dependency; Ctrl+C handling likewise remains the application's choice.
 
 ### Reqwest features
 
@@ -105,7 +105,7 @@ secrecy = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
-tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.54", features = ["macros", "rt", "sync", "time"] }
 tracing = "0.1"
 
 [dev-dependencies]
