@@ -23,5 +23,5 @@ pub use ids::{
     WebhookId,
 };
 pub use models::{
-    BotProfile, CommandDefinition, CommandDefinitionError, EventBatch, EventEnvelope,
+    BotProfile, CommandDefinition, CommandDefinitionError, EventBatch, EventEnvelope, Message,
 };
