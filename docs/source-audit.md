@@ -182,11 +182,11 @@ The visible tests do not amount to an end-to-end contract suite for every REST e
 
 ## 7. Licensing is a release blocker
 
-The upstream Python repository declares **GPL-3.0-only** in its package metadata and includes a GPL-3.0 license. Yapcore currently has an MIT license.
+The upstream Python repository declares **GPL-3.0-only** in its package metadata and includes a GPL-3.0 license. Yapcore's license was changed from MIT to GPL-3.0-only on 2026-11-21 to align with the upstream framework's declared license.
 
-A direct translation/derivative port of GPL-licensed implementation code generally cannot simply be distributed under the existing MIT-only terms. Before copying or translating source implementation, choose a compatible licensing path (for example, discuss changing Yapcore to GPL-3.0-only) or obtain permission from the relevant rights holder for different terms. A clean-room implementation based only on independently documented API behavior is a different approach, but should be deliberately separated from copied code and reviewed appropriately.
+A direct translation/derivative port should retain GPL-3.0-only notices and comply with the license's distribution/source obligations. This is an engineering record, not legal advice. A clean-room implementation based only on independently documented API behavior is a different approach, but should be deliberately separated from copied code and reviewed appropriately.
 
-This note is an engineering risk flag, not legal advice. Do not copy upstream source into Yapcore until the licensing decision is made.
+This note is an engineering record, not legal advice. Preserve required copyright and license notices for any reused or translated upstream material.
 
 ## 8. Conclusions
 
