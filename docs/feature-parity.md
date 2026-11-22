@@ -114,9 +114,9 @@ Rust API should favor explicit typed command registration and async handlers. It
 | --- | --- | --- |
 | [x] Documented | Embed title/description/url/color/author/footer/fields/image/thumbnail/timestamp | Typed `Embed`, `EmbedAuthor`, `EmbedFooter`, and `EmbedField` builders |
 | [x] Documented | Up to 5 embeds and 6000 aggregate characters | Local validation across all embeds before sending |
-| [ ] Documented | Button row and button styles | `Button` and `ActionRow` builders |
-| [ ] Documented | Link buttons | Validate HTTPS URL |
-| [ ] Documented | Disabled buttons and emoji | Builder fields |
+| [x] Documented | Button row and button styles | Typed `Button` and `ActionRow` builders with message-wide validation |
+| [x] Documented | Link buttons | Link style validates HTTPS URLs |
+| [x] Documented | Disabled buttons and emoji | `disabled` and `emoji` builder methods |
 | [ ] Verify | Select menu option builders | Include after schema confirmation |
 | [ ] Verify | Modal/TextInput builders | Include after schema confirmation |
 | [ ] Verify | Components V2: text, section, gallery, separator, file, container | Dedicated typed component enum once protocol is confirmed |
