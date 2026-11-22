@@ -84,7 +84,8 @@ impl ApiClient {
         message_id: &crate::ids::MessageId,
         content: &str,
     ) -> Result<Message> {
-        self.send_message_inner(channel_id, content, Some(message_id)).await
+        self.send_message_inner(channel_id, content, Some(message_id))
+            .await
     }
 
     async fn send_message_inner(
