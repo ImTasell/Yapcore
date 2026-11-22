@@ -413,23 +413,9 @@ impl Bot {
         &self,
         server_id: &crate::ids::ServerId,
         role_id: &crate::ids::RoleId,
-        name: Option<&str>,
-        color: Option<&str>,
-        mentionable: Option<bool>,
-        permissions: Option<&serde_json::Value>,
-        position: Option<i64>,
+        changes: &crate::models::RoleEditOptions,
     ) -> Result<crate::models::Role> {
-        self.api
-            .edit_role(
-                server_id,
-                role_id,
-                name,
-                color,
-                mentionable,
-                permissions,
-                position,
-            )
-            .await
+        self.api.edit_role(server_id, role_id, changes).await
     }
 
     /// Delete a role in a server.
