@@ -9,7 +9,7 @@ use crate::commands::{CommandContext, CommandRegistry, HandlerResult};
 use crate::config::{Config, ConfigBuilder, ConfigError};
 use crate::error::{Error, Result};
 use crate::ids::{ChannelId, MessageId, UserId};
-use crate::models::{BotProfile, Message};
+use crate::models::{BotProfile, CommandDefinition, Message};
 
 /// Handle used to request a graceful stop of a running bot.
 #[derive(Debug, Clone)]
@@ -172,6 +172,14 @@ impl Bot {
     {
         self.commands.register(name, description, handler)?;
         Ok(self)
+    }
+
+    /// Return the currently registered command definitions in name order.
+    ///
+    /// This is useful for inspection and for synchronizing the registry once
+    /// slash-command interaction handling is enabled.
+    pub fn command_definitions(&self) -> Vec<CommandDefinition> {
+        self.commands.definitions()
     }
 
     /// Fetch the current bot profile.
