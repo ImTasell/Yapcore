@@ -1013,11 +1013,7 @@ mod tests {
         let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
 
         let messages = client
-            .get_recent_messages(
-                &channel_id,
-                Some(50),
-                Some("2026-11-21T12:00:00Z"),
-            )
+            .get_recent_messages(&channel_id, Some(50), Some("2026-11-21T12:00:00Z"))
             .await
             .unwrap();
         let request = server.finish();
@@ -1071,7 +1067,9 @@ mod tests {
             Err(Error::InvalidMessagePageLimit { actual: 0 })
         ));
         assert!(matches!(
-            client.get_recent_messages(&channel_id, Some(101), None).await,
+            client
+                .get_recent_messages(&channel_id, Some(101), None)
+                .await,
             Err(Error::InvalidMessagePageLimit { actual: 101 })
         ));
         assert!(matches!(
