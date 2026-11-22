@@ -3,8 +3,8 @@ use std::sync::Arc;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue, RETRY_AFTER};
 use reqwest::redirect::Policy;
 use reqwest::{Client, Method, Response};
-use serde_json::Value;
 use secrecy::ExposeSecret;
+use serde_json::Value;
 
 use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
@@ -90,10 +90,7 @@ impl ApiClient {
             request = request.json(&body);
         }
 
-        let mut response = request
-            .send()
-            .await
-            .map_err(sanitize_transport_error)?;
+        let mut response = request.send().await.map_err(sanitize_transport_error)?;
 
         let status = response.status();
         let retry_after = parse_retry_after(response.headers().get(RETRY_AFTER));
@@ -203,12 +200,15 @@ mod tests {
                             let body_start = header_start + 4;
                             let header_text =
                                 String::from_utf8_lossy(&request_bytes[..header_start]);
-                            let content_length = header_text.lines().find_map(|line| {
-                                let (name, value) = line.split_once(':')?;
-                                name.eq_ignore_ascii_case("content-length")
-                                    .then(|| value.trim().parse::<usize>().ok())
-                                    .flatten()
-                            }).unwrap_or(0);
+                            let content_length = header_text
+                                .lines()
+                                .find_map(|line| {
+                                    let (name, value) = line.split_once(':')?;
+                                    name.eq_ignore_ascii_case("content-length")
+                                        .then(|| value.trim().parse::<usize>().ok())
+                                        .flatten()
+                                })
+                                .unwrap_or(0);
                             expected_request_length = Some(body_start + content_length);
                         }
                     }
