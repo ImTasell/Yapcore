@@ -18,10 +18,14 @@ async fn main() -> Result<()> {
         .prefixes(["!", "/"])
         .build()?;
 
-    bot.command("ping", "Check whether the bot is alive", |context| async move {
-        context.reply("Pong from Yapcore!").await?;
-        Ok(())
-    })?;
+    bot.command(
+        "ping",
+        "Check whether the bot is alive",
+        |context| async move {
+            context.reply("Pong from Yapcore!").await?;
+            Ok(())
+        },
+    )?;
 
     bot.run().await
 }
