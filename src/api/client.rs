@@ -242,7 +242,11 @@ mod tests {
         let request = server.finish();
 
         assert!(request.starts_with("GET /api/bot/v1/me HTTP/1.1"));
-        assert!(request.to_ascii_lowercase().contains("authorization: bot yb_test-token"));
+        assert!(
+            request
+                .to_ascii_lowercase()
+                .contains("authorization: bot yb_test-token")
+        );
         assert_eq!(profile.id.unwrap().as_str(), BOT_ID);
         assert_eq!(profile.username.as_deref(), Some("yapcore-test"));
         assert_eq!(profile.display_name.as_deref(), Some("Yapcore Test Bot"));
