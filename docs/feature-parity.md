@@ -58,11 +58,13 @@ Retry safety rules:
 | [x] Documented | Up to 100 events per poll, up to 25-second wait | Wait capped at 25 seconds; response body limit enforced |
 | [ ] Documented | One-day event retention | Explain restart/cursor implications |
 | [x] Documented | Optional `max_age` catch-up filter | `poll_events` validates one-day maximum |
-| [ ] Documented | Ready/error lifecycle callbacks | Typed lifecycle events |
+| [x] Documented | Ready lifecycle callback | Synthetic `ready` event after profile retrieval and command synchronization |
+| [ ] Documented | Error lifecycle callback | Typed lifecycle notification for fatal/runtime errors |
 | [ ] Documented | Event webhooks as a server-side delivery option | Not needed for normal outbound-only client; document as deployment mode |
 | [ ] Verify | WebSocket gateway `wss://rt.yapper.website/bot` | Defer; current public guide does not document its protocol |
 | [ ] Verify | Invite/channel/thread/category/message/server extra event kinds | Preserve unknown event payloads; add typed events only after endpoint confirmation |
 | [ ] Verify | DM message event | Official docs say ordinary DMs are not delivered as bot events |
+| [x] Documented | Generic asynchronous event listeners | `Bot::on_event` delivers the full event envelope in registration order |
 | [x] Documented | Filter bot-authored messages | Configurable bot-message filter, default on |
 | [~] Documented | Ignore duplicate/out-of-order event IDs | Deduplicates against the in-memory cursor; persisted cursor/recovery is not implemented |
 
@@ -99,8 +101,8 @@ Rust API should favor explicit typed command registration and async handlers. It
 | [ ] Documented | Pin/unpin | Typed API methods |
 | [ ] Documented | Add/remove/list reactions | URL-encode emoji in route segment |
 | [ ] Verify | Four-file multipart send and sticker IDs | Confirm current upload contract and limits |
-| [ ] Documented | Button interactions: reply/ephemeral/update/ack | One-shot/deadline-aware interaction response |
-| [ ] Documented | Interaction expiry and answer count limits | Track deadline/expiry locally, still treat server as authority |
+| [x] Documented | Button interactions: reply/ephemeral/update/ack | Exact `on_button` and prefix `button` registrations; shared secret-safe response session and two-second auto-ack |
+| [~] Documented | Interaction expiry and answer count limits | Enforces ten-response cap and auto-ack margin; explicit expires_at tracking remains |
 | [ ] Verify | Select menu handlers | Python package supports selects; official page's interaction examples focus on buttons |
 | [ ] Verify | Modal and text-input components | Present in Python source; confirm current server payload schema |
 | [ ] Verify | Components V2 layouts | Present in Python source; confirm official schema before finalizing |
