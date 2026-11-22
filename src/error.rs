@@ -6,7 +6,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::config::ConfigError;
-use crate::models::{CommandDefinitionError, EmbedValidationError};
+use crate::models::{CommandDefinitionError, ComponentValidationError, EmbedValidationError};
 
 /// Result type used by Yapcore's public API.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -111,6 +111,10 @@ pub enum Error {
     /// An embed or embed field violates a documented size or structure limit.
     #[error(transparent)]
     EmbedValidation(#[from] EmbedValidationError),
+
+    /// A button or action row violates a documented component limit.
+    #[error(transparent)]
+    ComponentValidation(#[from] ComponentValidationError),
 
     /// A message may contain no more than five embeds.
     #[error("a message may contain at most 5 embeds; received {actual}")]
