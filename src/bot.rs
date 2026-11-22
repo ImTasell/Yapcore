@@ -382,6 +382,74 @@ impl Bot {
         self.api.list_roles(server_id).await
     }
 
+    /// Fetch one role in a server.
+    ///
+    /// The source-only endpoint is retained for feature parity but should be
+    /// verified against the current public API before depending on it.
+    pub async fn get_role(
+        &self,
+        server_id: &crate::ids::ServerId,
+        role_id: &crate::ids::RoleId,
+    ) -> Result<crate::models::Role> {
+        self.api.get_role(server_id, role_id).await
+    }
+
+    /// Create a role below the bot's highest role.
+    pub async fn create_role(
+        &self,
+        server_id: &crate::ids::ServerId,
+        name: &str,
+        color: Option<&str>,
+        mentionable: bool,
+        permissions: Option<&serde_json::Value>,
+    ) -> Result<crate::models::Role> {
+        self.api
+            .create_role(server_id, name, color, mentionable, permissions)
+            .await
+    }
+
+    /// Edit selected fields of a role; None leaves a field unchanged.
+    pub async fn edit_role(
+        &self,
+        server_id: &crate::ids::ServerId,
+        role_id: &crate::ids::RoleId,
+        name: Option<&str>,
+        color: Option<&str>,
+        mentionable: Option<bool>,
+        permissions: Option<&serde_json::Value>,
+        position: Option<i64>,
+    ) -> Result<crate::models::Role> {
+        self.api
+            .edit_role(
+                server_id,
+                role_id,
+                name,
+                color,
+                mentionable,
+                permissions,
+                position,
+            )
+            .await
+    }
+
+    /// Delete a role in a server.
+    pub async fn delete_role(
+        &self,
+        server_id: &crate::ids::ServerId,
+        role_id: &crate::ids::RoleId,
+    ) -> Result<()> {
+        self.api.delete_role(server_id, role_id).await
+    }
+
+    /// Reorder roles from highest to lowest using their IDs.
+    pub async fn reorder_roles(
+        &self,
+        server_id: &crate::ids::ServerId,
+        role_ids: &[crate::ids::RoleId],
+    ) -> Result<Vec<crate::models::Role>> {
+        self.api.reorder_roles(server_id, role_ids).await
+    }
+
     /// Fetch one public user profile.
     pub async fn get_user(&self, user_id: &UserId) -> Result<crate::models::UserProfile> {
         self.api.get_user(user_id).await
