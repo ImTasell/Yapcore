@@ -422,9 +422,7 @@ impl ApiClient {
         let body = serde_json::json!({
             "ids": role_ids.iter().map(crate::ids::RoleId::as_str).collect::<Vec<_>>()
         });
-        let response = self
-            .request_json(Method::PATCH, &route, Some(body))
-            .await?;
+        let response = self.request_json(Method::PATCH, &route, Some(body)).await?;
         let roles = response.get("roles").cloned().unwrap_or(response);
         serde_json::from_value(roles).map_err(Error::from)
     }
