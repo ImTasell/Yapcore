@@ -138,7 +138,10 @@ mod tests {
     #[test]
     fn serializes_ids_as_strings() {
         let id = MessageId::new(VALID_ID).unwrap();
-        assert_eq!(serde_json::to_string(&id).unwrap(), format!("\"{VALID_ID}\""));
+        assert_eq!(
+            serde_json::to_string(&id).unwrap(),
+            format!("\"{VALID_ID}\"")
+        );
     }
 
     #[test]
