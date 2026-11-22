@@ -216,6 +216,29 @@ impl Embed {
             validate_length("field name", &field.name, 256)?;
             validate_length("field value", &field.value, 1_024)?;
         }
+        if let Some(url) = &self.url {
+            validate_length("embed URL", url, 512)?;
+            let is_http = url
+                .get(..7)
+                .is_some_and(|scheme| scheme.eq_ignore_ascii_case("http://"));
+            let is_https = url
+                .get(..8)
+                .is_some_and(|scheme| scheme.eq_ignore_ascii_case("https://"));
+            if !is_http && !is_https {
+                return Err(EmbedValidationError::InvalidLinkUrl);
+            }
+        }
+
+        for image_url in [&self.image, &self.thumbnail].into_iter().flatten() {
+            validate_length("embed image URL", image_url, 512)?;
+            if !image_url
+                .get(..8)
+                .is_some_and(|scheme| scheme.eq_ignore_ascii_case("https://"))
+            {
+                return Err(EmbedValidationError::InvalidImageUrl);
+            }
+        }
+
         if let Some(color) = self.color {
             if color > 0xFF_FFFF {
                 return Err(EmbedValidationError::InvalidColor { actual: color });
@@ -346,6 +369,14 @@ pub enum EmbedValidationError {
         /// Supplied color.
         actual: u32,
     },
+
+    /// Embed link URLs must use HTTP or HTTPS.
+    #[error("embed link URL must use HTTP or HTTPS")]
+    InvalidLinkUrl,
+
+    /// Embed image URLs must use HTTPS.
+    #[error("embed image and thumbnail URLs must use HTTPS")]
+    InvalidImageUrl,
 }
 
 fn validate_length(
