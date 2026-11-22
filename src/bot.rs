@@ -269,6 +269,14 @@ impl Bot {
             "Yapcore bot connected"
         );
 
+        let ready_event = crate::models::EventEnvelope {
+            id: 0,
+            event_type: "ready".to_owned(),
+            data: serde_json::json!({ "bot": profile }),
+            created_at: None,
+        };
+        self.dispatch_event(&ready_event, bot_id.as_ref()).await?;
+
         let initial = self.api.poll_events(0, 0, None).await?;
         let mut cursor = initial.last();
         let mut shutdown = self.shutdown.subscribe();
