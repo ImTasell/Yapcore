@@ -141,6 +141,10 @@ pub enum Error {
         max: usize,
     },
 
+    /// A reaction identifier must not be empty.
+    #[error("reaction emoji identifier must not be empty")]
+    InvalidEmoji,
+
     /// The request failed before a usable HTTP response was received.
     ///
     /// The underlying Reqwest error has its URL removed to avoid accidental
