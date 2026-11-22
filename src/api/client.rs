@@ -813,7 +813,7 @@ mod tests {
         let embed = Embed::builder()
             .title("Yapcore")
             .description("Native Rust framework")
-            .color(0x5865_FF)
+            .color(0x0058_65FF)
             .field(crate::models::EmbedField::new("Language", "Rust").unwrap())
             .build()
             .unwrap();
