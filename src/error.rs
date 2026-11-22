@@ -125,7 +125,7 @@ pub enum Error {
     MessageContextRequired,
 
     /// The interaction already received a response attempt.
-    #[error("this interaction has already been answered")]
+    #[error("this interaction has reached its 10-response limit")]
     InteractionAlreadyAnswered,
 
     /// Plain-text messages cannot be empty.
