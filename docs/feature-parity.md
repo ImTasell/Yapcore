@@ -173,7 +173,7 @@ Do not treat voice presence management as equivalent to voice media streaming. T
 
 ## 10. Suggested milestone order
 
-1. **M0 — Decisions:** resolve MIT/GPL license mismatch; write down the documented API contract and unverified features.
+1. **M0 — Decisions: COMPLETED.** GPL-3.0-only selected; source audit, feature inventory, API contract, architecture and dependency decisions are documented.
 2. **M1 — Core client:** configuration, token handling, reqwest client, error types, typed IDs and raw API escape hatch.
 3. **M2 — Event loop:** official long polling, cursor management, event models, graceful shutdown and error propagation.
 4. **M3 — Commands:** command registry, synchronization, prefix parser, typed option parser and async handlers.
