@@ -302,7 +302,9 @@ impl Bot {
             (bot_id, data.get("command_for").and_then(Value::as_array))
         {
             let addressed_to_this_bot = targets.iter().any(|target| {
-                target.as_str().is_some_and(|target| target == bot_id.as_str())
+                target
+                    .as_str()
+                    .is_some_and(|target| target == bot_id.as_str())
             });
             if !addressed_to_this_bot {
                 return Ok(());
@@ -413,10 +415,7 @@ impl Bot {
 }
 
 fn poll_retry_delay(error: &Error, failures: u32) -> Option<Duration> {
-    let backoff_seconds = 1_u64
-        .checked_shl(failures.min(5))
-        .unwrap_or(30)
-        .min(30);
+    let backoff_seconds = 1_u64.checked_shl(failures.min(5)).unwrap_or(30).min(30);
     let backoff = Duration::from_secs(backoff_seconds);
 
     match error {
@@ -460,10 +459,7 @@ mod tests {
             bot.parse_prefix_command("!!ping hello there"),
             Some(("ping".to_owned(), "hello there".to_owned()))
         );
-        assert_eq!(
-            bot.parse_prefix_command("!unknown"),
-            None
-        );
+        assert_eq!(bot.parse_prefix_command("!unknown"), None);
     }
 
     #[test]
