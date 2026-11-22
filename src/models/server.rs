@@ -129,6 +129,26 @@ pub struct Member {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// A record describing a user banned from a server.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Ban {
+    /// Banned user identifier.
+    #[serde(default)]
+    pub user_id: Option<UserId>,
+    /// User identifier of the moderator who created the ban.
+    #[serde(default)]
+    pub banned_by: Option<UserId>,
+    /// When the ban was created.
+    #[serde(default)]
+    pub created_at: Option<String>,
+    /// Public profile of the banned user, when included by Yapper.
+    #[serde(default)]
+    pub user: Option<UserProfile>,
+    /// Additional ban fields not yet modelled by Yapcore.
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// A server role.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Role {
