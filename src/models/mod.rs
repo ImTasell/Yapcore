@@ -12,3 +12,7 @@ pub use command::{CommandDefinition, CommandDefinitionError};
 mod event;
 
 pub use event::{EventBatch, EventEnvelope};
+
+mod message;
+
+pub use message::Message;
