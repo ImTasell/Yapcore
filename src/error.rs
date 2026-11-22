@@ -153,7 +153,7 @@ fn truncate_message(message: &str, maximum_characters: usize) -> String {
     let mut result: String = message.chars().take(maximum_characters).collect();
 
     if message.chars().count() > maximum_characters {
-        result.push_str("…");
+        result.push('…');
     }
 
     result
@@ -161,8 +161,6 @@ fn truncate_message(message: &str, maximum_characters: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use super::*;
 
     #[test]
