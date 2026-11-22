@@ -40,7 +40,7 @@ The following is the human-readable REST endpoint index as exposed by the develo
 | GET | `/commands` | Read registered commands |
 | PUT | `/commands` | Replace the entire command list: `{ "commands": [{ "name": "ping", "description": "..." }] }` |
 
-Command registration constraints: up to 50 commands; names are 1–32 lowercase letters, numbers, hyphens or underscores; descriptions max 100 characters; names must be unique. Since PUT replaces the whole list, Yapcore must send the complete registry, not one command at a time.
+Command registration constraints: the current official guide says up to 50 commands; names are 1–32 lowercase letters, numbers, hyphens or underscores; descriptions max 100 characters; names must be unique. The Python upstream source allows 100 locally (`COMMAND_LIMIT = 100`), which exceeds the documented platform cap. Yapcore deliberately validates to 50. Since PUT replaces the whole list, Yapcore must send the complete registry, not one command at a time.
 
 ### Event polling
 
