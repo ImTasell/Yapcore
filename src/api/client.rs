@@ -46,7 +46,11 @@ impl ApiClient {
             .timeout(config.request_timeout())
             .redirect(Policy::none())
             .default_headers(headers)
-            .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!(
+                env!("CARGO_PKG_NAME"),
+                "/",
+                env!("CARGO_PKG_VERSION")
+            ))
             .build()
             .map_err(sanitize_transport_error)?;
 
