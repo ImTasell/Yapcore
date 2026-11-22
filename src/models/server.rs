@@ -5,6 +5,24 @@ use serde_json::Value;
 
 use crate::ids::{CategoryId, ChannelId, RoleId, ServerId, UserId};
 
+/// Filter for text or voice channel listings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChannelType {
+    /// Text channels.
+    Text,
+    /// Voice channels.
+    Voice,
+}
+
+impl ChannelType {
+    pub(crate) fn as_query_value(self) -> &'static str {
+        match self {
+            Self::Text => "text",
+            Self::Voice => "voice",
+        }
+    }
+}
+
 /// A server the bot has been added to.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Server {
