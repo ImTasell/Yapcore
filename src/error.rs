@@ -108,6 +108,14 @@ pub enum Error {
     #[error(transparent)]
     CommandDefinition(#[from] CommandDefinitionError),
 
+    /// The event poll wait exceeds Yapper's 25-second maximum.
+    #[error("event poll wait must be between 0 and 25 seconds")]
+    InvalidEventPollWait,
+
+    /// The event catch-up age exceeds the one-day maximum.
+    #[error("event max_age must not exceed 86,400 seconds")]
+    InvalidEventMaxAge,
+
     /// The request failed before a usable HTTP response was received.
     ///
     /// The underlying Reqwest error has its URL removed to avoid accidental
