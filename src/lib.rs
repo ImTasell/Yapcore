@@ -12,6 +12,7 @@ pub mod bot;
 pub mod commands;
 pub mod config;
 pub mod error;
+pub mod events;
 pub mod ids;
 pub mod interactions;
 pub mod models;
@@ -21,6 +22,7 @@ pub use bot::{Bot, BotBuilder, ShutdownHandle};
 pub use commands::{CommandContext, HandlerError, HandlerResult};
 pub use config::{Config, ConfigBuilder, ConfigError, DEFAULT_API_BASE_URL};
 pub use error::{ApiError, Error, Result};
+pub use events::EventRegistrationError;
 pub use ids::{
     CategoryId, ChannelId, EmojiId, IdError, InteractionId, MessageId, RoleId, ServerId, ThreadId,
     UserId, WebhookId,
