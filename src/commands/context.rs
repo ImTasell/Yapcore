@@ -206,27 +206,81 @@ impl CommandContext {
 
         // Claim the response slot before I/O. If the connection fails after
         // Yapper has accepted the callback, retrying could duplicate it.
-        let mut count = interaction.response_count.load(Ordering::Acquire);
-        loop {
-            if count >= 10 {
-                return Err(Error::InteractionAlreadyAnswered);
-            }
-
-            match interaction.response_count.compare_exchange_weak(
-                count,
-                count + 1,
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            ) {
-                Ok(_) => break,
-                Err(actual) => count = actual,
-            }
-        }
+        claim_interaction_response(&interaction.response_count)?;
 
         self.api
             .respond_interaction(&interaction.id, &interaction.token, response_type, content)
             .await?;
 
         Ok(())
+    }
+}
+
+
+fn claim_interaction_response(response_count: &AtomicU8) -> Result<()> {
+    let mut count = response_count.load(Ordering::Acquire);
+
+    loop {
+        if count >= 10 {
+            return Err(Error::InteractionAlreadyAnswered);
+        }
+
+        match response_count.compare_exchange_weak(
+            count,
+            count + 1,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        ) {
+            Ok(_) => return Ok(()),
+            Err(actual) => count = actual,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::AtomicUsize;
+    use std::thread;
+
+    use super::*;
+
+    #[test]
+    fn interaction_allows_exactly_ten_response_claims() {
+        let response_count = AtomicU8::new(0);
+
+        for _ in 0..10 {
+            assert!(claim_interaction_response(&response_count).is_ok());
+        }
+
+        assert!(matches!(
+            claim_interaction_response(&response_count),
+            Err(Error::InteractionAlreadyAnswered)
+        ));
+        assert_eq!(response_count.load(Ordering::Acquire), 10);
+    }
+
+    #[test]
+    fn concurrent_interaction_response_claims_never_exceed_ten() {
+        let response_count = Arc::new(AtomicU8::new(0));
+        let successful_claims = Arc::new(AtomicUsize::new(0));
+        let mut workers = Vec::new();
+
+        for _ in 0..32 {
+            let response_count = response_count.clone();
+            let successful_claims = successful_claims.clone();
+
+            workers.push(thread::spawn(move || {
+                if claim_interaction_response(&response_count).is_ok() {
+                    successful_claims.fetch_add(1, Ordering::Relaxed);
+                }
+            }));
+        }
+
+        for worker in workers {
+            worker.join().unwrap();
+        }
+
+        assert_eq!(successful_claims.load(Ordering::Relaxed), 10);
+        assert_eq!(response_count.load(Ordering::Acquire), 10);
     }
 }
