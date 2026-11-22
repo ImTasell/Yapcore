@@ -98,7 +98,7 @@ impl BotBuilder {
             .filter(|prefix: &String| !prefix.is_empty())
             .collect();
         self.prefixes
-            .sort_by(|left, right| right.len().cmp(&left.len()));
+            .sort_by_key(|prefix| std::cmp::Reverse(prefix.len()));
         self.prefixes.dedup();
         self
     }
