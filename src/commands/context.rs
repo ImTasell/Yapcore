@@ -1,23 +1,12 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::AtomicU8;
 
 use secrecy::SecretString;
 
 use crate::api::ApiClient;
 use crate::error::{Error, Result};
 use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
+use crate::interactions::InteractionSession;
 use crate::models::InteractionResponseType;
-
-/// Shared credentials and response state for a slash-command interaction.
-///
-/// The token's Debug output is redacted by secrecy. The atomic counter permits
-/// Yapper's documented multiple-response interaction lifecycle.
-#[derive(Debug, Clone)]
-struct InteractionCredentials {
-    id: InteractionId,
-    token: SecretString,
-    response_count: Arc<AtomicU8>,
-}
 
 /// Inputs required to create a slash-command context.
 #[derive(Debug, Clone)]
@@ -42,7 +31,7 @@ pub struct CommandContext {
     message_id: Option<MessageId>,
     channel_id: ChannelId,
     author_id: Option<UserId>,
-    interaction: Option<InteractionCredentials>,
+    interaction: Option<InteractionSession>,
 }
 
 impl CommandContext {
@@ -71,11 +60,10 @@ impl CommandContext {
     }
 
     pub(crate) fn new_interaction(api: ApiClient, invocation: SlashCommandInvocation) -> Self {
-        let interaction = InteractionCredentials {
-            id: invocation.interaction_id,
-            token: invocation.interaction_token,
-            response_count: Arc::new(AtomicU8::new(0)),
-        };
+        let interaction = InteractionSession::new(
+            invocation.interaction_id,
+            invocation.interaction_token,
+        );
 
         let argv = invocation
             .args
@@ -192,7 +180,7 @@ impl CommandContext {
     pub(crate) fn interaction_response_count(&self) -> Option<Arc<AtomicU8>> {
         self.interaction
             .as_ref()
-            .map(|interaction| interaction.response_count.clone())
+            .map(InteractionSession::response_count)
     }
 
     async fn answer_interaction(
@@ -204,82 +192,6 @@ impl CommandContext {
             return Err(Error::InteractionRequired);
         };
 
-        // Claim the response slot before I/O. If the connection fails after
-        // Yapper has accepted the callback, retrying could duplicate it.
-        claim_interaction_response(&interaction.response_count)?;
-
-        self.api
-            .respond_interaction(&interaction.id, &interaction.token, response_type, content)
-            .await?;
-
-        Ok(())
-    }
-}
-
-fn claim_interaction_response(response_count: &AtomicU8) -> Result<()> {
-    let mut count = response_count.load(Ordering::Acquire);
-
-    loop {
-        if count >= 10 {
-            return Err(Error::InteractionAlreadyAnswered);
-        }
-
-        match response_count.compare_exchange_weak(
-            count,
-            count + 1,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
-            Ok(_) => return Ok(()),
-            Err(actual) => count = actual,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::atomic::AtomicUsize;
-    use std::thread;
-
-    use super::*;
-
-    #[test]
-    fn interaction_allows_exactly_ten_response_claims() {
-        let response_count = AtomicU8::new(0);
-
-        for _ in 0..10 {
-            assert!(claim_interaction_response(&response_count).is_ok());
-        }
-
-        assert!(matches!(
-            claim_interaction_response(&response_count),
-            Err(Error::InteractionAlreadyAnswered)
-        ));
-        assert_eq!(response_count.load(Ordering::Acquire), 10);
-    }
-
-    #[test]
-    fn concurrent_interaction_response_claims_never_exceed_ten() {
-        let response_count = Arc::new(AtomicU8::new(0));
-        let successful_claims = Arc::new(AtomicUsize::new(0));
-        let mut workers = Vec::new();
-
-        for _ in 0..32 {
-            let response_count = response_count.clone();
-            let successful_claims = successful_claims.clone();
-
-            workers.push(thread::spawn(move || {
-                if claim_interaction_response(&response_count).is_ok() {
-                    successful_claims.fetch_add(1, Ordering::Relaxed);
-                }
-            }));
-        }
-
-        for worker in workers {
-            worker.join().unwrap();
-        }
-
-        assert_eq!(successful_claims.load(Ordering::Relaxed), 10);
-        assert_eq!(response_count.load(Ordering::Acquire), 10);
+        interaction.respond(&self.api, response_type, content).await
     }
 }
