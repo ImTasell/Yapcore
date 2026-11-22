@@ -8,7 +8,11 @@ use serde_json::Value;
 
 use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
-use crate::models::{BotProfile, CommandDefinition, EventBatch, Message, validate_command_list};
+use crate::ids::InteractionId;
+use crate::models::{
+    BotProfile, CommandDefinition, EventBatch, InteractionResponseType, Message,
+    validate_command_list,
+};
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
 #[derive(Clone)]
@@ -154,6 +158,43 @@ impl ApiClient {
 
         let value = self.request_json_url(Method::GET, url, None).await?;
         serde_json::from_value(value).map_err(Error::from)
+    }
+
+    /// Answer a slash-command or button interaction.
+    ///
+    /// The token is kept in a secret wrapper and inserted as a URL path
+    /// segment, which ensures reserved characters are percent-encoded.
+    /// Callback requests are never automatically retried.
+    pub(crate) async fn respond_interaction(
+        &self,
+        interaction_id: &InteractionId,
+        interaction_token: &secrecy::SecretString,
+        response_type: InteractionResponseType,
+        content: Option<&str>,
+    ) -> Result<Value> {
+        let mut url = self
+            .config
+            .api_base_url()
+            .join("interactions/")
+            .map_err(|_| Error::InvalidApiRoute("interactions".to_owned()))?;
+
+        {
+            let mut segments = url
+                .path_segments_mut()
+                .map_err(|_| Error::InvalidApiRoute("interactions".to_owned()))?;
+            segments
+                .pop_if_empty()
+                .push(interaction_id.as_str())
+                .push(interaction_token.expose_secret())
+                .push("callback");
+        }
+
+        let mut body = serde_json::json!({ "type": response_type });
+        if let Some(content) = content {
+            body["content"] = serde_json::json!(content);
+        }
+
+        self.request_json_url(Method::POST, url, Some(body)).await
     }
 
     /// Replace the bot's complete registered command list with PUT /commands.
@@ -449,6 +490,34 @@ mod tests {
             }
             other => panic!("expected an API error, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn responds_to_interaction_with_encoded_token_and_callback_body() {
+        let server = LocalMockServer::start(200, &[], r#"{"ok":true}"#.to_owned());
+        let client = test_client(&server, 1024).await;
+        let interaction_id = InteractionId::new("123e4567-e89b-12d3-a456-426614174010").unwrap();
+        let interaction_token = secrecy::SecretString::from("token-with/slash");
+
+        let response = client
+            .respond_interaction(
+                &interaction_id,
+                &interaction_token,
+                InteractionResponseType::Ephemeral,
+                Some("Only you can see this"),
+            )
+            .await
+            .unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "POST /api/bot/v1/interactions/123e4567-e89b-12d3-a456-426614174010/token-with%2Fslash/callback HTTP/1.1"
+        ));
+        let request_body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(request_body).unwrap();
+        assert_eq!(payload["type"], "ephemeral");
+        assert_eq!(payload["content"], "Only you can see this");
+        assert!(response["ok"].as_bool().unwrap());
     }
 
     #[tokio::test]
