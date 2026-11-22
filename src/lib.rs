@@ -14,6 +14,7 @@ pub mod config;
 pub mod error;
 pub mod ids;
 pub mod models;
+pub(crate) mod interactions;
 
 pub use api::ApiClient;
 pub use bot::{Bot, BotBuilder, ShutdownHandle};
