@@ -61,10 +61,8 @@ impl CommandContext {
     }
 
     pub(crate) fn new_interaction(api: ApiClient, invocation: SlashCommandInvocation) -> Self {
-        let interaction = InteractionSession::new(
-            invocation.interaction_id,
-            invocation.interaction_token,
-        );
+        let interaction =
+            InteractionSession::new(invocation.interaction_id, invocation.interaction_token);
 
         let argv = invocation
             .args
