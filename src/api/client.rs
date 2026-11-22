@@ -90,7 +90,8 @@ impl ApiClient {
         content: Option<&str>,
         embeds: &[Embed],
     ) -> Result<Message> {
-        self.send_rich_message(channel_id, content, embeds, &[]).await
+        self.send_rich_message(channel_id, content, embeds, &[])
+            .await
     }
 
     /// Send a message with button action rows.
@@ -103,7 +104,8 @@ impl ApiClient {
         content: Option<&str>,
         components: &[crate::models::ActionRow],
     ) -> Result<Message> {
-        self.send_rich_message(channel_id, content, &[], components).await
+        self.send_rich_message(channel_id, content, &[], components)
+            .await
     }
 
     /// Send a message containing any supported combination of text, embeds and buttons.
@@ -854,9 +856,18 @@ mod tests {
         let body = request.split_once("\r\n\r\n").unwrap().1;
         let payload: Value = serde_json::from_str(body).unwrap();
         assert_eq!(payload["components"][0]["type"], "row");
-        assert_eq!(payload["components"][0]["components"][0]["style"], "success");
-        assert_eq!(payload["components"][0]["components"][1]["custom_id"], "vote:no");
-        assert_eq!(payload["components"][0]["components"][2]["url"], "https://example.com/rules");
+        assert_eq!(
+            payload["components"][0]["components"][0]["style"],
+            "success"
+        );
+        assert_eq!(
+            payload["components"][0]["components"][1]["custom_id"],
+            "vote:no"
+        );
+        assert_eq!(
+            payload["components"][0]["components"][2]["url"],
+            "https://example.com/rules"
+        );
     }
 
     #[tokio::test]
@@ -867,12 +878,14 @@ mod tests {
             crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174002").unwrap();
         let rows = [
             crate::models::ActionRow::new([
-                crate::models::Button::primary("First", "duplicate").unwrap(),
+                crate::models::Button::primary("First", "duplicate").unwrap()
             ])
             .unwrap(),
-            crate::models::ActionRow::new([
-                crate::models::Button::secondary("Second", "duplicate").unwrap(),
-            ])
+            crate::models::ActionRow::new([crate::models::Button::secondary(
+                "Second",
+                "duplicate",
+            )
+            .unwrap()])
             .unwrap(),
         ];
 
