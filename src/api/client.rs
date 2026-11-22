@@ -371,7 +371,7 @@ mod tests {
             "Show information about the bot"
         );
         assert!(payload.get("interactions").is_none());
-        assert_eq!(response["ok"], true);
+        assert!(response["ok"].as_bool().unwrap());
     }
 
     #[tokio::test]
