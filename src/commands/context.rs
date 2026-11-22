@@ -61,13 +61,13 @@ impl CommandContext {
         content: String,
         args: String,
         interaction_id: InteractionId,
-        interaction_token: String,
+        interaction_token: SecretString,
         channel_id: ChannelId,
         author_id: Option<UserId>,
     ) -> Self {
         let interaction = InteractionCredentials {
             id: interaction_id,
-            token: SecretString::from(interaction_token),
+            token: interaction_token,
             response_count: Arc::new(AtomicU8::new(0)),
         };
 
@@ -226,12 +226,7 @@ impl CommandContext {
             .map_err(|_| Error::InteractionAlreadyAnswered)?;
 
         self.api
-            .respond_interaction(
-                &interaction.id,
-                &interaction.token,
-                response_type,
-                content,
-            )
+            .respond_interaction(&interaction.id, &interaction.token, response_type, content)
             .await?;
 
         Ok(())
