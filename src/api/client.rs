@@ -10,8 +10,9 @@ use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
 use crate::ids::InteractionId;
 use crate::models::{
-    BotProfile, CommandDefinition, Embed, EventBatch, InteractionResponseType, Message,
-    validate_action_rows, validate_command_list,
+    BotProfile, Channel, ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch,
+    InteractionResponseType, Member, Message, Role, Server, UserProfile, validate_action_rows,
+    validate_command_list,
 };
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
@@ -205,6 +206,121 @@ impl ApiClient {
 
         let message = response.get("message").cloned().unwrap_or(response);
         serde_json::from_value(message).map_err(Error::from)
+    }
+
+    /// List servers the bot has been added to.
+    pub async fn list_servers(&self) -> Result<Vec<Server>> {
+        let response = self.request_json(Method::GET, "servers", None).await?;
+        let servers = response.get("servers").cloned().unwrap_or(response);
+        serde_json::from_value(servers).map_err(Error::from)
+    }
+
+    /// Fetch details for one server.
+    pub async fn get_server(&self, server_id: &crate::ids::ServerId) -> Result<Server> {
+        let route = format!("servers/{server_id}");
+        let response = self.request_json(Method::GET, &route, None).await?;
+        let server = response.get("server").cloned().unwrap_or(response);
+        serde_json::from_value(server).map_err(Error::from)
+    }
+
+    /// List visible channels globally or within one server.
+    ///
+    /// The server-specific response also includes its categories.
+    pub async fn list_channels(
+        &self,
+        server_id: Option<&crate::ids::ServerId>,
+        channel_type: Option<ChannelType>,
+    ) -> Result<ChannelListing> {
+        let route = match server_id {
+            Some(server_id) => format!("servers/{server_id}/channels"),
+            None => "channels".to_owned(),
+        };
+        let mut url = self
+            .config
+            .api_base_url()
+            .join(&route)
+            .map_err(|_| Error::InvalidApiRoute(route.clone()))?;
+
+        if let Some(channel_type) = channel_type {
+            url.query_pairs_mut()
+                .append_pair("type", channel_type.as_query_value());
+        }
+
+        let response = self.request_json_url(Method::GET, url, None).await?;
+        serde_json::from_value(response).map_err(Error::from)
+    }
+
+    /// Fetch one visible channel.
+    pub async fn get_channel(&self, channel_id: &crate::ids::ChannelId) -> Result<Channel> {
+        let route = format!("channels/{channel_id}");
+        let response = self.request_json(Method::GET, &route, None).await?;
+        let channel = response.get("channel").cloned().unwrap_or(response);
+        serde_json::from_value(channel).map_err(Error::from)
+    }
+
+    /// List server members in user-ID order.
+    ///
+    /// The server defaults to 200 members and accepts at most 500 per page.
+    /// The after cursor is the last user ID from the previous page.
+    pub async fn list_members(
+        &self,
+        server_id: &crate::ids::ServerId,
+        limit: Option<usize>,
+        after: Option<&crate::ids::UserId>,
+    ) -> Result<Vec<Member>> {
+        if let Some(limit) = limit {
+            if !(1..=500).contains(&limit) {
+                return Err(Error::InvalidMemberPageLimit { actual: limit });
+            }
+        }
+
+        let mut url = self
+            .config
+            .api_base_url()
+            .join(&format!("servers/{server_id}/members"))
+            .map_err(|_| Error::InvalidApiRoute("members".to_owned()))?;
+
+        {
+            let mut query = url.query_pairs_mut();
+            if let Some(limit) = limit {
+                query.append_pair("limit", &limit.to_string());
+            }
+            if let Some(after) = after {
+                query.append_pair("after", after.as_str());
+            }
+        }
+
+        let response = self.request_json_url(Method::GET, url, None).await?;
+        let members = response.get("members").cloned().unwrap_or(response);
+        serde_json::from_value(members).map_err(Error::from)
+    }
+
+    /// Fetch one server member, including nickname, role IDs and timeout data.
+    pub async fn get_member(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &crate::ids::UserId,
+    ) -> Result<Member> {
+        let route = format!("servers/{server_id}/members/{user_id}");
+        let response = self.request_json(Method::GET, &route, None).await?;
+        let member = response.get("member").cloned().unwrap_or(response);
+        serde_json::from_value(member).map_err(Error::from)
+    }
+
+    /// List roles in a server.
+    pub async fn list_roles(&self, server_id: &crate::ids::ServerId) -> Result<Vec<Role>> {
+        let route = format!("servers/{server_id}/roles");
+        let response = self.request_json(Method::GET, &route, None).await?;
+        let roles = response.get("roles").cloned().unwrap_or(response);
+        serde_json::from_value(roles).map_err(Error::from)
+    }
+
+    /// Fetch one public user profile.
+    pub async fn get_user(&self, user_id: &crate::ids::UserId) -> Result<UserProfile> {
+        let route = format!("users/{user_id}");
+        let response = self.request_json(Method::GET, &route, None).await?;
+        let user = response.get("user").cloned().unwrap_or(response);
+        serde_json::from_value(user).map_err(Error::from)
     }
 
     /// Fetch recent channel messages in oldest-first order.
@@ -1332,6 +1448,124 @@ mod tests {
         assert!(matches!(
             client.get_messages_after(&channel_id, "").await,
             Err(Error::EmptyMessageCursor)
+        ));
+    }
+
+    #[tokio::test]
+    async fn lists_servers_from_the_documented_response_wrapper() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "servers": [{
+                    "id": SERVER_ID,
+                    "name": "Example",
+                    "member_count": 12
+                }]
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+
+        let servers = client.list_servers().await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with("GET /api/bot/v1/servers HTTP/1.1"));
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers[0].name.as_deref(), Some("Example"));
+        assert_eq!(servers[0].member_count, Some(12));
+    }
+
+    #[tokio::test]
+    async fn lists_server_channels_with_type_and_categories() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174021";
+        const CATEGORY_ID: &str = "123e4567-e89b-12d3-a456-426614174024";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "channels": [{
+                    "id": CHANNEL_ID,
+                    "name": "general",
+                    "type": "text",
+                    "server_id": SERVER_ID
+                }],
+                "categories": [{
+                    "id": CATEGORY_ID,
+                    "name": "Community"
+                }]
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+
+        let listing = client
+            .list_channels(Some(&server_id), Some(ChannelType::Text))
+            .await
+            .unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "GET /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/channels?type=text HTTP/1.1"
+        ));
+        assert_eq!(listing.channels.len(), 1);
+        assert_eq!(listing.channels[0].channel_type.as_deref(), Some("text"));
+        assert_eq!(listing.categories[0].name.as_deref(), Some("Community"));
+    }
+
+    #[tokio::test]
+    async fn lists_members_with_limit_and_after_user_cursor() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "members": [{
+                    "id": USER_ID,
+                    "username": "new-member",
+                    "role_ids": []
+                }]
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+        let after = crate::ids::UserId::new(USER_ID).unwrap();
+
+        let members = client
+            .list_members(&server_id, Some(500), Some(&after))
+            .await
+            .unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "GET /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/members?limit=500&after=123e4567-e89b-12d3-a456-426614174022 HTTP/1.1"
+        ));
+        assert_eq!(members.len(), 1);
+        assert_eq!(members[0].username.as_deref(), Some("new-member"));
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_member_page_sizes_before_networking() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        let server_id =
+            crate::ids::ServerId::new("123e4567-e89b-12d3-a456-426614174020").unwrap();
+
+        assert!(matches!(
+            client.list_members(&server_id, Some(0), None).await,
+            Err(Error::InvalidMemberPageLimit { actual: 0 })
+        ));
+        assert!(matches!(
+            client.list_members(&server_id, Some(501), None).await,
+            Err(Error::InvalidMemberPageLimit { actual: 501 })
         ));
     }
 
