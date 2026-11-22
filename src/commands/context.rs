@@ -70,17 +70,18 @@ impl CommandContext {
         }
     }
 
-    pub(crate) fn new_interaction(
-        api: ApiClient,
-        invocation: SlashCommandInvocation,
-    ) -> Self {
+    pub(crate) fn new_interaction(api: ApiClient, invocation: SlashCommandInvocation) -> Self {
         let interaction = InteractionCredentials {
             id: invocation.interaction_id,
             token: invocation.interaction_token,
             response_count: Arc::new(AtomicU8::new(0)),
         };
 
-        let argv = invocation.args.split_whitespace().map(str::to_owned).collect();
+        let argv = invocation
+            .args
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect();
 
         Self {
             api,
