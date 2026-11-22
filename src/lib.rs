@@ -22,4 +22,6 @@ pub use ids::{
     CategoryId, ChannelId, EmojiId, IdError, MessageId, RoleId, ServerId, ThreadId, UserId,
     WebhookId,
 };
-pub use models::{BotProfile, CommandDefinition, CommandDefinitionError};
+pub use models::{
+    BotProfile, CommandDefinition, CommandDefinitionError, EventBatch, EventEnvelope,
+};
