@@ -19,9 +19,9 @@ impl CommandDefinition {
 
         if name.is_empty()
             || name.len() > 32
-            || !name
-                .bytes()
-                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_'))
+            || !name.bytes().all(|byte| {
+                byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_')
+            })
         {
             return Err(CommandDefinitionError::InvalidName);
         }
