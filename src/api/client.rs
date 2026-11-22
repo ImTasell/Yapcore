@@ -800,6 +800,100 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn bulk_delete_sends_documented_ids_and_preserves_result() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ONE: &str = "123e4567-e89b-12d3-a456-426614174001";
+        const MESSAGE_TWO: &str = "123e4567-e89b-12d3-a456-426614174003";
+
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "deleted": [MESSAGE_ONE],
+                "skipped": [MESSAGE_TWO]
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let message_ids = [
+            crate::ids::MessageId::new(MESSAGE_ONE).unwrap(),
+            crate::ids::MessageId::new(MESSAGE_TWO).unwrap(),
+        ];
+
+        let result = client
+            .bulk_delete_messages(&channel_id, &message_ids)
+            .await
+            .unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "POST /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174002/messages/bulk-delete HTTP/1.1"
+        ));
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["ids"].as_array().unwrap().len(), 2);
+        assert_eq!(result["deleted"][0], MESSAGE_ONE);
+        assert_eq!(result["skipped"][0], MESSAGE_TWO);
+    }
+
+    #[tokio::test]
+    async fn bulk_delete_rejects_invalid_id_counts_before_networking() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        let channel_id =
+            crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174002").unwrap();
+        let one_id =
+            crate::ids::MessageId::new("123e4567-e89b-12d3-a456-426614174001").unwrap();
+        let too_many = vec![one_id; 101];
+
+        assert!(matches!(
+            client.bulk_delete_messages(&channel_id, &[]).await,
+            Err(Error::InvalidBulkDeleteCount { actual: 0 })
+        ));
+        assert!(matches!(
+            client.bulk_delete_messages(&channel_id, &too_many).await,
+            Err(Error::InvalidBulkDeleteCount { actual: 101 })
+        ));
+    }
+
+    #[tokio::test]
+    async fn pins_a_message_with_put() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+
+        let server = LocalMockServer::start(204, &[], String::new());
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let message_id = crate::ids::MessageId::new(MESSAGE_ID).unwrap();
+
+        client.pin_message(&channel_id, &message_id).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "PUT /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174002/messages/123e4567-e89b-12d3-a456-426614174001/pin HTTP/1.1"
+        ));
+    }
+
+    #[tokio::test]
+    async fn unpins_a_message_with_delete() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+
+        let server = LocalMockServer::start(204, &[], String::new());
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let message_id = crate::ids::MessageId::new(MESSAGE_ID).unwrap();
+
+        client.unpin_message(&channel_id, &message_id).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "DELETE /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174002/messages/123e4567-e89b-12d3-a456-426614174001/pin HTTP/1.1"
+        ));
+    }
+
+    #[tokio::test]
     async fn adds_reactions_using_one_encoded_emoji_path_segment() {
         const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
         const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
