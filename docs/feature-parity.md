@@ -76,7 +76,7 @@ The official docs say event history is retained for one day. A persistent cursor
 | [~] Documented | Slash command synchronization | `ApiClient::sync_commands` exists; runtime slash handling/automatic sync awaits interaction support |
 | [x] Documented | Prefix-command parsing | Longest matching prefix, case-insensitive name handling |
 | [x] Documented | `args` and `argv` | Typed `CommandContext` argument access |
-| [x] Documented | 50 command maximum per bot | Enforced when preparing a full command list for sync |
+| [x] Documented | 50 command maximum per bot (Python SDK local cap is 100) | Rust follows the stricter official platform cap before full-list sync |
 | [ ] Documented | Per-command permission/check callback | Async check hook |
 | [ ] Verify | Typed options: string/integer/number/boolean/user/channel/role | Typed option schema and parser |
 | [ ] Verify | Choices and named `key=value` input | Parser compatibility tests |
