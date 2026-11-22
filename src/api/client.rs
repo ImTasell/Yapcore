@@ -153,9 +153,7 @@ impl ApiClient {
 
         let route = format!("channels/{channel_id}/messages/{message_id}");
         let body = serde_json::json!({ "content": content });
-        let response = self
-            .request_json(Method::PATCH, &route, Some(body))
-            .await?;
+        let response = self.request_json(Method::PATCH, &route, Some(body)).await?;
         let message = response.get("message").cloned().unwrap_or(response);
         serde_json::from_value(message).map_err(Error::from)
     }
