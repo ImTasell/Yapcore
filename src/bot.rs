@@ -95,6 +95,9 @@ mod tests {
     #[test]
     fn builder_requires_a_bot_token() {
         let error = Bot::builder().build().unwrap_err();
-        assert!(matches!(error, crate::Error::Configuration(ConfigError::MissingToken)));
+        assert!(matches!(
+            error,
+            crate::Error::Configuration(ConfigError::MissingToken)
+        ));
     }
 }
