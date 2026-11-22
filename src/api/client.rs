@@ -72,6 +72,27 @@ impl ApiClient {
         channel_id: &crate::ids::ChannelId,
         content: &str,
     ) -> Result<Message> {
+        self.send_message_inner(channel_id, content, None).await
+    }
+
+    /// Reply to an existing message in a channel.
+    ///
+    /// The reply reference is included in the request body as reply_to.
+    pub async fn reply_message(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        message_id: &crate::ids::MessageId,
+        content: &str,
+    ) -> Result<Message> {
+        self.send_message_inner(channel_id, content, Some(message_id)).await
+    }
+
+    async fn send_message_inner(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        content: &str,
+        reply_to: Option<&crate::ids::MessageId>,
+    ) -> Result<Message> {
         if content.is_empty() {
             return Err(Error::EmptyMessageContent);
         }
@@ -85,7 +106,10 @@ impl ApiClient {
         }
 
         let route = format!("channels/{channel_id}/messages");
-        let body = serde_json::json!({ "content": content });
+        let mut body = serde_json::json!({ "content": content });
+        if let Some(message_id) = reply_to {
+            body["reply_to"] = serde_json::json!(message_id.as_str());
+        }
         let response = self.request_json(Method::POST, &route, Some(body)).await?;
 
         let message = response.get("message").cloned().unwrap_or(response);
