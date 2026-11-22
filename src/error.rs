@@ -145,6 +145,17 @@ pub enum Error {
     #[error("reaction emoji identifier must not be empty")]
     InvalidEmoji,
 
+    /// A recent-message page size must be between 1 and 100.
+    #[error("message page limit must be between 1 and 100; received {actual}")]
+    InvalidMessagePageLimit {
+        /// Requested page size.
+        actual: usize,
+    },
+
+    /// A forward-message cursor must not be empty.
+    #[error("message cursor must not be empty")]
+    EmptyMessageCursor,
+
     /// A bulk-delete request must contain between 1 and 100 message IDs.
     #[error("bulk delete requires 1-100 message IDs; received {actual}")]
     InvalidBulkDeleteCount {
