@@ -1,115 +1,159 @@
-# Yapcore architecture proposal
+# Yapcore architecture
 
-**Status:** Proposed; no implementation has been committed.  
-**Audit date:** 2026-11-21
+**Status:** Locked for the v0.1 implementation baseline  
+**Decision date:** 2026-11-21  
+**License:** GPL-3.0-only  
+**Crate:** \`yapcore\`  
+**Protocol authority:** the current public Yapper developer guide and API contract in [api-contract.md](api-contract.md)
 
-## 1. Goals
+This document is the implementation contract for the initial crate. It intentionally separates the stable, documented platform surface from unverified features in the Python framework. "Feature parity" means reproducing supported behavior, not copying Python's syntax or internals.
 
-Yapcore is a native Rust framework for building bots on Yapper. It aims to preserve the useful capabilities of the `our-websites/yapper.py` framework while using Rust-native APIs, async execution and a maintainable module structure.
+## 1. Product and engineering goals
 
-Priorities:
+Yapcore is a native Rust framework for building bots on Yapper. It should feel like an idiomatic Rust library, not a mechanical translation of Python.
 
-1. Correctness against the official Yapper HTTP API.
-2. Feature parity for documented, supported functionality.
-3. Async I/O and predictable shutdown/reconnect behavior.
-4. Strongly typed public models with a raw JSON escape hatch.
-5. Useful errors and safe retry behavior.
-6. A small, deliberate dependency set and modular optional features.
+Priorities, in order:
 
-Non-goals for the first release:
+1. Correct HTTP/API behavior and safe handling of bot credentials.
+2. Reliable event polling, cursor handling and graceful shutdown.
+3. Ergonomic async command and event handlers.
+4. Broad coverage of documented bot endpoints.
+5. Maintainable typed models/builders with forward-compatible raw JSON access.
+6. A small default dependency graph and reproducible builds.
 
-- Reproducing Python decorators or Python's dynamic import behavior.
-- Reproducing the upstream monolithic file structure.
-- Porting the separate telemetry web server/panel.
-- Implementing undocumented gateway or voice-media protocols before they are confirmed.
+The framework must not claim support for API behavior that Yapper does not document or that has not been verified against a dedicated test bot.
 
-## 2. Protocol baseline
+## 2. Locked platform scope
 
-Use the current official documented base URL:
+### Stable v0.1 platform contract
 
-```text
-https://www.yapper.website/api/bot/v1
-```
+- REST base URL: \`https://www.yapper.website/api/bot/v1\`.
+- Authentication header: \`Authorization: Bot <token>\`.
+- JSON is the default request/response representation.
+- Event transport: long polling through \`GET /events?after=<cursor>&wait=25\`.
+- Poll response cap: 100 events; maximum long-poll wait: 25 seconds.
+- Commands are synchronized as a complete list through \`PUT /commands\`.
+- Message, embed, button-interaction, server, channel, member, role, moderation, DM-opening and voice-state APIs follow the public contract in \`api-contract.md\`.
+- Use a real bot token from the Developer settings. Normal user-account automation is out of scope.
 
-Authenticate every bot API request with:
+### Explicitly deferred
 
-```http
-Authorization: Bot <bot-token>
-Content-Type: application/json
-```
+| Feature | Decision |
+| --- | --- |
+| Python package's custom WebSocket gateway | Not in v0.1. The current public guide does not document its protocol. |
+| Bot joining calls / LiveKit audio / E2EE media | Not supported by the public bot contract; do not port. |
+| Select menus and modal submit handlers | Wait for official payload-schema verification. |
+| Components V2 layouts | Wait for official payload-schema verification. |
+| Message attachments, sticker IDs and nonce-based send deduplication | Wait for the raw API contract or live test-bot confirmation. |
+| Threads, scheduled events, custom emoji CRUD, detailed permission overrides, bot-managed webhook CRUD | Implement only after each route is confirmed. |
+| Dynamic source-code hot reload | Not a Rust library baseline. Use statically linked cog registration. |
+| Telemetry | Not in v0.1. If added later, it is opt-in, previewable and off by default. |
+| The Python telemetry receiver/panel | Separate service; out of scope for this client library. |
 
-The bot token is secret. It must never appear in logs, debug output, panic messages, telemetry or examples committed to the repository.
+The optional signed event webhook is a server-side delivery configuration, not the same thing as a channel webhook used to post messages. Long polling remains the default v0.1 client transport.
 
-The first transport is HTTPS REST plus event long polling:
+## 3. Language, crate and compatibility policy
 
-```text
-GET /events?after=<last_event_id>&wait=25
-```
+| Item | Decision |
+| --- | --- |
+| Package | One library crate named \`yapcore\` |
+| Edition | Rust 2024 |
+| MSRV | Rust 1.85 |
+| Version | Start at 0.1.0 |
+| License | GPL-3.0-only |
+| Runtime | Tokio |
+| HTTP | Reqwest with rustls |
+| Serialization | Serde / serde_json |
+| Error representation | Public structured error enum using thiserror |
+| Logging | tracing facade; the application chooses its subscriber |
+| Unsafe code | Forbidden in Yapcore's own source unless a documented, reviewed requirement appears (not expected) |
+| Workspace | Not yet. Add one only when separately published crates or tools actually require it. |
 
-The current official guide documents up to 100 events per response, waits up to 25 seconds, and describes event history retained for one day. Persisting the event cursor should be an optional capability so applications can catch up after restarts; a clean-start mode should also be available.
+Rust 1.85 is selected because it is the baseline for the 2024 edition and the chosen current Tokio/Reqwest release lines. The project must test both the declared MSRV and current stable Rust in CI.
 
-The Python source includes a WebSocket gateway at `wss://rt.yapper.website/bot`, but the current public developer guide does not document its protocol. Keep it out of the stable baseline. If the platform confirms it, add it behind an optional feature using a maintained WebSocket crate.
+Commit Cargo.lock for reproducible repository builds and CI. Dependency declarations use compatible version ranges; the lockfile records the exact tested graph. Keep the dependency graph lean and review new direct dependencies before adding them.
 
-## 3. Crate layout
+## 4. Crate structure
 
-Start as one library crate named `yapcore`, split into modules. A workspace is unnecessary until an independently versioned CLI, code generator or plugin host actually exists.
+Use a single crate with clear module boundaries. This is the intended shape, not a requirement to create every file in the first commit.
 
-Suggested source layout:
-
-```text
+~~~
 src/
   lib.rs
-  bot.rs              # Bot builder, runtime and lifecycle
-  config.rs           # token, API URL, prefixes, timeouts, feature options
-  client/
+  bot.rs                 # BotBuilder, Bot lifecycle, BotHandle
+  config.rs              # validated configuration
+  shutdown.rs            # watch-channel shutdown handle
+  error.rs                # public errors and API error decoding
+  ids.rs                  # typed string ID newtypes
+  api/
     mod.rs
-    http.rs            # Reqwest client, auth, request execution and retry policy
-    routes.rs          # route construction and query encoding
-  error.rs             # public error type and API error decoding
-  ids.rs               # typed ID newtypes
+    client.rs             # reusable Reqwest client and auth
+    request.rs            # request execution and bounded response reads
+    retry.rs              # Retry-After and safe retry policy
+    routes.rs             # route and query construction
+    resources/
+      mod.rs
+      bot.rs
+      commands.rs
+      events.rs
+      messages.rs
+      users.rs
+      servers.rs
+      members.rs
+      channels.rs
+      roles.rs
+      moderation.rs
+      voice.rs
   models/
     mod.rs
+    bot.rs
     user.rs
     server.rs
     member.rs
     channel.rs
-    message.rs
     role.rs
+    message.rs
     event.rs
+    interaction.rs
   events/
     mod.rs
-    poller.rs          # cursor-based long poll
-    dispatch.rs        # event routing and handler registration
+    poller.rs             # one cursor-based long-poll loop
+    dispatcher.rs         # bounded handler dispatch
+    registry.rs           # listeners and ownership metadata
+    context.rs
   commands/
     mod.rs
-    registry.rs
-    parser.rs
-    options.rs
+    registry.rs           # command definitions and full-list sync
+    parser.rs             # prefix and argument parsing
+    context.rs
   interactions/
     mod.rs
-    response.rs
-    components.rs
-    modal.rs           # add after schema verification
+    responder.rs          # callback response lifecycle/deadlines
+    context.rs
   builders/
     mod.rs
     embed.rs
     button.rs
-    layout.rs          # Components V2, after schema verification
-  cogs.rs              # runtime registration groups
-  telemetry.rs         # optional, explicit opt-in only
-  voice.rs             # voice presence management; no call media initially
-```
+  cogs.rs                 # statically linked registration groups
+~~~
 
-Names can be adjusted when implementation begins, but boundaries should remain clear: HTTP should not know about commands, and command dispatch should not know how JSON is transmitted.
+Keep the layers independent:
 
-## 4. Public API direction
+- The API client knows HTTP, authentication, routes, serialization, response limits and retry policy. It knows nothing about commands or event callbacks.
+- Models describe platform data and do not perform network requests.
+- The poller fetches event envelopes and manages cursor state. It does not parse prefix commands.
+- The dispatcher maps events to registered handlers. It does not construct URLs or know HTTP headers.
+- Command and interaction contexts provide ergonomic helper methods over the API client.
+- Builders produce JSON-compatible payload models. They do not send messages themselves.
 
-Use an async builder instead of trying to recreate Python decorators.
+## 5. Public API design
 
-Illustrative shape (not a committed API contract):
+### v0.1 user-facing shape
 
-```rust
-use yapcore::{Bot, CommandContext, Result};
+The target API is a builder plus explicit registration methods. This is the intended ergonomic direction; exact signatures will be compile-tested during the foundation milestone.
+
+~~~rust
+use yapcore::{Bot, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -118,209 +162,269 @@ async fn main() -> Result<()> {
         .prefixes(["/", "!"])
         .build()?;
 
-    bot.command("ping", "Check whether the bot is alive", |ctx: CommandContext| async move {
+    bot.command("ping", "Check whether the bot is alive", |ctx| async move {
         ctx.reply("pong").await?;
         Ok(())
     })?;
 
-    bot.on_message(|ctx| async move {
-        if ctx.message().mentioned {
-            ctx.reply(format!("hey {}", ctx.message().author_mention())).await?;
-        }
-        Ok(())
+    let shutdown = bot.shutdown_handle();
+    tokio::spawn(async move {
+        let _ = tokio::signal::ctrl_c().await;
+        shutdown.cancel();
     });
 
-    bot.start().await
+    bot.run().await
 }
-```
+~~~
 
-Exact handler traits and lifetimes should be decided in a small compile-tested API spike before the public interface is frozen. Async closure ergonomics in Rust have trade-offs; do not hide them behind unsafe code or overengineered procedural macros.
+The library does not install process signal handlers automatically. Applications decide how Ctrl+C, service-manager signals or their own shutdown conditions map to the shutdown handle.
 
-A likely internal representation is an owned event/context and a boxed `Send + 'static` future returned by each registered handler. A simpler generic callback abstraction can be chosen if the prototype proves it ergonomic.
+### Async handler representation
 
-## 5. Core internal design
+Do not add async-trait or a procedural macro for v0.1. Use generic registration functions and box futures only at the registry boundary:
 
-### Configuration
+~~~rust
+type HandlerFuture =
+    Pin<Box<dyn Future<Output = Result<(), HandlerError>> + Send + 'static>>;
 
-A validated `Config` should hold:
+type Handler =
+    Arc<dyn Fn(CommandContext) -> HandlerFuture + Send + Sync + 'static>;
+~~~
 
-- Token (redacted in `Debug` output).
-- Official API base URL, overridable for tests and compatible alternate deployments.
-- Prefix list.
-- Request/connect timeout.
-- Retry budget and retry policy.
-- Bot-message filtering option.
-- Poll wait/cursor policy.
-- Optional logger/tracing behavior.
+The public registration method is generic over a closure and its future, then stores a boxed future internally. This keeps call sites simple (\`|ctx| async move { ... }\`) without requiring users to write boxed futures.
 
-Read environment variables only when the builder asks for them. Optional `.env` support can use `dotenvy` behind a feature or be left to the application; it must not silently load secrets from surprising parent directories.
+Handlers receive owned contexts and owned event data. No handler future may borrow from the poller's temporary response buffer. Do not use unsafe lifetime tricks.
 
-### HTTP client
+### Contexts
 
-A cloneable API client should own one reusable `reqwest::Client` and shared immutable configuration.
+Use separate context types for different operations:
 
-Responsibilities:
+- \`MessageContext\`: message metadata and reply/say helpers.
+- \`CommandContext\`: command name, arguments, parsed options when supported, reply and ephemeral response helpers.
+- \`InteractionContext\`: interaction ID, user/message metadata and callback response helpers.
+- \`EventContext\`: typed event plus the API client for general listeners.
 
-- Add authentication and user-agent headers centrally.
-- Serialize request models with Serde.
-- Decode successful typed responses and error payloads.
-- Preserve unknown fields where forward compatibility is valuable.
-- Enforce bounded response/upload sizes.
-- Encode path segments and query parameters safely.
-- Apply method-aware retry rules.
+Context methods are async where they perform network requests. Raw platform payload access remains available through a \`serde_json::Value\` accessor for forward compatibility.
 
-Retry policy must not duplicate side effects. GET is normally safe to repeat. For POST, retry only when the API provides a documented idempotency mechanism and the same key is reused. Respect the server's `Retry-After` value for rate limits and retryable busy responses.
+### Bot lifecycle
 
-### Errors
+\`Bot::run()\` performs this sequence:
 
-Expose one public error type with structured categories, for example:
+1. Validate already-built configuration.
+2. Fetch the bot profile with \`GET /me\`.
+3. Synchronize the full registered command list with \`PUT /commands\`.
+4. Determine the initial cursor according to the configured start policy.
+5. Run exactly one long-poll loop.
+6. Dispatch events with bounded concurrency.
+7. Exit when the shutdown handle is cancelled; stop starting new work and drain in-flight handlers for a bounded grace period.
 
-- Configuration/token error.
-- Transport/timeout error.
-- HTTP/API error: status, API message, optional API code, optional permission, optional retry-after.
-- Serialization/deserialization error.
-- Event/handler error.
-- Shutdown/cancellation state.
+A \`BotHandle\` contains only the shutdown sender and any intentionally public control operations. It must not expose mutable internals.
 
-Do not convert every error into a string. Applications need to branch on 401, 403, 404, 409, 429 and 503.
+## 6. Runtime and event-delivery model
 
-### Event poller
+### Poller
 
-The poller should:
+- Exactly one poller per bot instance.
+- Use the documented 25-second maximum wait.
+- Use a 40-second HTTP timeout so the request timeout exceeds the long-poll wait with network overhead.
+- Use a cancellable \`tokio::select!\` around the long-poll request.
+- Skip duplicate/out-of-order event IDs at or below the committed cursor.
+- Never advance the cursor after a failed poll.
+- Do not poll again until the current response batch has been admitted to the dispatcher.
+- Respect the page-level \`last\` cursor only after all events in that response have been admitted/settled according to the documented response semantics. Keep the cursor logic isolated and contract-tested because the raw OpenAPI response schema still needs final verification.
 
-1. Start from either a configured cursor or a clean-start cursor.
-2. Request events after the last successfully processed ID.
-3. Process events in server order.
-4. Advance the cursor only after the event has been handed to the dispatcher according to the documented semantics.
-5. Keep the prior cursor when a request fails, so a retry does not silently skip data.
-6. Back off on network/server errors while respecting Retry-After.
-7. Stop promptly when cancellation is requested.
+### Startup cursor policy
 
-For stronger delivery guarantees, expose a cursor-store trait. The library should not require a database. An in-memory cursor is the default; applications can provide file/database persistence.
+Provide two explicit start modes:
 
-Unknown event types should not crash the runtime. Preserve the event name, common envelope and raw JSON payload so new server events can be handled before a new typed release.
+- \`Latest\` (default): call \`GET /events?after=0&wait=0\` and begin after the returned latest cursor. This matches the Python framework's clean-start behavior and avoids replaying the bot's historical backlog unexpectedly.
+- \`Resume(cursor)\`: begin after a caller-supplied saved cursor to catch up within the platform's one-day event retention.
 
-### Command registry and dispatcher
+Expose the current cursor so applications can persist it. Do not require SQLite, Redis or any database. A built-in persistent cursor store can be designed later if demand justifies it.
 
-The command registry should validate names/descriptions/options before syncing to `PUT /commands`.
+The library cannot promise exactly-once side effects. If an application persists a cursor and crashes during a batch, a later resume may replay events that were already handled but not covered by the last saved cursor. Handlers that perform external side effects should be idempotent.
 
-The dispatcher should separate:
-- Raw event decoding.
-- Filtering (for example, ignore bot-authored messages).
-- Prefix and command detection.
-- Slash-command option parsing.
-- Command checks.
-- Handler execution.
-- Interaction response tracking and acknowledgement.
-- Generic event listeners.
-- Error reporting.
+### Dispatch and backpressure
 
-Interactions must be treated as deadline-bound operations. The official guide requires a response within 3 seconds. The framework should prevent accidental double responses and offer an automatic acknowledgement policy, without hiding handler failures.
+- Use a bounded dispatcher; never create an unbounded task per event.
+- Default maximum concurrent ordinary event handlers: 8, configurable down to 1 for strict sequential behavior.
+- Invoke event handlers in received order, but when concurrency is greater than 1 their completion order is not guaranteed.
+- Time-sensitive interaction callbacks use a priority lane and must be started immediately; the dispatcher must not let a slow general message listener starve them.
+- Wait for all work from the current page to settle before accepting an unlimited amount of more work.
+- Handler errors and panics are isolated, sent to the error-reporting hook and do not crash the entire poller by default.
+- Provide a way to choose strict sequential event processing for bots whose logic depends on global event order.
 
-### Models and builders
+Do not hold a Tokio mutex or standard-library lock across an \`.await\`. Clone the handler \`Arc\`s while holding a registry lock, release the lock, then invoke handlers.
 
-Use typed structs/enums for common models and Serde. For API fields that are optional or may change, use `Option<T>` and preserve unknown data where needed.
+### Unknown events
 
-Builders should produce the same JSON shapes expected by the API. They should not perform network operations. Keep validation close to builder finalization, but do not pretend client-side validation can replace server-side validation.
+Decode the common event envelope first. Keep the raw event type and raw JSON payload. An unknown event is not a deserialization failure and must not stop the bot. Users can register a raw event listener before a typed model is added in a later release.
+
+### Interaction deadline
+
+The public API requires the initial interaction answer within 3 seconds. The interaction context must carry its creation time and track whether an initial answer has been sent. Provide reply/ephemeral/update/ack methods and reject obviously expired local attempts before sending the request. The server remains authoritative.
+
+Do not automatically retry an interaction callback after an ambiguous transport failure: it may already have been accepted, and replaying a response can consume the interaction's answer allowance.
+
+## 7. HTTP/API client design
+
+### Client ownership
+
+- Build one reusable \`reqwest::Client\` per bot.
+- Clone the client handle; do not create a new HTTP client per request.
+- Use the official base URL by default and allow a custom base URL for tests/compatible deployments.
+- Construct routes and query parameters centrally. Encode dynamic path segments and never concatenate untrusted user-supplied strings into route paths.
+- Set the \`Authorization: Bot ...\` header centrally.
+- Set a Yapcore User-Agent with package version.
+- Disable automatic redirects for authenticated API requests. A redirect must not move a bot token to an unexpected host.
+- Do not store cookies.
+- Do not log request bodies or sensitive headers by default.
+
+### Response and request limits
+
+- Enforce a configurable response-body size cap (initial default: 16 MiB) while reading the body, not only by trusting Content-Length.
+- Enforce endpoint-specific upload limits before sending: avatar 8 MiB and banner 10 MiB per the current public guide.
+- Do not implement undocumented message attachment upload limits until that feature is verified.
+- Preserve unknown JSON fields when practical for platform forward compatibility.
+
+### Error model
+
+Expose a structured \`Error\` with distinct cases for:
+
+- Invalid/missing configuration or token.
+- Transport failure and timeout.
+- API response failure, carrying status, message, optional API code, optional permission and parsed Retry-After.
+- JSON encode/decode failure.
+- Handler failure (reported separately from transport failure).
+- Shutdown/cancellation.
+
+Do not reduce API errors to strings. Keep the original HTTP status and a bounded representation of the response body so applications can react to 401, 403, 404, 409, 429 and 503.
+
+### Retry rules
+
+Retries are centralized and method-aware. Reqwest's own retry behavior is not relied on.
+
+1. Retry transient transport failures and selected gateway/proxy 5xx responses only for safe/idempotent operations.
+2. Retry 429 only when the response includes a valid Retry-After value.
+3. Retry 503 only when the response includes Retry-After and the server contract says the operation was not performed.
+4. Never automatically replay arbitrary POST requests.
+5. PUT/DELETE retries are permitted only for operations whose API semantics are idempotent and whose request body is unchanged.
+6. Parse both delta-seconds and HTTP-date Retry-After formats.
+7. Use a bounded exponential backoff with jitter for retryable transport failures; never sleep longer than the configured retry budget.
+8. Do not retry malformed JSON, local validation errors, 400, 401, 403, 404 or ambiguous interaction callbacks.
+
+A client-generated nonce must not be introduced as an idempotency mechanism unless Yapper documents and confirms server-side support.
+
+## 8. Models, IDs and serialization
+
+- Use Serde structs for stable documented response shapes.
+- Use enums for known discriminants, with an \`Unknown(String)\`/raw-value path where forward compatibility is required.
+- Represent IDs as distinct transparent newtypes around \`String\` (for example \`UserId\`, \`ServerId\`, \`ChannelId\`, \`MessageId\`). This prevents mixing IDs without introducing a UUID parsing dependency.
+- Keep timestamps as the platform's serialized ISO-8601 string in the first release. Add a typed time crate only if the public API needs date arithmetic or conversion.
+- Use \`Option<T>\` for fields that are legitimately absent or nullable.
+- Use \`serde_json::Value\` only at flexible extension boundaries and raw event payloads; prefer typed public fields elsewhere.
+- Keep serialization builders separate from resource methods.
+
+Do not eagerly deserialize fields that are not stable in the current official contract. Unknown data should be retained or ignored safely rather than breaking the event loop.
+
+## 9. Commands and framework registration
+
+### Commands
+
+- Register commands locally before \`run()\`.
+- Validate command name and description lengths locally using the published limits.
+- Synchronize the entire command registry in one \`PUT /commands\` request.
+- Enforce the published 100-command maximum.
+- Implement prefix parsing with longest-prefix matching.
+- Keep the slash-command dispatch path distinct from normal message-prefix parsing.
+- Implement the documented option schema only after its exact OpenAPI payload is verified. The Python implementation's option parser is a useful compatibility target, not proof that every option type is currently supported by the server.
+- No procedural macros are required.
 
 ### Cogs
 
-A Rust `Cog` should be an owned group of registered commands, event listeners and interaction handlers. The bot should track which registrations belong to each cog and remove them as a unit.
+A Rust cog is a statically linked group of command and event registrations with an ownership token. It can register/unregister its handlers as a unit. Runtime source loading and arbitrary code hot-reload are not part of v0.1. A WASM plugin ABI or dynamic library mechanism would be a separate design with its own safety and versioning constraints.
 
-The Python package can load/reload arbitrary source files at runtime. Rust source code cannot be recompiled and safely imported as a normal runtime feature. First release should support explicit statically linked cog registration and unload/reload of registrations; a dynamic plugin ABI/WASM design is a separate opt-in project.
+### Components
 
-## 6. Dependency strategy
+Implement the stable documented Embed and Button payload surface first. Keep builders as plain serializable data. Do not freeze Select, Modal or Components V2 payload types until the official schema/live test-bot verification is complete.
 
-Keep dependencies small. Proposed baseline:
+## 10. Dependency and feature policy
 
-| Crate | Purpose | Notes |
-| --- | --- | --- |
-| `tokio` | Async runtime, timers, signals and synchronization | Enable only required features |
-| `reqwest` | HTTPS client | Prefer rustls to avoid system OpenSSL requirements |
-| `serde` + `serde_json` | Models and JSON | Core serialization |
-| `thiserror` | Public typed errors | Keep error definitions ergonomic |
-| `url` | URL and query construction | Avoid manual query concatenation |
-| `bytes` | File/body buffers | Use bounded streaming where possible |
-| `tracing` | Optional structured diagnostics | Do not log credentials or interaction tokens |
+The exact dependency decisions and Cargo manifest are recorded in [dependencies.md](dependencies.md).
 
-Possible later additions:
+The default graph stays intentionally small:
 
-- `futures-util` and `tokio-tungstenite`: only if the gateway is officially confirmed.
-- `regex`: only if regular-expression interaction matching is kept as a public feature.
-- `dotenvy`: optional environment-file loading.
-- `time` or `chrono`: only if timestamp ergonomics require it.
-- `mime_guess`: optional file content-type inference.
+- Tokio runtime, macros, time, synchronization and signal support for examples.
+- Reqwest using rustls and JSON only; no native OpenSSL dependency.
+- Serde and serde_json.
+- thiserror for structured errors.
+- secrecy for token redaction/zeroization support.
+- tracing for library diagnostics.
+- httpdate and fastrand for Retry-After parsing and non-cryptographic retry jitter.
 
-Avoid adding `livekit`, crypto stacks, database frameworks or a plugin runtime to the default dependency graph. Voice media is not in the documented bot capability set.
+Do not add async-trait, futures-util, bytes, url, uuid, chrono, a database, a CLI parser, WebSocket client, LiveKit, or a plugin runtime to the baseline. The standard library and existing dependencies cover the initial design.
 
-## 7. Feature flags
+No optional features are declared until there is a real, verified capability or optional dependency to gate. .env loading, telemetry, gateway support and experimental platform extensions can be evaluated separately.
 
-Possible features once the baseline compiles:
-
-- `dotenv`: optional .env file support.
-- `gateway`: experimental WebSocket transport, only after protocol confirmation.
-- `telemetry`: optional opt-in report client; disabled by default.
-- `regex`: regex-based custom ID routing if this is wanted in the stable API.
-
-Do not create feature flags speculatively for every module. A feature flag should correspond to a meaningful optional dependency or capability.
-
-## 8. Testing strategy
+## 11. Testing and quality gates
 
 ### Unit tests
 
-- Token and configuration validation.
-- Command names, descriptions and option schema.
-- Prefix parsing, longest-prefix matching and edge cases.
-- Positional and named option parsing.
-- Embed/button/component JSON serialization.
-- Event decoding, unknown event preservation and typed ID wrappers.
-- Error payload decoding and Retry-After parsing.
-- Retry policy decisions (especially ensuring POST is not repeated unsafely).
-- Cog registration/unregistration ownership.
-- Interaction response state and deadline handling.
+- Config validation and redacted Debug output for secrets.
+- Typed ID wrappers and Serde round-tripping.
+- Command name/description validation.
+- Longest-prefix matching and parser boundary cases.
+- Embed/button serialization.
+- Unknown event deserialization.
+- API error-body decoding.
+- Retry-After seconds/date parsing.
+- Retry matrix proving unsafe POSTs are not replayed.
+- Cursor behavior for empty, duplicate, ordered and full 100-event pages.
+- Interaction response deadline/state behavior.
+- Dispatcher bounded concurrency, priority lane and cancellation.
+- Cog registration ownership/unregistration.
 
-### Mock API contract tests
+### HTTP contract tests
 
-Use a local mock HTTP server; no live token in CI. Test:
+Use an isolated local mock HTTP server (Wiremock in dev-dependencies is the current choice). No live bot token is required in CI.
 
-- Correct API base and auth header.
-- `GET /me` and `PUT /commands`.
+Test:
+- Exact default base URL and \`Authorization\` header.
+- Redirects do not forward credentials.
+- \`GET /me\`, \`PUT /commands\`, \`GET /events\`.
 - Message send/edit/delete and interaction callbacks.
-- Server/channel/member/role/moderation routes.
-- 401/403/404/409/429/503 responses.
-- Malformed JSON and empty responses.
-- Connection timeout and retry behavior.
-- Multipart uploads within configured limits.
-- Polling cursor behavior, duplicate IDs and event order.
+- Documented server/channel/member/role/moderation routes.
+- Empty success bodies and malformed JSON.
+- 400/401/403/404/409/429/503 behavior.
+- Retry-After integer/date values.
+- Request timeout, response-size limits and cancellation.
+- Multipart/raw avatar/banner upload constraints once upload code is added.
 
 ### Live smoke tests
 
-Run manually against a dedicated test bot after each major milestone. Keep tokens in local environment variables or repository secrets. Never commit tokens or screenshots/logs containing them.
+Use a dedicated test bot manually. Store credentials in environment variables or GitHub Actions secrets. Live tests are opt-in and never run on ordinary pull requests. Never put a token in code, issue comments, logs or artifacts.
 
-### CI
+### CI commands
 
-At minimum:
-
-```sh
+~~~
 cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-features
-```
+~~~
 
-Use a pinned stable Rust toolchain in CI. Cache Cargo registry/build artifacts. Do not require a live Yapper token for ordinary CI.
+Also test the declared MSRV (1.85) separately from current stable. Cache the Cargo registry and build outputs. Keep CI free of live platform credentials.
 
-## 9. Implementation sequence
+## 12. Implementation sequence
 
-1. Resolve licensing and scope.
-2. Create crate skeleton, public error type, configuration and API client.
-3. Implement typed IDs, core models and `GET /me`.
-4. Implement event polling, cursor handling and graceful shutdown.
-5. Implement event dispatch and async handlers.
-6. Implement command registry, sync and parser.
-7. Implement message operations and interaction responses.
-8. Implement embeds/buttons/components.
-9. Implement documented server/member/channel/role/moderation routes.
-10. Add cogs and optional verified endpoint families.
-11. Consider telemetry, gateway and voice only after the support questions are answered.
+1. **M0 — Decisions (complete):** GPL-3.0-only, source audit, feature inventory, API contract and architecture decisions.
+2. **M1 — Crate foundation:** Cargo manifest, lint policy, public Error, Config, secret token wrapper, typed IDs and API client.
+3. **M2 — First live API path:** GET /me, command sync and a mock-tested request layer.
+4. **M3 — Polling runtime:** startup cursor policy, long polling, shutdown, response/error handling and bounded dispatcher.
+5. **M4 — First usable bot:** prefix command parser, command context, send/reply and live /ping smoke test.
+6. **M5 — Interactions:** button event model and callback responder with deadline tracking.
+7. **M6 — Main documented resources:** servers, channels, members, roles, moderation, DMs and voice-state management.
+8. **M7 — Builders and cogs:** Embed/Button builders, registration ownership and documented command options.
+9. **M8 — Verified extended surface:** only add each undocumented endpoint family after schema/live contract confirmation.
+10. **M9 — Release quality:** public docs, examples, compatibility tests, CI, crate metadata and versioning.
 
-The first release should be useful with a minimal dependency set: start a bot, register a command, receive events, reply to messages and shut down cleanly.
+A useful v0.1 is not "thousands of lines". It is the smallest complete path that can authenticate, register a command, receive an event, reply, handle shutdown and pass deterministic mock-server tests. Expand from that working spine without pre-emptively implementing speculative features.
