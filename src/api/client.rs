@@ -417,9 +417,9 @@ mod tests {
         let batch = client.poll_events(10, 25, Some(3_600)).await.unwrap();
         let request = server.finish();
 
-        assert!(request.starts_with(
-            "GET /api/bot/v1/events?after=10&wait=25&max_age=3600 HTTP/1.1"
-        ));
+        assert!(
+            request.starts_with("GET /api/bot/v1/events?after=10&wait=25&max_age=3600 HTTP/1.1")
+        );
         assert_eq!(batch.last(), 12);
         assert_eq!(batch.events().len(), 1);
         assert_eq!(batch.events()[0].event_type, "new_event_type");
