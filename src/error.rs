@@ -6,6 +6,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::config::ConfigError;
+use crate::models::CommandDefinitionError;
 
 /// Result type used by Yapcore's public API.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -102,6 +103,10 @@ pub enum Error {
     /// Invalid or incomplete local configuration.
     #[error(transparent)]
     Configuration(#[from] ConfigError),
+
+    /// A command definition or command list violates the documented local constraints.
+    #[error(transparent)]
+    CommandDefinition(#[from] CommandDefinitionError),
 
     /// The request failed before a usable HTTP response was received.
     ///
