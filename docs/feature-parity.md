@@ -128,10 +128,10 @@ Do not expose both a huge builder API and dozens of raw JSON methods for the sam
 
 | Status | Python feature | Rust target |
 | --- | --- | --- |
-| [ ] Documented | List/get servers | Server endpoints |
-| [ ] Documented | List server/global channels and channel details | Channel endpoints and filters |
-| [ ] Documented | List members with pagination / fetch one member | Member endpoints |
-| [ ] Documented | Roles list/get/create/edit/delete/reorder | Role endpoints |
+| [x] Documented | List/get servers | `list_servers` / `get_server` with forward-compatible models |
+| [x] Documented | List server/global channels and channel details | `list_channels` with text/voice filters, categories, and `get_channel` |
+| [x] Documented | List members with pagination / fetch one member | `list_members(limit, after)` and `get_member`; validates 1–500 page size |
+| [~] Documented | Roles list/get/create/edit/delete/reorder | `list_roles` exists; individual role and mutation methods remain |
 | [ ] Documented | Add/remove role | Role assignment endpoints |
 | [ ] Documented | Get and set permissions/overrides | Documented permission endpoints first |
 | [ ] Documented | Kick/ban/unban/list bans/timeout | Moderation endpoints |
