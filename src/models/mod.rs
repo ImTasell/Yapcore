@@ -9,6 +9,10 @@ mod command;
 pub(crate) use command::validate_command_list;
 pub use command::{CommandDefinition, CommandDefinitionError};
 
+mod embed;
+
+pub use embed::{Embed, EmbedAuthor, EmbedBuilder, EmbedField, EmbedFooter, EmbedValidationError};
+
 mod event;
 
 pub use event::{EventBatch, EventEnvelope};
