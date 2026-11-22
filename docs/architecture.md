@@ -155,7 +155,7 @@ The target API is a builder plus explicit registration methods. This is the inte
 ~~~rust
 use yapcore::{Bot, Result};
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let mut bot = Bot::builder()
         .token_from_env("YAPPER_BOT_TOKEN")
@@ -171,7 +171,7 @@ async fn main() -> Result<()> {
 }
 ~~~
 
-The library does not install process signal handlers automatically. Applications may clone the shutdown handle and cancel it when their own shutdown condition fires. Applications that use Tokio's Ctrl+C helper must enable Tokio's `signal` feature in their own dependency declaration; Yapcore does not enable process-signal support for every consumer.
+The library does not create or own the Tokio runtime and does not install process signal handlers. It runs inside the application's Tokio runtime. Applications choose current-thread or multi-thread execution and may clone the shutdown handle to cancel the bot from their own Ctrl+C or service-manager signal handling.
 
 ### Async handler representation
 
@@ -376,7 +376,7 @@ The exact dependency decisions and Cargo manifest are recorded in [dependencies.
 
 The default graph stays intentionally small:
 
-- Tokio runtime, macros, time and synchronization; applications opt into process-signal support separately.
+- Tokio runtime primitives, macros, time and synchronization; the application owns runtime construction and process signals.
 - Reqwest using rustls and JSON only; no native OpenSSL dependency.
 - Serde and serde_json.
 - thiserror for structured errors.
