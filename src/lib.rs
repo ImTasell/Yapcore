@@ -29,7 +29,7 @@ pub use ids::{
 };
 pub use interactions::{InteractionContext, InteractionRegistrationError};
 pub use models::{
-    ActionRow, BotProfile, Button, ButtonStyle, Channel, ChannelCategory, ChannelListing,
+    ActionRow, Ban, BotProfile, Button, ButtonStyle, Channel, ChannelCategory, ChannelListing,
     ChannelType, CommandDefinition, CommandDefinitionError, ComponentValidationError, Embed,
     EmbedAuthor, EmbedBuilder, EmbedField, EmbedFooter, EmbedValidationError, EventBatch,
     EventEnvelope, InteractionResponseType, Member, Message, Role, Server, UserProfile,
