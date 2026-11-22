@@ -16,3 +16,7 @@ pub use event::{EventBatch, EventEnvelope};
 mod message;
 
 pub use message::Message;
+
+mod interaction;
+
+pub use interaction::InteractionResponseType;
