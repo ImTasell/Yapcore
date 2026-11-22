@@ -116,6 +116,19 @@ pub enum Error {
     #[error("event max_age must not exceed 86,400 seconds")]
     InvalidEventMaxAge,
 
+    /// Plain-text messages cannot be empty.
+    #[error("message content must not be empty")]
+    EmptyMessageContent,
+
+    /// Plain-text message content is longer than Yapper's 2,000-character limit.
+    #[error("message content is {actual} characters; the maximum is {max}")]
+    MessageContentTooLong {
+        /// Actual character count.
+        actual: usize,
+        /// Maximum allowed character count.
+        max: usize,
+    },
+
     /// The request failed before a usable HTTP response was received.
     ///
     /// The underlying Reqwest error has its URL removed to avoid accidental
