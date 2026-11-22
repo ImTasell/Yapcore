@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue, RETRY_AFTER};
 use reqwest::redirect::Policy;
-use reqwest::{Client, Response};
+use reqwest::{Client, Method, Response};
+use serde_json::Value;
 use secrecy::ExposeSecret;
 
 use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
-use crate::models::BotProfile;
+use crate::models::{BotProfile, CommandDefinition, validate_command_list};
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
 #[derive(Clone)]
@@ -58,28 +59,62 @@ impl ApiClient {
 
     /// Fetch the current bot profile from GET /me.
     pub async fn get_me(&self) -> Result<BotProfile> {
+        let value = self.request_json(Method::GET, "me", None).await?;
+        serde_json::from_value(value).map_err(Error::from)
+    }
+
+    /// Replace the bot's complete registered command list with PUT /commands.
+    ///
+    /// Yapper replaces the full list in one request. The list is validated
+    /// locally before any network request is sent.
+    pub async fn sync_commands(&self, commands: &[CommandDefinition]) -> Result<Value> {
+        validate_command_list(commands)?;
+        let body = serde_json::json!({ "commands": commands });
+        self.request_json(Method::PUT, "commands", Some(body)).await
+    }
+
+    async fn request_json(
+        &self,
+        method: Method,
+        route: &str,
+        body: Option<Value>,
+    ) -> Result<Value> {
         let url = self
             .config
             .api_base_url()
-            .join("me")
-            .map_err(|_| Error::InvalidApiRoute("me".to_owned()))?;
+            .join(route)
+            .map_err(|_| Error::InvalidApiRoute(route.to_owned()))?;
 
-        let mut response = self
-            .client
-            .get(url)
+        let mut request = self.client.request(method, url);
+        if let Some(body) = body {
+            request = request.json(&body);
+        }
+
+        let mut response = request
             .send()
             .await
             .map_err(sanitize_transport_error)?;
 
         let status = response.status();
         let retry_after = parse_retry_after(response.headers().get(RETRY_AFTER));
-        let body = read_limited_body(&mut response, self.config.max_response_bytes()).await?;
+        let response_body =
+            read_limited_body(&mut response, self.config.max_response_bytes()).await?;
+
+        tracing::debug!(
+            http.status = status.as_u16(),
+            response.bytes = response_body.len(),
+            "received Yapper API response"
+        );
 
         if !status.is_success() {
-            return Err(ApiError::from_response(status, retry_after, &body).into());
+            return Err(ApiError::from_response(status, retry_after, &response_body).into());
         }
 
-        serde_json::from_slice(&body).map_err(Error::from)
+        if response_body.is_empty() {
+            return Ok(Value::Null);
+        }
+
+        serde_json::from_slice(&response_body).map_err(Error::from)
     }
 }
 
@@ -151,6 +186,7 @@ mod tests {
                 let mut request_bytes = Vec::new();
                 let mut buffer = [0_u8; 1024];
 
+                let mut expected_request_length = None;
                 loop {
                     let read = stream.read(&mut buffer).unwrap();
                     if read == 0 {
@@ -158,7 +194,28 @@ mod tests {
                     }
 
                     request_bytes.extend_from_slice(&buffer[..read]);
-                    if request_bytes.windows(4).any(|window| window == b"\r\n\r\n") {
+
+                    if expected_request_length.is_none() {
+                        if let Some(header_start) = request_bytes
+                            .windows(4)
+                            .position(|window| window == b"\r\n\r\n")
+                        {
+                            let body_start = header_start + 4;
+                            let header_text =
+                                String::from_utf8_lossy(&request_bytes[..header_start]);
+                            let content_length = header_text.lines().find_map(|line| {
+                                let (name, value) = line.split_once(':')?;
+                                name.eq_ignore_ascii_case("content-length")
+                                    .then(|| value.trim().parse::<usize>().ok())
+                                    .flatten()
+                            }).unwrap_or(0);
+                            expected_request_length = Some(body_start + content_length);
+                        }
+                    }
+
+                    if expected_request_length
+                        .is_some_and(|expected| request_bytes.len() >= expected)
+                    {
                         break;
                     }
                 }
@@ -290,6 +347,31 @@ mod tests {
             }
             other => panic!("expected an API error, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn sync_commands_replaces_the_full_registry_with_the_documented_payload() {
+        let server = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
+        let client = test_client(&server, 1024).await;
+        let commands = vec![
+            CommandDefinition::new("ping", "Check whether the bot is alive").unwrap(),
+            CommandDefinition::new("about", "Show information about the bot").unwrap(),
+        ];
+
+        let response = client.sync_commands(&commands).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with("PUT /api/bot/v1/commands HTTP/1.1"));
+        let request_body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(request_body).unwrap();
+
+        assert_eq!(payload["commands"][0]["name"], "ping");
+        assert_eq!(
+            payload["commands"][1]["description"],
+            "Show information about the bot"
+        );
+        assert!(payload.get("interactions").is_none());
+        assert_eq!(response["ok"], true);
     }
 
     #[tokio::test]
