@@ -269,11 +269,7 @@ impl Bot {
     }
 
     /// Pin a message. Requires Manage Messages permission.
-    pub async fn pin_message(
-        &self,
-        channel_id: &ChannelId,
-        message_id: &MessageId,
-    ) -> Result<()> {
+    pub async fn pin_message(&self, channel_id: &ChannelId, message_id: &MessageId) -> Result<()> {
         self.api.pin_message(channel_id, message_id).await
     }
 
