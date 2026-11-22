@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue, RETRY_AFTER};
 use reqwest::redirect::Policy;
-use reqwest::{Client, Method, Response};
+use reqwest::{Client, Method, Response, Url};
 use secrecy::ExposeSecret;
 use serde_json::Value;
 
 use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
-use crate::models::{BotProfile, CommandDefinition, validate_command_list};
+use crate::models::{BotProfile, CommandDefinition, EventBatch, validate_command_list};
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
 #[derive(Clone)]
@@ -63,6 +63,45 @@ impl ApiClient {
         serde_json::from_value(value).map_err(Error::from)
     }
 
+    /// Fetch one page of events using Yapper's documented long-poll endpoint.
+    ///
+    /// wait_seconds is capped at 25 seconds. Optional max_age_seconds
+    /// filters events older than the supplied age and is capped at one day.
+    pub async fn poll_events(
+        &self,
+        after: u64,
+        wait_seconds: u8,
+        max_age_seconds: Option<u32>,
+    ) -> Result<EventBatch> {
+        if wait_seconds > 25 {
+            return Err(Error::InvalidEventPollWait);
+        }
+
+        if max_age_seconds.is_some_and(|age| age > 86_400) {
+            return Err(Error::InvalidEventMaxAge);
+        }
+
+        let mut url = self
+            .config
+            .api_base_url()
+            .join("events")
+            .map_err(|_| Error::InvalidApiRoute("events".to_owned()))?;
+
+        {
+            let mut query = url.query_pairs_mut();
+            query
+                .append_pair("after", &after.to_string())
+                .append_pair("wait", &wait_seconds.to_string());
+
+            if let Some(max_age) = max_age_seconds {
+                query.append_pair("max_age", &max_age.to_string());
+            }
+        }
+
+        let value = self.request_json_url(Method::GET, url, None).await?;
+        serde_json::from_value(value).map_err(Error::from)
+    }
+
     /// Replace the bot's complete registered command list with PUT /commands.
     ///
     /// Yapper replaces the full list in one request. The list is validated
@@ -85,6 +124,15 @@ impl ApiClient {
             .join(route)
             .map_err(|_| Error::InvalidApiRoute(route.to_owned()))?;
 
+        self.request_json_url(method, url, body).await
+    }
+
+    async fn request_json_url(
+        &self,
+        method: Method,
+        url: Url,
+        body: Option<Value>,
+    ) -> Result<Value> {
         let mut request = self.client.request(method, url);
         if let Some(body) = body {
             request = request.json(&body);
@@ -347,6 +395,49 @@ mod tests {
             }
             other => panic!("expected an API error, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn poll_events_uses_cursor_wait_and_max_age_query_parameters() {
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "events": [{
+                    "id": 12,
+                    "type": "new_event_type",
+                    "data": { "channel_id": "channel-1" }
+                }],
+                "last": 12
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+
+        let batch = client.poll_events(10, 25, Some(3_600)).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "GET /api/bot/v1/events?after=10&wait=25&max_age=3600 HTTP/1.1"
+        ));
+        assert_eq!(batch.last(), 12);
+        assert_eq!(batch.events().len(), 1);
+        assert_eq!(batch.events()[0].event_type, "new_event_type");
+    }
+
+    #[tokio::test]
+    async fn poll_events_rejects_wait_and_max_age_above_platform_limits() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+
+        assert!(matches!(
+            client.poll_events(0, 26, None).await,
+            Err(Error::InvalidEventPollWait)
+        ));
+        assert!(matches!(
+            client.poll_events(0, 0, Some(86_401)).await,
+            Err(Error::InvalidEventMaxAge)
+        ));
     }
 
     #[tokio::test]
