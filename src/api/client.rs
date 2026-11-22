@@ -315,6 +315,120 @@ impl ApiClient {
         serde_json::from_value(roles).map_err(Error::from)
     }
 
+    /// Fetch one role in a server.
+    ///
+    /// This route exists in the upstream Python framework but is not listed in
+    /// the current public endpoint overview; treat it as a source-parity route.
+    pub async fn get_role(
+        &self,
+        server_id: &crate::ids::ServerId,
+        role_id: &crate::ids::RoleId,
+    ) -> Result<Role> {
+        let route = format!("servers/{server_id}/roles/{role_id}");
+        let response = self.request_json(Method::GET, &route, None).await?;
+        let role = response.get("role").cloned().unwrap_or(response);
+        serde_json::from_value(role).map_err(Error::from)
+    }
+
+    /// Create a role below the bot's highest role.
+    ///
+    /// This route is supported by the Python source but requires live contract
+    /// verification against the current Yapper API.
+    pub async fn create_role(
+        &self,
+        server_id: &crate::ids::ServerId,
+        name: &str,
+        color: Option<&str>,
+        mentionable: bool,
+        permissions: Option<&Value>,
+    ) -> Result<Role> {
+        let mut body = serde_json::Map::new();
+        body.insert("name".to_owned(), serde_json::json!(name));
+        body.insert("mentionable".to_owned(), serde_json::json!(mentionable));
+        if let Some(color) = color {
+            body.insert("color".to_owned(), serde_json::json!(color));
+        }
+        if let Some(permissions) = permissions {
+            body.insert("permissions".to_owned(), permissions.clone());
+        }
+
+        let route = format!("servers/{server_id}/roles");
+        let response = self
+            .request_json(Method::POST, &route, Some(Value::Object(body)))
+            .await?;
+        let role = response.get("role").cloned().unwrap_or(response);
+        serde_json::from_value(role).map_err(Error::from)
+    }
+
+    /// Edit selected fields of a role; fields set to None remain unchanged.
+    ///
+    /// Pass an empty color string to clear the role color.
+    pub async fn edit_role(
+        &self,
+        server_id: &crate::ids::ServerId,
+        role_id: &crate::ids::RoleId,
+        name: Option<&str>,
+        color: Option<&str>,
+        mentionable: Option<bool>,
+        permissions: Option<&Value>,
+        position: Option<i64>,
+    ) -> Result<Role> {
+        let mut body = serde_json::Map::new();
+        if let Some(name) = name {
+            body.insert("name".to_owned(), serde_json::json!(name));
+        }
+        if let Some(color) = color {
+            body.insert("color".to_owned(), serde_json::json!(color));
+        }
+        if let Some(mentionable) = mentionable {
+            body.insert("mentionable".to_owned(), serde_json::json!(mentionable));
+        }
+        if let Some(permissions) = permissions {
+            body.insert("permissions".to_owned(), permissions.clone());
+        }
+        if let Some(position) = position {
+            body.insert("position".to_owned(), serde_json::json!(position));
+        }
+
+        let route = format!("servers/{server_id}/roles/{role_id}");
+        let response = self
+            .request_json(Method::PATCH, &route, Some(Value::Object(body)))
+            .await?;
+        let role = response.get("role").cloned().unwrap_or(response);
+        serde_json::from_value(role).map_err(Error::from)
+    }
+
+    /// Delete a role in a server.
+    pub async fn delete_role(
+        &self,
+        server_id: &crate::ids::ServerId,
+        role_id: &crate::ids::RoleId,
+    ) -> Result<()> {
+        let route = format!("servers/{server_id}/roles/{role_id}");
+        self.request_json(Method::DELETE, &route, None).await?;
+        Ok(())
+    }
+
+    /// Reorder roles from highest to lowest using their IDs.
+    ///
+    /// Roles omitted by the request retain their relative order below the
+    /// supplied roles, subject to the bot's own role hierarchy.
+    pub async fn reorder_roles(
+        &self,
+        server_id: &crate::ids::ServerId,
+        role_ids: &[crate::ids::RoleId],
+    ) -> Result<Vec<Role>> {
+        let route = format!("servers/{server_id}/roles");
+        let body = serde_json::json!({
+            "ids": role_ids.iter().map(crate::ids::RoleId::as_str).collect::<Vec<_>>()
+        });
+        let response = self
+            .request_json(Method::PATCH, &route, Some(body))
+            .await?;
+        let roles = response.get("roles").cloned().unwrap_or(response);
+        serde_json::from_value(roles).map_err(Error::from)
+    }
+
     /// Fetch one public user profile.
     pub async fn get_user(&self, user_id: &crate::ids::UserId) -> Result<UserProfile> {
         let route = format!("users/{user_id}");
