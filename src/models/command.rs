@@ -54,7 +54,7 @@ pub enum CommandDefinitionError {
     /// Description must be 1-100 characters.
     #[error("command descriptions must be 1-100 characters")]
     InvalidDescription,
-    /// A bot may register at most 100 commands.
+    /// A bot may register at most 50 commands.
     #[error("a bot may register at most 100 commands")]
     TooManyCommands,
     /// Command names must be unique within a bot.
@@ -66,7 +66,7 @@ pub enum CommandDefinitionError {
 pub(crate) fn validate_command_list(
     commands: &[CommandDefinition],
 ) -> Result<(), CommandDefinitionError> {
-    if commands.len() > 100 {
+    if commands.len() > 50 {
         return Err(CommandDefinitionError::TooManyCommands);
     }
 
@@ -119,7 +119,7 @@ mod tests {
             Err(CommandDefinitionError::DuplicateName)
         );
 
-        let commands = (0..101)
+        let commands = (0..51)
             .map(|index| CommandDefinition::new(format!("cmd-{index}"), "Command").unwrap())
             .collect::<Vec<_>>();
         assert_eq!(
