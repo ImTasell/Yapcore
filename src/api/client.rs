@@ -367,33 +367,15 @@ impl ApiClient {
         &self,
         server_id: &crate::ids::ServerId,
         role_id: &crate::ids::RoleId,
-        name: Option<&str>,
-        color: Option<&str>,
-        mentionable: Option<bool>,
-        permissions: Option<&Value>,
-        position: Option<i64>,
+        changes: &crate::models::RoleEditOptions,
     ) -> Result<Role> {
-        let mut body = serde_json::Map::new();
-        if let Some(name) = name {
-            body.insert("name".to_owned(), serde_json::json!(name));
-        }
-        if let Some(color) = color {
-            body.insert("color".to_owned(), serde_json::json!(color));
-        }
-        if let Some(mentionable) = mentionable {
-            body.insert("mentionable".to_owned(), serde_json::json!(mentionable));
-        }
-        if let Some(permissions) = permissions {
-            body.insert("permissions".to_owned(), permissions.clone());
-        }
-        if let Some(position) = position {
-            body.insert("position".to_owned(), serde_json::json!(position));
+        if changes.is_empty() {
+            return Err(Error::EmptyRoleEditOptions);
         }
 
+        let body = serde_json::to_value(changes)?;
         let route = format!("servers/{server_id}/roles/{role_id}");
-        let response = self
-            .request_json(Method::PATCH, &route, Some(Value::Object(body)))
-            .await?;
+        let response = self.request_json(Method::PATCH, &route, Some(body)).await?;
         let role = response.get("role").cloned().unwrap_or(response);
         serde_json::from_value(role).map_err(Error::from)
     }
