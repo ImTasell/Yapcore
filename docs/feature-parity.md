@@ -95,11 +95,11 @@ Rust API should favor explicit typed command registration and async handlers. It
 | [x] Documented | Send plain-text message | `ApiClient::send_message` / `Bot::send_message` |
 | [x] Documented | Reply to message | `ApiClient::reply_message`; `CommandContext::reply` |
 | [ ] Documented | Send embed(s) | Embed builder and Serde serialization |
-| [ ] Documented | Edit/delete own message | Typed API methods |
-| [ ] Documented | Fetch one/recent/forward messages | Pagination and time cursor |
+| [x] Documented | Edit/delete own message | `ApiClient::edit_message` / `delete_message`; `Bot` convenience wrappers |
+| [~] Documented | Fetch one/recent/forward messages | `get_message` exists; recent/forward pagination remains |
 | [ ] Documented | Bulk delete | Up to documented API limit |
 | [ ] Documented | Pin/unpin | Typed API methods |
-| [ ] Documented | Add/remove/list reactions | URL-encode emoji in route segment |
+| [~] Documented | Add/remove/list reactions | Add/remove exist with encoded emoji path segments; list remains |
 | [ ] Verify | Four-file multipart send and sticker IDs | Confirm current upload contract and limits |
 | [x] Documented | Button interactions: reply/ephemeral/update/ack | Exact `on_button` and prefix `button` registrations; shared secret-safe response session and two-second auto-ack |
 | [~] Documented | Interaction expiry and answer count limits | Enforces ten-response cap and auto-ack margin; explicit expires_at tracking remains |
