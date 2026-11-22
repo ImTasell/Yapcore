@@ -36,6 +36,20 @@ The framework must not claim support for API behavior that Yapper does not docum
 - Message, embed, button-interaction, server, channel, member, role, moderation, DM-opening and voice-state APIs follow the public contract in `api-contract.md`.
 - Use a real bot token from the Developer settings. Normal user-account automation is out of scope.
 
+### Current implementation slice
+
+The first working runtime is intentionally narrower than the long-term architecture:
+
+- One bot instance owns one poll loop.
+- Poll responses are dispatched sequentially in server order.
+- Local text-prefix commands are registered with `Bot::command`.
+- `CommandContext` exposes `command`, `args`, `argv`, `reply` and `say`.
+- `Bot::run` starts from the newest cursor and stops through a clonable watch-channel shutdown handle.
+- Poll transport failures use bounded exponential backoff; 429/503 are retried only when Yapper supplies `Retry-After`.
+- Command handler failures are logged and isolated from the poll loop.
+
+This slice does not yet synchronize slash commands automatically, dispatch slash-command interaction events, expose general event listeners, or provide an ordered persistent cursor store. Those features are intentionally not implied by the initial `!ping` example. The target bounded-concurrency design below remains a future milestone; the current sequential dispatcher is the conservative first implementation.
+
 ### Explicitly deferred
 
 | Feature | Decision |
