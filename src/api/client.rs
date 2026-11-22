@@ -843,8 +843,7 @@ mod tests {
         let client = ApiClient::new(config).unwrap();
         let channel_id =
             crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174002").unwrap();
-        let one_id =
-            crate::ids::MessageId::new("123e4567-e89b-12d3-a456-426614174001").unwrap();
+        let one_id = crate::ids::MessageId::new("123e4567-e89b-12d3-a456-426614174001").unwrap();
         let too_many = vec![one_id; 101];
 
         assert!(matches!(
@@ -885,7 +884,10 @@ mod tests {
         let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
         let message_id = crate::ids::MessageId::new(MESSAGE_ID).unwrap();
 
-        client.unpin_message(&channel_id, &message_id).await.unwrap();
+        client
+            .unpin_message(&channel_id, &message_id)
+            .await
+            .unwrap();
         let request = server.finish();
 
         assert!(request.starts_with(
