@@ -900,6 +900,74 @@ mod tests {
         }
     }
 
+    fn button_interaction_event(custom_id: &str) -> crate::models::EventEnvelope {
+        crate::models::EventEnvelope {
+            id: 8,
+            event_type: "interaction".to_owned(),
+            data: serde_json::json!({
+                "id": "123e4567-e89b-12d3-a456-426614174011",
+                "token": "button/token",
+                "type": "button",
+                "custom_id": custom_id,
+                "message_id": "123e4567-e89b-12d3-a456-426614174001",
+                "channel_id": "123e4567-e89b-12d3-a456-426614174002",
+                "user_id": "123e4567-e89b-12d3-a456-426614174003",
+                "username": "test-user"
+            }),
+            created_at: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn prefix_button_handler_updates_the_source_message() {
+        let server = CallbackServer::start();
+        let mut bot = test_bot(&server);
+
+        bot.button("vote:", |interaction| async move {
+            assert_eq!(interaction.custom_id(), "vote:yes");
+            assert_eq!(interaction.kind(), "button");
+            assert_eq!(interaction.username(), Some("test-user"));
+            interaction
+                .update("Vote recorded")
+                .await
+                .map_err(|error| -> crate::HandlerError { Box::new(error) })?;
+            Ok(())
+        })
+        .unwrap();
+
+        bot.dispatch_event(&button_interaction_event("vote:yes"), None)
+            .await
+            .unwrap();
+
+        let request = server.finish();
+        assert!(request.starts_with(
+            "POST /api/bot/v1/interactions/123e4567-e89b-12d3-a456-426614174011/button%2Ftoken/callback HTTP/1.1"
+        ));
+
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["type"], "update");
+        assert_eq!(payload["content"], "Vote recorded");
+    }
+
+    #[tokio::test]
+    async fn button_handler_without_response_is_automatically_acknowledged() {
+        let server = CallbackServer::start();
+        let mut bot = test_bot(&server);
+
+        bot.on_button("confirm:yes", |_interaction| async { Ok(()) })
+            .unwrap();
+
+        bot.dispatch_event(&button_interaction_event("confirm:yes"), None)
+            .await
+            .unwrap();
+
+        let request = server.finish();
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["type"], "ack");
+    }
+
     #[tokio::test]
     async fn dispatches_slash_command_reply_through_interaction_callback() {
         let server = CallbackServer::start();
