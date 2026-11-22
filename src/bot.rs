@@ -259,6 +259,15 @@ impl Bot {
         self.api.delete_message(channel_id, message_id).await
     }
 
+    /// List reactions attached to a message.
+    pub async fn get_reactions(
+        &self,
+        channel_id: &ChannelId,
+        message_id: &MessageId,
+    ) -> Result<serde_json::Value> {
+        self.api.get_reactions(channel_id, message_id).await
+    }
+
     /// Add the bot's reaction to a message.
     pub async fn add_reaction(
         &self,
