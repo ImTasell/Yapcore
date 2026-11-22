@@ -1556,8 +1556,7 @@ mod tests {
     async fn rejects_invalid_member_page_sizes_before_networking() {
         let config = Config::builder().token("yb_test-token").build().unwrap();
         let client = ApiClient::new(config).unwrap();
-        let server_id =
-            crate::ids::ServerId::new("123e4567-e89b-12d3-a456-426614174020").unwrap();
+        let server_id = crate::ids::ServerId::new("123e4567-e89b-12d3-a456-426614174020").unwrap();
 
         assert!(matches!(
             client.list_members(&server_id, Some(0), None).await,
