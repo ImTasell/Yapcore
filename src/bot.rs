@@ -349,6 +349,18 @@ impl Bot {
         self.api.get_me().await
     }
 
+    /// Send a message with optional text content and up to five embeds.
+    pub async fn send_message_with_embeds(
+        &self,
+        channel_id: &ChannelId,
+        content: Option<&str>,
+        embeds: &[crate::models::Embed],
+    ) -> Result<Message> {
+        self.api
+            .send_message_with_embeds(channel_id, content, embeds)
+            .await
+    }
+
     /// Send a plain-text message to a channel.
     pub async fn send_message(
         &self,
