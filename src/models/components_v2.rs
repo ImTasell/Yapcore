@@ -456,7 +456,7 @@ mod tests {
         assert_eq!(value[1]["accessory"]["custom_id"], "continue");
         assert_eq!(value[2]["type"], 12);
         assert_eq!(value[2]["items"][0]["media"]["url"], "https://cdn.example/image.png");
-        assert_eq!(value[2]["items"][0]["spoiler"], true);
+        assert_eq!(value[2]["items"][0]["spoiler"].as_bool(), Some(true));
         assert_eq!(value[3]["type"], 14);
         assert_eq!(value[3]["spacing"], 2);
         assert_eq!(value[4]["type"], 17);
