@@ -227,7 +227,7 @@ mod tests {
         assert_eq!(value["title"], "Apply");
         assert_eq!(value["components"][0]["type"], "text_input");
         assert_eq!(value["components"][0]["style"], "short");
-        assert_eq!(value["components"][0]["required"], true);
+        assert_eq!(value["components"][0]["required"].as_bool(), Some(true));
         assert_eq!(value["components"][1]["style"], "paragraph");
         assert_eq!(value["components"][1]["max_length"], 4000);
     }
