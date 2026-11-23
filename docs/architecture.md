@@ -173,7 +173,7 @@ Keep the layers independent:
 
 ### Presence and experimental permissions
 
-The documented `PUT /me/status` endpoint is a normal authenticated REST operation. Yapcore exposes it as `Bot::set_status(BotStatus, activity)` with the platform's 60-character activity limit. This is bot presence/activity, not a local Discord-compatible RPC or IPC client.
+The documented `PUT /me/status` endpoint is a normal authenticated REST operation. Yapcore exposes it as `Bot::set_status(BotStatus, activity)` and the typed `Bot::set_presence(&Presence)` builder API. `Activity::playing` formats ordinary display text such as `Playing Minecraft`; Yapper accepts one activity string (60 characters), not structured Discord game metadata. This is bot presence/activity, not a local Discord-compatible RPC or IPC client.
 
 Permission inspection and override mutation routes found in the Python framework are currently source-parity only. Keep them clearly marked experimental until a live Yapper bot confirms the routes and payloads; some upstream methods are explicitly described as testing-only, and an independent SDK report has observed `feature_off` responses.
 
