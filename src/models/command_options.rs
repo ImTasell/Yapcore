@@ -67,6 +67,43 @@ impl CommandOptionChoice {
 
 /// Validated option schema builder.
 impl CommandOption {
+    /// Format a command usage hint with required arguments in angle brackets
+    /// and optional arguments in square brackets.
+    pub fn usage(command_name: &str, options: &[Self]) -> String {
+        let mut usage = format!("/{command_name}");
+        for (index, option) in options.iter().enumerate() {
+            let value = if option.choices.is_empty() {
+                let rest = if index + 1 == options.len()
+                    && option.kind == CommandOptionType::String
+                {
+                    "…"
+                } else {
+                    ""
+                };
+                format!("{}{rest}", option.name)
+            } else {
+                option
+                    .choices
+                    .iter()
+                    .map(|choice| {
+                        choice
+                            .value
+                            .as_str()
+                            .map(str::to_owned)
+                            .unwrap_or_else(|| choice.value.to_string())
+                    })
+                    .collect::<Vec<_>>()
+                    .join("|")
+            };
+            if option.required {
+                usage.push_str(&format!(" <{value}>"));
+            } else {
+                usage.push_str(&format!(" [{value}]"));
+            }
+        }
+        usage
+    }
+
     /// Declare a string argument.
     pub fn string(
         name: impl Into<String>,
@@ -669,6 +706,24 @@ mod tests {
                 .unwrap()
                 .get_number("ratio"),
             Some(2.0)
+        );
+    }
+
+    #[test]
+    fn formats_usage_with_required_optional_and_choice_arguments() {
+        let schema = [
+            CommandOption::user("member", "Member").unwrap().required(true),
+            CommandOption::string("reason", "Reason").unwrap(),
+            CommandOption::string("mode", "Mode")
+                .unwrap()
+                .choice(CommandOptionChoice::string("Fast", "fast"))
+                .unwrap()
+                .choice(CommandOptionChoice::string("Slow", "slow"))
+                .unwrap(),
+        ];
+        assert_eq!(
+            CommandOption::usage("ban", &schema),
+            "/ban <member> [reason…] [fast|slow]"
         );
     }
 
