@@ -241,6 +241,36 @@ Yapcore's `verify_event_webhook(secret, raw_body, signature_header)` validates t
 
 The SDK surface also exposes an `error` callback for runtime and handler failures. Yapcore reports these through `Bot::on_error`, using an `ErrorEvent` with a stage, optional event ID/type, command name, button custom ID, optional owning cog name (`cog`), and the error message. Failures inside an error callback are logged and are not recursively reported.
 
+### Select menu rows (experimental source-parity)
+
+Yapcore includes typed select-menu and option builders. A select menu occupies its own row; button rows and select rows can be mixed in one message:
+
+~~~rust
+use yapcore::{
+    MessageComponentRow, SelectActionRow, SelectMenu, SelectOption,
+};
+
+let menu = SelectMenu::new("food")?
+    .option(SelectOption::new("Pizza", "pizza")?)?
+    .option(SelectOption::new("Taco", "taco")?)?
+    .placeholder("Choose a food")?
+    .min_values(1)?
+    .max_values(2)?;
+let row = SelectActionRow::new(menu)?;
+bot.send_message_with_component_rows(
+    &channel_id,
+    Some("Pick one or two options"),
+    &[MessageComponentRow::from(row)],
+).await?;
+
+bot.on_select("food", |interaction| async move {
+    interaction.reply(format!("Selected: {}", interaction.values())).await?;
+    Ok(())
+})?;
+~~~
+
+The callback receives the selected values as JSON through `InteractionContext::values()`. This serializes the upstream `type: "select"` component shape but remains an experimental source-parity extension until the current public API schema or a live test bot confirms it.
+
 ### Interactions
 
 | Method | Route | Contract |
