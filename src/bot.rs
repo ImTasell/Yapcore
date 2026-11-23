@@ -15,7 +15,7 @@ use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
 use crate::interactions::{
     ButtonRegistry, InteractionContext, InteractionInvocation, InteractionRegistrationError,
 };
-use crate::models::{BotProfile, CommandDefinition, InteractionResponseType, Message};
+use crate::models::{BotProfile, BotStatus, CommandDefinition, InteractionResponseType, Message, PermissionTarget};
 
 /// Handle used to request a graceful stop of a running bot.
 #[derive(Debug, Clone)]
@@ -485,6 +485,51 @@ impl Bot {
         role_ids: &[crate::ids::RoleId],
     ) -> Result<Vec<crate::models::Role>> {
         self.api.reorder_roles(server_id, role_ids).await
+    }
+
+    /// Set the bot's online state and optional activity line.
+    pub async fn set_status(&self, status: BotStatus, activity: Option<&str>) -> Result<Value> {
+        self.api.set_status(status, activity).await
+    }
+
+    /// Fetch a member's effective server permissions (experimental API route).
+    pub async fn get_member_permissions(&self, server_id: &crate::ids::ServerId, user_id: &UserId) -> Result<Value> {
+        self.api.get_member_permissions(server_id, user_id).await
+    }
+
+    /// Fetch a member's effective permissions in one channel (experimental API route).
+    pub async fn get_channel_member_permissions(&self, channel_id: &ChannelId, user_id: &UserId) -> Result<Value> {
+        self.api.get_channel_member_permissions(channel_id, user_id).await
+    }
+
+    /// List channel permission overrides (experimental API route).
+    pub async fn list_channel_permission_overrides(&self, channel_id: &ChannelId) -> Result<Value> {
+        self.api.list_channel_permission_overrides(channel_id).await
+    }
+
+    /// Set a channel permission override (experimental API route).
+    pub async fn set_channel_permissions(&self, channel_id: &ChannelId, target: &PermissionTarget, allow: &[String], deny: &[String]) -> Result<Value> {
+        self.api.set_channel_permissions(channel_id, target, allow, deny).await
+    }
+
+    /// Clear a channel permission override (experimental API route).
+    pub async fn clear_channel_permissions(&self, channel_id: &ChannelId, target: &PermissionTarget) -> Result<()> {
+        self.api.clear_channel_permissions(channel_id, target).await
+    }
+
+    /// Set server-wide @everyone permissions (experimental API route).
+    pub async fn set_everyone_permissions(&self, server_id: &crate::ids::ServerId, permissions: &Value) -> Result<Value> {
+        self.api.set_everyone_permissions(server_id, permissions).await
+    }
+
+    /// Set a category permission override (experimental API route).
+    pub async fn set_category_permissions(&self, server_id: &crate::ids::ServerId, category_id: &crate::ids::CategoryId, target: &PermissionTarget, allow: &[String], deny: &[String]) -> Result<Value> {
+        self.api.set_category_permissions(server_id, category_id, target, allow, deny).await
+    }
+
+    /// Clear a category permission override (experimental API route).
+    pub async fn clear_category_permissions(&self, server_id: &crate::ids::ServerId, category_id: &crate::ids::CategoryId, target: &PermissionTarget) -> Result<()> {
+        self.api.clear_category_permissions(server_id, category_id, target).await
     }
 
     /// Fetch one public user profile.
