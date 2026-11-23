@@ -1960,4 +1960,34 @@ mod presence_rotation_tests {
             .await
             .expect("dropping the handle should wake the rotation task");
     }
+    #[tokio::test]
+    async fn server_presence_monitor_rejects_zero_interval_before_networking() {
+        let bot = Bot::builder().token("yb_test-token").build().unwrap();
+        let error = bot
+            .monitor_server_count_presence(Duration::ZERO, BotStatus::Online)
+            .await
+            .unwrap_err();
+        assert!(matches!(error, Error::InvalidServerPresenceMonitorInterval));
+    }
+
+    #[tokio::test]
+    async fn dropping_server_presence_monitor_requests_cancellation() {
+        let (sender, mut receiver) = watch::channel(false);
+        let notified = Arc::new(Notify::new());
+        let task_notified = Arc::clone(&notified);
+        let task = tokio::spawn(async move {
+            let _ = receiver.changed().await;
+            task_notified.notify_one();
+            Ok(())
+        });
+        let handle = ServerPresenceMonitorHandle {
+            sender,
+            task: Some(task),
+        };
+
+        drop(handle);
+        tokio::time::timeout(Duration::from_secs(1), notified.notified())
+            .await
+            .expect("dropping the monitor handle should wake its task");
+    }
 }
