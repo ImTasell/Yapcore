@@ -246,7 +246,7 @@ fn choice_matches(kind: CommandOptionType, value: &Value) -> bool {
     match kind {
         CommandOptionType::String | CommandOptionType::User | CommandOptionType::Channel | CommandOptionType::Role => value.is_string(),
         CommandOptionType::Integer => value.as_i64().is_some(),
-        CommandOptionType::Number => value.as_f64().is_some() && value.as_i64().is_none(),
+        CommandOptionType::Number => value.is_number(),
         CommandOptionType::Boolean => value.is_boolean(),
     }
 }
@@ -342,6 +342,29 @@ mod tests {
         assert!(matches!(ParsedCommandOptions::parse(&schema, "slow"), Err(CommandOptionError::InvalidChoice(_))));
         let integer = [CommandOption::integer("count", "Count").unwrap()];
         assert!(matches!(ParsedCommandOptions::parse(&integer, "nope"), Err(CommandOptionError::InvalidValue(_))));
+    }
+
+    #[test]
+    fn rejects_duplicate_schema_names_and_accepts_numeric_choices() {
+        let duplicate = [
+            CommandOption::string("name", "Name").unwrap(),
+            CommandOption::integer("name", "Second name").unwrap(),
+        ];
+        assert!(matches!(
+            ParsedCommandOptions::parse(&duplicate, "value"),
+            Err(CommandOptionError::DuplicateOption(_))
+        ));
+
+        let schema = [CommandOption::number("ratio", "Ratio")
+            .unwrap()
+            .choice(CommandOptionChoice::integer("Whole", 2))
+            .unwrap()];
+        assert_eq!(
+            ParsedCommandOptions::parse(&schema, "2")
+                .unwrap()
+                .get_number("ratio"),
+            Some(2.0)
+        );
     }
 
     #[test]
