@@ -218,6 +218,24 @@ bot.on_modal("application", |interaction| async move {
 
 These handlers are matched by both interaction kind and exact custom ID, so a button with the same ID cannot accidentally trigger a select or modal callback. Select values and modal field payloads are retained as raw JSON for forward compatibility. The upstream Python source describes these payloads, but the current official public interaction summary does not; treat the Rust support as experimental until the full schema or a live test bot confirms it.
 
+A button or select handler can open a typed modal as its first response:
+
+~~~rust
+use yapcore::{Modal, TextInput};
+
+bot.on_button("apply", |interaction| async move {
+    let modal = Modal::new(
+        "application",
+        "Apply",
+        [TextInput::paragraph("why", "Why do you want to join?")?],
+    )?;
+    interaction.show_modal(&modal).await?;
+    Ok(())
+})?;
+~~~
+
+A modal response is claimed atomically as the interaction's first answer; trying to open one after replying or acknowledging returns InteractionAlreadyAnswered.
+
 ### Generic authenticated API escape hatch
 
 The official SDKs expose `bot.api(method, path, body?)` for endpoints not wrapped by convenience methods. Yapcore exposes the same capability as `ApiClient::api` and `Bot::api`. The path is relative to the configured bot API base; absolute URLs, origin-relative paths, and traversal segments are rejected so the bot token cannot be redirected to an unrelated host. The response is returned as `serde_json::Value`.
