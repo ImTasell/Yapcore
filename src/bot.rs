@@ -2601,6 +2601,69 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cog_check_skips_commands_owned_by_that_cog() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+
+        struct GuardedCog {
+            invoked: Arc<AtomicBool>,
+        }
+
+        impl crate::cogs::Cog for GuardedCog {
+            fn name(&self) -> &str {
+                "guarded"
+            }
+
+            fn check(&self, context: &CommandContext) -> bool {
+                assert_eq!(context.command(), "restricted");
+                false
+            }
+
+            fn register(&self, bot: &mut Bot) -> std::result::Result<(), String> {
+                let invoked = self.invoked.clone();
+                bot.command("restricted", "A command guarded by its cog", move |_context| {
+                    let invoked = invoked.clone();
+                    async move {
+                        invoked.store(true, Ordering::SeqCst);
+                        Ok(())
+                    }
+                })
+                .map_err(|error| error.to_string())?;
+                Ok(())
+            }
+        }
+
+        let mut bot = Bot::builder()
+            .token("yb_test-token")
+            .prefixes(["!"])
+            .build()
+            .unwrap();
+        let invoked = Arc::new(AtomicBool::new(false));
+        bot.add_cog(GuardedCog {
+            invoked: invoked.clone(),
+        })
+        .unwrap();
+
+        let event = crate::models::EventEnvelope {
+            id: 4,
+            event_type: "message".to_owned(),
+            data: serde_json::json!({
+                "id": "123e4567-e89b-12d3-a456-426614174001",
+                "channel_id": "123e4567-e89b-12d3-a456-426614174002",
+                "author_id": "123e4567-e89b-12d3-a456-426614174003",
+                "author_bot": false,
+                "content": "!restricted"
+            }),
+            created_at: None,
+        };
+
+        bot.dispatch_event(&event, None).await.unwrap();
+        assert!(!invoked.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
     async fn dispatches_general_event_listeners_in_order_and_isolates_failures() {
         use std::sync::{Arc, Mutex};
 
