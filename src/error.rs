@@ -196,6 +196,27 @@ pub enum Error {
         actual: usize,
     },
 
+
+    /// A channel name must not be empty.
+    #[error("channel name must not be empty")]
+    EmptyChannelName,
+
+    /// A category name must not be empty.
+    #[error("category name must not be empty")]
+    EmptyCategoryName,
+
+    /// A channel edit must include at least one changed field.
+    #[error("channel edit options must contain at least one field")]
+    EmptyChannelEditOptions,
+
+    /// Channel slowmode cannot exceed six hours.
+    #[error("channel slowmode must be between 0 and 21,600 seconds; received {actual}")]
+    InvalidChannelSlowmode { actual: u64 },
+
+    /// A private channel may list at most 50 explicitly allowed users.
+    #[error("a channel may list at most 50 allowed users; received {actual}")]
+    TooManyChannelUsers { actual: usize },
+
     /// A role edit must include at least one changed field.
     #[error("role edit options must contain at least one field")]
     EmptyRoleEditOptions,
