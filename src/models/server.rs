@@ -257,6 +257,15 @@ pub struct Server {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// The people currently connected to a visible voice channel.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct VoiceChannelState {
+    /// Voice channel identifier.
+    pub channel_id: ChannelId,
+    /// User IDs currently connected to the channel.
+    #[serde(default)]
+    pub user_ids: Vec<UserId>,
+}
 /// A visible text or voice channel.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Channel {
