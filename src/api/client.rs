@@ -1742,6 +1742,69 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn send_message_with_component_rows_serializes_buttons_and_select_menu() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "message": {
+                    "id": MESSAGE_ID,
+                    "channel_id": CHANNEL_ID,
+                    "content": "Choose below"
+                }
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 2048).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let button_row = crate::models::ActionRow::new([
+            crate::models::Button::primary("Other", "choice:other").unwrap(),
+        ])
+        .unwrap();
+        let select_row = crate::models::SelectActionRow::new(
+            crate::models::SelectMenu::new("food")
+                .unwrap()
+                .option(
+                    crate::models::SelectOption::new("Pizza", "pizza")
+                        .unwrap()
+                        .description("Cheesy")
+                        .unwrap()
+                        .emoji("🍕"),
+                )
+                .unwrap()
+                .option(crate::models::SelectOption::new("Taco", "taco").unwrap())
+                .unwrap()
+                .placeholder("Choose a food")
+                .unwrap()
+                .min_values(1)
+                .unwrap()
+                .max_values(2)
+                .unwrap(),
+        )
+        .unwrap();
+        let rows = [
+            crate::models::MessageComponentRow::from(button_row),
+            crate::models::MessageComponentRow::from(select_row),
+        ];
+
+        client
+            .send_message_with_component_rows(&channel_id, Some("Choose below"), &rows)
+            .await
+            .unwrap();
+
+        let request = server.finish();
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["components"][0]["components"][0]["custom_id"], "choice:other");
+        assert_eq!(payload["components"][1]["components"][0]["type"], "select");
+        assert_eq!(payload["components"][1]["components"][0]["custom_id"], "food");
+        assert_eq!(payload["components"][1]["components"][0]["options"][0]["value"], "pizza");
+        assert_eq!(payload["components"][1]["components"][0]["max_values"], 2);
+    }
+
+    #[tokio::test]
     async fn send_layout_uses_components_v2_flag_and_reply_reference() {
         const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
         const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
