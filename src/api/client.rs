@@ -106,6 +106,37 @@ impl ApiClient {
     ///
     /// Yapper keeps this presence while the bot polls. This is the documented
     /// HTTP presence API, not a Discord-compatible local RPC/IPC connection.
+    /// Perform an authenticated request to a relative bot API route.
+    ///
+    /// Absolute URLs, origin-relative paths and path traversal are rejected to
+    /// prevent accidentally sending the bot token to another host.
+    pub async fn api(
+        &self,
+        method: Method,
+        route: &str,
+        body: Option<Value>,
+    ) -> Result<Value> {
+        if route.is_empty()
+            || route.starts_with('/')
+            || route.contains("://")
+            || route.split('/').any(|part| part == "." || part == "..")
+        {
+            return Err(Error::InvalidApiRoute(route.to_owned()));
+        }
+
+        let base = self.config.api_base_url();
+        let url = base
+            .join(route)
+            .map_err(|_| Error::InvalidApiRoute(route.to_owned()))?;
+        let base_path = base.path().trim_end_matches('/');
+        let allowed_path = format!("{base_path}/");
+        if url.origin() != base.origin() || !url.path().starts_with(&allowed_path) {
+            return Err(Error::InvalidApiRoute(route.to_owned()));
+        }
+
+        self.request_json_url(method, url, body).await
+    }
+
     pub async fn set_status(&self, status: BotStatus, activity: Option<&str>) -> Result<Value> {
         if let Some(activity) = activity {
             let actual = activity.chars().count();
