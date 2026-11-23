@@ -7,7 +7,9 @@ use thiserror::Error;
 
 use crate::config::ConfigError;
 use crate::ids::IdError;
-use crate::models::{CommandDefinitionError, ComponentValidationError, EmbedValidationError};
+use crate::models::{
+    CommandDefinitionError, ComponentValidationError, EmbedValidationError, LayoutValidationError,
+};
 
 /// Result type used by Yapcore's public API.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -116,6 +118,10 @@ pub enum Error {
     /// An embed or embed field violates a documented size or structure limit.
     #[error(transparent)]
     EmbedValidation(#[from] EmbedValidationError),
+
+    /// A Components V2 layout violates a local structure constraint.
+    #[error(transparent)]
+    LayoutValidation(#[from] LayoutValidationError),
 
     /// A button or action row violates a documented component limit.
     #[error(transparent)]
