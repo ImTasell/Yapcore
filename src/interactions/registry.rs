@@ -17,6 +17,9 @@ pub enum InteractionRegistrationError {
     /// A custom ID or prefix exceeds Yapper's 100-character limit.
     #[error("interaction custom IDs and prefixes must not exceed 100 characters")]
     CustomIdTooLong,
+    /// Only button, select and modal-submit interaction kinds are supported.
+    #[error("interaction kind must be 'button', 'select' or 'modal_submit'")]
+    UnsupportedKind,
 }
 
 type HandlerFuture = Pin<Box<dyn Future<Output = HandlerResult> + Send + 'static>>;
@@ -32,6 +35,7 @@ enum ButtonMatcher {
 #[derive(Clone)]
 pub(crate) struct RegisteredButton {
     matcher: ButtonMatcher,
+    pub(crate) kind: String,
     pub(crate) handler: ButtonHandler,
     pub(crate) owner: Option<String>,
 }
@@ -71,7 +75,7 @@ impl ButtonRegistry {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.register(ButtonMatcher::Exact(custom_id.into()), None, handler)
+        self.register("button", ButtonMatcher::Exact(custom_id.into()), None, handler)
     }
 
     /// Register an exact custom ID handler with optional cog ownership metadata.
@@ -85,7 +89,7 @@ impl ButtonRegistry {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.register(ButtonMatcher::Exact(custom_id.into()), owner, handler)
+        self.register("button", ButtonMatcher::Exact(custom_id.into()), owner, handler)
     }
 
     /// Register a handler for every custom ID with the given prefix.
@@ -98,7 +102,7 @@ impl ButtonRegistry {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.register(ButtonMatcher::Prefix(prefix.into()), None, handler)
+        self.register("button", ButtonMatcher::Prefix(prefix.into()), None, handler)
     }
 
     /// Register a prefix handler with optional cog ownership metadata.
@@ -112,11 +116,31 @@ impl ButtonRegistry {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.register(ButtonMatcher::Prefix(prefix.into()), owner, handler)
+        self.register("button", ButtonMatcher::Prefix(prefix.into()), owner, handler)
+    }
+
+    /// Register an exact custom ID for a select or modal-submit interaction.
+    pub fn register_kind_owned<F, Fut>(
+        &mut self,
+        kind: impl Into<String>,
+        custom_id: impl Into<String>,
+        owner: Option<String>,
+        handler: F,
+    ) -> Result<(), InteractionRegistrationError>
+    where
+        F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        let kind = kind.into();
+        if !matches!(kind.as_str(), "button" | "select" | "modal_submit") {
+            return Err(InteractionRegistrationError::UnsupportedKind);
+        }
+        self.register(&kind, ButtonMatcher::Exact(custom_id.into()), owner, handler)
     }
 
     fn register<F, Fut>(
         &mut self,
+        kind: &str,
         matcher: ButtonMatcher,
         owner: Option<String>,
         handler: F,
@@ -140,6 +164,7 @@ impl ButtonRegistry {
         let handler: ButtonHandler = Arc::new(move |context| Box::pin(handler(context)));
         self.entries.push(RegisteredButton {
             matcher,
+            kind: kind.to_owned(),
             handler,
             owner,
         });
@@ -155,10 +180,10 @@ impl ButtonRegistry {
     }
 
     /// Clone all handlers matching a custom ID, preserving registration order.
-    pub fn handlers_for(&self, custom_id: &str) -> Vec<RegisteredButton> {
+    pub fn handlers_for(&self, kind: &str, custom_id: &str) -> Vec<RegisteredButton> {
         self.entries
             .iter()
-            .filter(|entry| match &entry.matcher {
+            .filter(|entry| entry.kind == kind && match &entry.matcher {
                 ButtonMatcher::Exact(expected) => expected == custom_id,
                 ButtonMatcher::Prefix(prefix) => custom_id.starts_with(prefix),
             })
@@ -184,7 +209,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(registry.remove_owner("alpha"), 1);
-        assert_eq!(registry.handlers_for("alpha:other").len(), 1);
+        assert_eq!(registry.handlers_for("button", "alpha:other").len(), 1);
     }
 
     #[test]
@@ -195,7 +220,7 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        let handlers = registry.handlers_for("vote:yes");
+        let handlers = registry.handlers_for("button", "vote:yes");
         assert_eq!(handlers.len(), 1);
         assert_eq!(handlers[0].owner.as_deref(), Some("polls"));
     }
@@ -229,7 +254,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(registry.handlers_for("vote:yes").len(), 2);
-        assert_eq!(registry.handlers_for("vote:no").len(), 1);
-        assert!(registry.handlers_for("unknown").is_empty());
+        assert_eq!(registry.handlers_for("button", "vote:no").len(), 1);
+        assert!(registry.handlers_for("button", "unknown").is_empty());
     }
 }
