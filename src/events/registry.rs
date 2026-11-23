@@ -26,6 +26,8 @@ pub enum ErrorStage {
     SlashCommandAfterAck,
     /// A button handler returned an error.
     ButtonHandler,
+    /// A select-menu or modal-submit handler returned an error.
+    InteractionHandler,
     /// An error listener itself returned an error.
     ErrorHandler,
 }
