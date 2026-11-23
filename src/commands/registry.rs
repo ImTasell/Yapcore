@@ -170,4 +170,101 @@ mod tests {
 
         assert_eq!(result, Err(CommandDefinitionError::DuplicateName));
     }
+    #[tokio::test]
+    async fn rejected_command_check_skips_handler() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let config = crate::config::Config::builder()
+            .token("yb_test-token")
+            .build()
+            .unwrap();
+        let api = crate::api::ApiClient::new(config).unwrap();
+        let message_id = crate::ids::MessageId::new(
+            "123e4567-e89b-12d3-a456-426614174010",
+        )
+        .unwrap();
+        let channel_id = crate::ids::ChannelId::new(
+            "123e4567-e89b-12d3-a456-426614174011",
+        )
+        .unwrap();
+        let context = CommandContext::new(
+            api,
+            "restricted".to_owned(),
+            "!restricted".to_owned(),
+            String::new(),
+            message_id,
+            channel_id,
+            None,
+        );
+        let invoked = Arc::new(AtomicBool::new(false));
+        let invoked_handler = invoked.clone();
+        let mut registry = CommandRegistry::default();
+        registry
+            .register_with_check(
+                "restricted",
+                "Requires a check",
+                |_context| async { false },
+                move |_context| {
+                    let invoked = invoked_handler.clone();
+                    async move {
+                        invoked.store(true, Ordering::SeqCst);
+                        Ok(())
+                    }
+                },
+            )
+            .unwrap();
+
+        let result = registry.dispatch("restricted", context).await.unwrap();
+        assert!(result.is_ok());
+        assert!(!invoked.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn accepted_command_check_runs_handler() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let config = crate::config::Config::builder()
+            .token("yb_test-token")
+            .build()
+            .unwrap();
+        let api = crate::api::ApiClient::new(config).unwrap();
+        let message_id = crate::ids::MessageId::new(
+            "123e4567-e89b-12d3-a456-426614174010",
+        )
+        .unwrap();
+        let channel_id = crate::ids::ChannelId::new(
+            "123e4567-e89b-12d3-a456-426614174011",
+        )
+        .unwrap();
+        let context = CommandContext::new(
+            api,
+            "allowed".to_owned(),
+            "!allowed".to_owned(),
+            String::new(),
+            message_id,
+            channel_id,
+            None,
+        );
+        let invoked = Arc::new(AtomicBool::new(false));
+        let invoked_handler = invoked.clone();
+        let mut registry = CommandRegistry::default();
+        registry
+            .register_with_check(
+                "allowed",
+                "Passes a check",
+                |_context| async { true },
+                move |_context| {
+                    let invoked = invoked_handler.clone();
+                    async move {
+                        invoked.store(true, Ordering::SeqCst);
+                        Ok(())
+                    }
+                },
+            )
+            .unwrap();
+
+        let result = registry.dispatch("allowed", context).await.unwrap();
+        assert!(result.is_ok());
+        assert!(invoked.load(Ordering::SeqCst));
+    }
 }
