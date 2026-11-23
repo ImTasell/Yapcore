@@ -1,6 +1,6 @@
 use std::future::Future;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tokio::task::JoinHandle;
 
@@ -838,7 +838,9 @@ impl Bot {
         user_id: &UserId,
         channel_id: &ChannelId,
     ) -> Result<Value> {
-        self.api.move_member_to_voice(server_id, user_id, channel_id).await
+        self.api
+            .move_member_to_voice(server_id, user_id, channel_id)
+            .await
     }
 
     /// Disconnect a member from voice.
@@ -847,7 +849,9 @@ impl Bot {
         server_id: &crate::ids::ServerId,
         user_id: &UserId,
     ) -> Result<Value> {
-        self.api.disconnect_member_from_voice(server_id, user_id).await
+        self.api
+            .disconnect_member_from_voice(server_id, user_id)
+            .await
     }
     /// Fetch a member's effective server permissions (experimental API route).
     pub async fn get_member_permissions(
@@ -1147,7 +1151,8 @@ impl Bot {
         // the complete set once before beginning event polling.
         self.api.sync_commands(&self.commands.definitions()).await?;
 
-        log_info!(self.logging,
+        log_info!(
+            self.logging,
             username = profile.username.as_deref().unwrap_or("<unknown>"),
             "Yapcore bot connected"
         );
@@ -1169,7 +1174,9 @@ impl Bot {
         let mut consecutive_failures = 0_u32;
 
         loop {
-            if *shutdown.borrow() { break; }
+            if *shutdown.borrow() {
+                break;
+            }
             let batch = tokio::select! {
                 biased;
                 changed = shutdown.changed() => {
@@ -1202,7 +1209,9 @@ impl Bot {
             };
 
             for event in batch.events() {
-                if event.id <= cursor { continue; }
+                if event.id <= cursor {
+                    continue;
+                }
                 if let Err(error) = self.dispatch_event(event, bot_id.as_ref()).await {
                     tracing::error!(
                         event_type = %event.event_type,
@@ -1213,7 +1222,9 @@ impl Bot {
                 }
                 cursor = event.id;
                 self.last_event_id.store(cursor, Ordering::Release);
-                if *shutdown.borrow() { break; }
+                if *shutdown.borrow() {
+                    break;
+                }
             }
             cursor = cursor.max(batch.last());
             self.last_event_id.store(cursor, Ordering::Release);
