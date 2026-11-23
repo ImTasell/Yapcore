@@ -172,6 +172,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn removes_only_button_handlers_owned_by_selected_cog() {
+        let mut registry = ButtonRegistry::default();
+        registry
+            .register_prefix_owned("alpha:", Some("alpha".to_owned()), |_context| async {
+                Ok(())
+            })
+            .unwrap();
+        registry
+            .register_exact("alpha:other", |_context| async { Ok(()) })
+            .unwrap();
+
+        assert_eq!(registry.remove_owner("alpha"), 1);
+        assert_eq!(registry.handlers_for("alpha:other").len(), 1);
+    }
+
+    #[test]
     fn preserves_cog_ownership_for_button_handlers() {
         let mut registry = ButtonRegistry::default();
         registry
