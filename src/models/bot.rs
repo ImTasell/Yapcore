@@ -177,14 +177,18 @@ pub struct BotProfileEdit {
 
 impl BotProfileEdit {
     /// Start an empty profile update.
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     /// Set the bot's display name (maximum 32 characters).
     pub fn display_name(mut self, value: impl Into<String>) -> Self {
-        self.display_name = Some(value.into()); self
+        self.display_name = Some(value.into());
+        self
     }
     /// Set the bot's bio (maximum 190 characters).
     pub fn bio(mut self, value: impl Into<String>) -> Self {
-        self.bio = Some(value.into()); self
+        self.bio = Some(value.into());
+        self
     }
     /// Validate this patch against the documented profile limits.
     pub(crate) fn validate(&self) -> crate::error::Result<()> {
@@ -193,11 +197,15 @@ impl BotProfileEdit {
         }
         if let Some(value) = &self.display_name {
             let actual = value.chars().count();
-            if actual > 32 { return Err(crate::error::Error::BotDisplayNameTooLong { actual }); }
+            if actual > 32 {
+                return Err(crate::error::Error::BotDisplayNameTooLong { actual });
+            }
         }
         if let Some(value) = &self.bio {
             let actual = value.chars().count();
-            if actual > 190 { return Err(crate::error::Error::BotBioTooLong { actual }); }
+            if actual > 190 {
+                return Err(crate::error::Error::BotBioTooLong { actual });
+            }
         }
         Ok(())
     }
@@ -205,7 +213,12 @@ impl BotProfileEdit {
 
 /// Supported image formats for bot avatar and banner uploads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ImageFormat { Png, Jpeg, Gif, Webp }
+pub enum ImageFormat {
+    Png,
+    Jpeg,
+    Gif,
+    Webp,
+}
 
 impl ImageFormat {
     /// MIME type used for the raw image request body.
@@ -370,11 +383,32 @@ mod profile_tests {
     use super::*;
     #[test]
     fn validates_profile_patch_limits_and_presence() {
-        assert!(matches!(BotProfileEdit::new().validate(), Err(crate::error::Error::EmptyBotProfileEdit)));
-        assert!(BotProfileEdit::new().display_name("x".repeat(32)).validate().is_ok());
-        assert!(matches!(BotProfileEdit::new().display_name("x".repeat(33)).validate(), Err(crate::error::Error::BotDisplayNameTooLong { actual: 33 })));
-        assert!(BotProfileEdit::new().bio("x".repeat(190)).validate().is_ok());
-        assert!(matches!(BotProfileEdit::new().bio("x".repeat(191)).validate(), Err(crate::error::Error::BotBioTooLong { actual: 191 })));
+        assert!(matches!(
+            BotProfileEdit::new().validate(),
+            Err(crate::error::Error::EmptyBotProfileEdit)
+        ));
+        assert!(
+            BotProfileEdit::new()
+                .display_name("x".repeat(32))
+                .validate()
+                .is_ok()
+        );
+        assert!(matches!(
+            BotProfileEdit::new()
+                .display_name("x".repeat(33))
+                .validate(),
+            Err(crate::error::Error::BotDisplayNameTooLong { actual: 33 })
+        ));
+        assert!(
+            BotProfileEdit::new()
+                .bio("x".repeat(190))
+                .validate()
+                .is_ok()
+        );
+        assert!(matches!(
+            BotProfileEdit::new().bio("x".repeat(191)).validate(),
+            Err(crate::error::Error::BotBioTooLong { actual: 191 })
+        ));
     }
     #[test]
     fn image_formats_have_expected_mime_types() {
