@@ -225,7 +225,7 @@ bot.send_layout(&channel_id, &layout, None).await?;
 bot.edit_layout(&channel_id, &message_id, &layout).await?;
 ~~~
 
-The model includes text displays, sections with button/thumbnail accessories, media galleries, separators, file displays and nested containers. Locally validated constraints include 1–3 text displays per section, 1–10 media gallery items, HTTPS media/file URLs, 24-bit container accent colors and at least one top-level layout item. This support mirrors the Python source but is not a guarantee that every component shape is accepted by the current public API. A live test bot or current OpenAPI schema is still required before treating it as stable.
+The model includes text displays, sections with button/thumbnail accessories, media galleries, separators, file displays, nested containers and button action rows inside containers. Locally validated constraints include 1–3 text displays per section, 1–10 media gallery items, HTTPS media/file URLs, 24-bit container accent colors and at least one top-level layout item. This support mirrors the Python source but is not a guarantee that every component shape is accepted by the current public API. A live test bot or current OpenAPI schema is still required before treating it as stable.
 
 ### Signed event webhooks
 
