@@ -24,7 +24,7 @@ pub use bot::{
 pub use commands::{CommandContext, HandlerError, HandlerResult};
 pub use config::{Config, ConfigBuilder, ConfigError, DEFAULT_API_BASE_URL};
 pub use error::{ApiError, Error, Result};
-pub use events::EventRegistrationError;
+pub use events::{ErrorEvent, ErrorStage, EventRegistrationError};
 pub use ids::{
     CategoryId, ChannelId, EmojiId, IdError, InteractionId, MessageId, RoleId, ServerId, ThreadId,
     UserId, WebhookId,
