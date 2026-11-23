@@ -51,8 +51,8 @@ impl CommandOptionChoice {
 
     /// Create a numeric choice.
     pub fn number(name: impl Into<String>, value: f64) -> Result<Self, CommandOptionError> {
-        let value = serde_json::Number::from_f64(value)
-            .ok_or(CommandOptionError::NonFiniteNumber)?;
+        let value =
+            serde_json::Number::from_f64(value).ok_or(CommandOptionError::NonFiniteNumber)?;
         Ok(Self {
             name: name.into(),
             value: Value::Number(value),
@@ -73,8 +73,7 @@ impl CommandOption {
         let mut usage = format!("/{command_name}");
         for (index, option) in options.iter().enumerate() {
             let value = if option.choices.is_empty() {
-                let rest = if index + 1 == options.len()
-                    && option.kind == CommandOptionType::String
+                let rest = if index + 1 == options.len() && option.kind == CommandOptionType::String
                 {
                     "…"
                 } else {
@@ -241,9 +240,7 @@ pub struct ParsedCommandOptions {
 
 impl ParsedCommandOptions {
     /// Validate option count, unique names and required-before-optional ordering.
-    pub(crate) fn validate_schema(
-        schema: &[CommandOption],
-    ) -> Result<(), CommandOptionError> {
+    pub(crate) fn validate_schema(schema: &[CommandOption]) -> Result<(), CommandOptionError> {
         if schema.len() > 10 {
             return Err(CommandOptionError::TooManyOptions);
         }
@@ -293,9 +290,7 @@ impl ParsedCommandOptions {
             let (raw, positional_end) = if let Some(value) = named.remove(&option.name) {
                 (Some(value), None)
             } else if positional_index < positional.len() {
-                if is_last
-                    && option.kind == CommandOptionType::String
-                    && option.choices.is_empty()
+                if is_last && option.kind == CommandOptionType::String && option.choices.is_empty()
                 {
                     (
                         Some(positional[positional_index..].join(" ")),
@@ -558,7 +553,9 @@ mod tests {
     #[test]
     fn parses_typed_positional_and_named_arguments() {
         let schema = [
-            CommandOption::string("name", "Display name").unwrap().required(true),
+            CommandOption::string("name", "Display name")
+                .unwrap()
+                .required(true),
             CommandOption::integer("count", "Repeat count").unwrap(),
             CommandOption::boolean("enabled", "Enable feature").unwrap(),
             CommandOption::user("member", "Target member").unwrap(),
@@ -566,7 +563,8 @@ mod tests {
         let parsed = ParsedCommandOptions::parse(
             &schema,
             r#" "Altix Dev" 12 enabled=true member=123e4567-e89b-12d3-a456-426614174003 "#,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(parsed.get_string("name"), Some("Altix Dev"));
         assert_eq!(parsed.get_integer("count"), Some(12));
         assert_eq!(parsed.get_boolean("enabled"), Some(true));
@@ -580,10 +578,7 @@ mod tests {
     fn rejects_malformed_id_mentions() {
         let schema = [CommandOption::user("member", "Member").unwrap()];
         assert!(matches!(
-            ParsedCommandOptions::parse(
-                &schema,
-                "member=<@123e4567-e89b-12d3-a456-426614174003",
-            ),
+            ParsedCommandOptions::parse(&schema, "member=<@123e4567-e89b-12d3-a456-426614174003",),
             Err(CommandOptionError::InvalidValue(_))
         ));
     }
@@ -615,11 +610,8 @@ mod tests {
             ParsedCommandOptions::parse(&schema, "not-an-id"),
             Err(CommandOptionError::InvalidValue(_))
         ));
-        let parsed = ParsedCommandOptions::parse(
-            &schema,
-            "123e4567-e89b-12d3-a456-426614174003",
-        )
-        .unwrap();
+        let parsed =
+            ParsedCommandOptions::parse(&schema, "123e4567-e89b-12d3-a456-426614174003").unwrap();
         assert_eq!(
             parsed.get_user("member").unwrap().as_str(),
             "123e4567-e89b-12d3-a456-426614174003"
@@ -630,34 +622,37 @@ mod tests {
     fn final_string_option_consumes_the_remaining_positional_text() {
         let schema = [
             CommandOption::integer("count", "Repeat count").unwrap(),
-            CommandOption::string("reason", "Reason").unwrap().required(true),
+            CommandOption::string("reason", "Reason")
+                .unwrap()
+                .required(true),
         ];
-        let parsed = ParsedCommandOptions::parse(&schema, "this is the full reason")
-            .unwrap();
+        let parsed = ParsedCommandOptions::parse(&schema, "this is the full reason").unwrap();
         assert_eq!(parsed.get_integer("count"), None);
-        assert_eq!(
-            parsed.get_string("reason"),
-            Some("this is the full reason")
-        );
+        assert_eq!(parsed.get_string("reason"), Some("this is the full reason"));
     }
 
     #[test]
     fn optional_invalid_positional_option_does_not_consume_the_next_value() {
         let schema = [
             CommandOption::integer("count", "Count").unwrap(),
-            CommandOption::string("reason", "Reason").unwrap().required(true),
+            CommandOption::string("reason", "Reason")
+                .unwrap()
+                .required(true),
         ];
-        let parsed = ParsedCommandOptions::parse(&schema, "not-a-number because I can")
-            .unwrap();
+        let parsed = ParsedCommandOptions::parse(&schema, "not-a-number because I can").unwrap();
         assert_eq!(parsed.get_integer("count"), None);
-        assert_eq!(parsed.get_string("reason"), Some("not-a-number because I can"));
+        assert_eq!(
+            parsed.get_string("reason"),
+            Some("not-a-number because I can")
+        );
     }
 
     #[test]
     fn validates_required_choices_and_bad_values() {
         let schema = [CommandOption::string("mode", "Mode")
             .unwrap()
-            .choice(CommandOptionChoice::string("Fast", "fast")).unwrap()
+            .choice(CommandOptionChoice::string("Fast", "fast"))
+            .unwrap()
             .required(true)];
         assert!(matches!(
             ParsedCommandOptions::parse(&schema, ""),
@@ -682,7 +677,10 @@ mod tests {
 
         let schema = [CommandOption::boolean("enabled", "Enabled").unwrap()];
         let value_error = ParsedCommandOptions::parse(&schema, "enabled=@everyone").unwrap_err();
-        assert_eq!(value_error.user_message(), "Option enabled has an invalid value.");
+        assert_eq!(
+            value_error.user_message(),
+            "Option enabled has an invalid value."
+        );
         assert!(!value_error.user_message().contains("@everyone"));
     }
 
@@ -712,7 +710,9 @@ mod tests {
     #[test]
     fn formats_usage_with_required_optional_and_choice_arguments() {
         let schema = [
-            CommandOption::user("member", "Member").unwrap().required(true),
+            CommandOption::user("member", "Member")
+                .unwrap()
+                .required(true),
             CommandOption::string("mode", "Mode")
                 .unwrap()
                 .choice(CommandOptionChoice::string("Fast", "fast"))
