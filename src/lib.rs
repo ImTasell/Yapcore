@@ -9,8 +9,8 @@
 
 pub mod api;
 pub mod bot;
-pub mod commands;
 pub mod cogs;
+pub mod commands;
 pub mod config;
 pub mod error;
 pub mod events;
