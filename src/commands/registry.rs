@@ -153,6 +153,14 @@ impl CommandRegistry {
         Ok(())
     }
 
+    /// Remove every command registered by one cog and return the number removed.
+    pub fn remove_owner(&mut self, owner: &str) -> usize {
+        let before = self.entries.len();
+        self.entries
+            .retain(|_, entry| entry.owner.as_deref() != Some(owner));
+        before - self.entries.len()
+    }
+
     pub fn owner(&self, name: &str) -> Option<&str> {
         self.entries.get(name)?.owner.as_deref()
     }
