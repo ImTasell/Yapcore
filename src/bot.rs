@@ -444,7 +444,8 @@ impl Bot {
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
         if let Some(owner) = self.registering_cog.clone() {
-            self.buttons.register_prefix_owned(prefix, Some(owner), handler)?;
+            self.buttons
+                .register_prefix_owned(prefix, Some(owner), handler)?;
         } else {
             self.buttons.register_prefix(prefix, handler)?;
         }
@@ -465,7 +466,8 @@ impl Bot {
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
         if let Some(owner) = self.registering_cog.clone() {
-            self.events.register_owned(event_type, Some(owner), handler)?;
+            self.events
+                .register_owned(event_type, Some(owner), handler)?;
         } else {
             self.events.register(event_type, handler)?;
         }
