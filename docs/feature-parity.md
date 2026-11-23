@@ -104,8 +104,9 @@ Rust API should favor explicit typed command registration and async handlers. It
 | [ ] Verify | Four-file multipart send and sticker IDs | Confirm current upload contract and limits |
 | [x] Documented | Button interactions: reply/ephemeral/update/ack | Exact `on_button` and prefix `button` registrations; shared secret-safe response session and two-second auto-ack |
 | [~] Documented | Interaction expiry and answer count limits | Enforces ten-response cap and auto-ack margin; explicit expires_at tracking remains |
-| [ ] Verify | Select menu handlers | Python package supports selects; official page's interaction examples focus on buttons |
-| [ ] Verify | Modal and text-input components | Present in Python source; confirm current server payload schema |
+| [x] Verify | Select menu handlers | `Bot::on_select` dispatches `type: select` submissions and preserves selected values in `InteractionContext::values`; source-parity implementation, public schema/live verification still pending |
+| [x] Verify | Modal submission handlers | `Bot::on_modal` dispatches `type: modal_submit` and preserves submitted field values as JSON; source-parity implementation, public schema/live verification still pending |
+| [ ] Verify | Modal and text-input builders / opening modals | Present in Python source; typed payload builders and callback response support remain to be implemented after schema verification |
 | [ ] Verify | Components V2 layouts | Present in Python source; confirm official schema before finalizing |
 | [x] Documented | Unknown message/event JSON fields | Preserve unknown fields in message models and raw event payloads |
 
