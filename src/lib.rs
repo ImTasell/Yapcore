@@ -18,7 +18,7 @@ pub mod interactions;
 pub mod models;
 
 pub use api::ApiClient;
-pub use bot::{Bot, BotBuilder, ShutdownHandle};
+pub use bot::{Bot, BotBuilder, PresenceRotationHandle, ShutdownHandle};
 pub use commands::{CommandContext, HandlerError, HandlerResult};
 pub use config::{Config, ConfigBuilder, ConfigError, DEFAULT_API_BASE_URL};
 pub use error::{ApiError, Error, Result};
@@ -29,7 +29,7 @@ pub use ids::{
 };
 pub use interactions::{InteractionContext, InteractionRegistrationError};
 pub use models::{
-    ActionRow, Activity, Ban, BotProfile, BotStatus, Button, ButtonStyle, Channel, ChannelCategory,
+    ActionRow, Activity, ActivityRotation, Ban, BotProfile, BotStatus, Button, ButtonStyle, Channel, ChannelCategory,
     ChannelCreateOptions, ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition,
     CommandDefinitionError, ComponentValidationError, Embed, EmbedAuthor, EmbedBuilder, EmbedField,
     EmbedFooter, EmbedValidationError, EventBatch, EventEnvelope, InteractionResponseType, Member,
