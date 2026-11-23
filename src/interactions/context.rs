@@ -145,3 +145,38 @@ impl InteractionContext {
         self.session.response_count()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+
+    #[tokio::test]
+    async fn modal_submission_cannot_open_another_modal() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let api = ApiClient::new(config).unwrap();
+        let invocation = InteractionInvocation {
+            id: InteractionId::new("123e4567-e89b-12d3-a456-426614174030").unwrap(),
+            token: SecretString::from("modal/token"),
+            kind: "modal_submit".to_owned(),
+            custom_id: "application".to_owned(),
+            message_id: None,
+            channel_id: None,
+            user_id: None,
+            username: None,
+            values: serde_json::json!({ "name": "Altix" }),
+        };
+        let context = InteractionContext::new(api, invocation);
+        let modal = Modal::new(
+            "follow-up",
+            "Follow up",
+            [TextInput::short("answer", "Answer").unwrap()],
+        )
+        .unwrap();
+
+        assert!(matches!(
+            context.show_modal(&modal).await,
+            Err(crate::Error::ModalNotAllowedFromModalSubmit)
+        ));
+    }
+}
