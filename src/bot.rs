@@ -1,5 +1,6 @@
 use std::future::Future;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 
@@ -7,6 +8,23 @@ use secrecy::SecretString;
 use serde_json::Value;
 use tokio::sync::watch;
 
+macro_rules! log_info {
+    ($enabled:expr, $($args:tt)*) => {
+        if $enabled { tracing::info!($($args)*); }
+    };
+}
+
+macro_rules! log_warn {
+    ($enabled:expr, $($args:tt)*) => {
+        if $enabled { tracing::warn!($($args)*); }
+    };
+}
+
+macro_rules! log_error {
+    ($enabled:expr, $($args:tt)*) => {
+        if $enabled { tracing::error!($($args)*); }
+    };
+}
 use crate::api::ApiClient;
 use crate::commands::{CommandContext, CommandRegistry, HandlerResult, SlashCommandInvocation};
 use crate::config::{Config, ConfigBuilder, ConfigError};
@@ -116,6 +134,7 @@ pub struct BotBuilder {
     config: ConfigBuilder,
     prefixes: Vec<String>,
     ignore_bots: bool,
+    logging: bool,
 }
 
 impl Default for BotBuilder {
@@ -124,6 +143,7 @@ impl Default for BotBuilder {
             config: ConfigBuilder::default(),
             prefixes: vec!["/".to_owned(), "!".to_owned()],
             ignore_bots: true,
+            logging: true,
         }
     }
 }
@@ -197,6 +217,15 @@ impl BotBuilder {
         self
     }
 
+    /// Enable or disable Yapcore runtime logs (enabled by default).
+    ///
+    /// This controls lifecycle and handler logs emitted through tracing; it
+    /// does not install or configure a global tracing subscriber.
+    pub fn logging(mut self, enabled: bool) -> Self {
+        self.logging = enabled;
+        self
+    }
+
     /// Validate configuration and create the bot's shared HTTP client.
     pub fn build(self) -> Result<Bot> {
         let config: Config = self.config.build()?;
@@ -210,6 +239,8 @@ impl BotBuilder {
             events: EventRegistry::default(),
             prefixes: self.prefixes,
             ignore_bots: self.ignore_bots,
+            logging: self.logging,
+            last_event_id: Arc::new(AtomicU64::new(0)),
             shutdown,
         })
     }
@@ -224,6 +255,8 @@ pub struct Bot {
     events: EventRegistry,
     prefixes: Vec<String>,
     ignore_bots: bool,
+    logging: bool,
+    last_event_id: Arc<AtomicU64>,
     shutdown: watch::Sender<bool>,
 }
 
@@ -236,6 +269,14 @@ impl Bot {
     /// Access the authenticated REST API client.
     pub fn api_client(&self) -> &ApiClient {
         &self.api
+    }
+
+    /// Return the last event cursor observed by the runtime.
+    ///
+    /// Persist this value externally and pass it to run_from on restart to
+    /// resume from the event after the saved cursor.
+    pub fn last_event_id(&self) -> u64 {
+        self.last_event_id.load(Ordering::Acquire)
     }
 
     /// Create a handle that can cancel the bot's run loop.
@@ -599,6 +640,7 @@ impl Bot {
         self.api.set_presence(&initial_presence).await?;
 
         let api = self.api.clone();
+        let logging = self.logging;
         let (sender, mut stop_receiver) = watch::channel(false);
         let mut bot_shutdown = self.shutdown.subscribe();
 
@@ -648,7 +690,7 @@ impl Bot {
                         };
 
                         if let Err(error) = result {
-                            tracing::error!(error = %error, "activity rotation stopped after a presence update failed");
+                            log_error!(self.logging,error = %error, "activity rotation stopped after a presence update failed");
                             return Err(error);
                         }
                     }
@@ -693,6 +735,7 @@ impl Bot {
 
         let mut last_count = self.refresh_server_count_presence(status).await?;
         let api = self.api.clone();
+        let logging = self.logging;
         let (sender, mut stop_receiver) = watch::channel(false);
         let mut bot_shutdown = self.shutdown.subscribe();
 
@@ -736,7 +779,7 @@ impl Bot {
                             result = api.list_servers() => match result {
                                 Ok(servers) => servers,
                                 Err(error) => {
-                                    tracing::warn!(error = %error, "could not refresh server count for bot presence");
+                                    log_warn!(self.logging,error = %error, "could not refresh server count for bot presence");
                                     continue;
                                 }
                             },
@@ -1084,6 +1127,19 @@ impl Bot {
     /// Slash-command interactions, components and general event listeners are
     /// separate follow-up features.
     pub async fn run(&self) -> Result<()> {
+        self.run_inner(None).await.map(|_| ())
+    }
+
+    /// Resume event polling after an externally persisted event ID.
+    ///
+    /// Returns the last cursor observed when the bot shuts down. Use
+    /// last_event_id() while running to checkpoint progress. Yapper keeps
+    /// events for one day; anything older may already have been discarded.
+    pub async fn run_from(&self, last_event_id: u64) -> Result<u64> {
+        self.run_inner(Some(last_event_id)).await
+    }
+
+    async fn run_inner(&self, saved_cursor: Option<u64>) -> Result<u64> {
         let profile = self.api.get_me().await?;
         let bot_id = profile.id.clone();
 
@@ -1091,7 +1147,7 @@ impl Bot {
         // the complete set once before beginning event polling.
         self.api.sync_commands(&self.commands.definitions()).await?;
 
-        tracing::info!(
+        log_info!(self.logging,
             username = profile.username.as_deref().unwrap_or("<unknown>"),
             "Yapcore bot connected"
         );
@@ -1104,48 +1160,39 @@ impl Bot {
         };
         self.dispatch_event(&ready_event, bot_id.as_ref()).await?;
 
-        let initial = self.api.poll_events(0, 0, None).await?;
-        let mut cursor = initial.last();
+        let mut cursor = match saved_cursor {
+            Some(cursor) => cursor,
+            None => self.api.poll_events(0, 0, None).await?.last(),
+        };
+        self.last_event_id.store(cursor, Ordering::Release);
         let mut shutdown = self.shutdown.subscribe();
         let mut consecutive_failures = 0_u32;
 
         loop {
-            if *shutdown.borrow() {
-                break;
-            }
-
+            if *shutdown.borrow() { break; }
             let batch = tokio::select! {
                 biased;
                 changed = shutdown.changed() => {
-                    if changed.is_err() || *shutdown.borrow() {
-                        break;
-                    }
+                    if changed.is_err() || *shutdown.borrow() { break; }
                     continue;
                 }
                 result = self.api.poll_events(cursor, 25, None) => {
                     match result {
-                        Ok(batch) => {
-                            consecutive_failures = 0;
-                            batch
-                        }
+                        Ok(batch) => { consecutive_failures = 0; batch }
                         Err(error) => {
                             let Some(delay) = poll_retry_delay(&error, consecutive_failures) else {
                                 return Err(error);
                             };
-
                             consecutive_failures = consecutive_failures.saturating_add(1);
                             tracing::warn!(
                                 error = %error,
                                 retry_seconds = delay.as_secs_f64(),
                                 "event polling failed; retrying"
                             );
-
                             tokio::select! {
                                 _ = tokio::time::sleep(delay) => {}
                                 changed = shutdown.changed() => {
-                                    if changed.is_err() || *shutdown.borrow() {
-                                        break;
-                                    }
+                                    if changed.is_err() || *shutdown.borrow() { break; }
                                 }
                             }
                             continue;
@@ -1155,10 +1202,7 @@ impl Bot {
             };
 
             for event in batch.events() {
-                if event.id <= cursor {
-                    continue;
-                }
-
+                if event.id <= cursor { continue; }
                 if let Err(error) = self.dispatch_event(event, bot_id.as_ref()).await {
                     tracing::error!(
                         event_type = %event.event_type,
@@ -1167,19 +1211,15 @@ impl Bot {
                         "event dispatch failed"
                     );
                 }
-
                 cursor = event.id;
-                if *shutdown.borrow() {
-                    break;
-                }
+                self.last_event_id.store(cursor, Ordering::Release);
+                if *shutdown.borrow() { break; }
             }
-
             cursor = cursor.max(batch.last());
+            self.last_event_id.store(cursor, Ordering::Release);
         }
-
-        Ok(())
+        Ok(cursor)
     }
-
     /// Alias for run.
     pub async fn start(&self) -> Result<()> {
         self.run().await
