@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::api::ApiClient;
 use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
 use crate::interactions::InteractionSession;
-use crate::models::InteractionResponseType;
+use crate::models::{InteractionResponseType, Modal};
 
 /// Input data for one button, select, or modal interaction event.
 #[derive(Debug, Clone)]
@@ -122,6 +122,13 @@ impl InteractionContext {
                 Some(content.as_ref()),
             )
             .await
+    }
+
+    /// Open a modal as this interaction's initial response.
+    ///
+    /// Modals are only accepted as the first interaction response.
+    pub async fn show_modal(&self, modal: &Modal) -> crate::Result<()> {
+        self.session.respond_with_modal(&self.api, modal).await
     }
 
     /// Acknowledge the interaction without posting a visible message.
