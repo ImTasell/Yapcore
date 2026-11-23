@@ -12,6 +12,8 @@ use crate::models::EventEnvelope;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ErrorStage {
+    /// A startup or polling operation failed and stopped the runtime.
+    Runtime,
     /// Event dispatch failed before or during built-in handling.
     EventDispatch,
     /// A generic event listener returned an error.
