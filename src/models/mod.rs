@@ -2,7 +2,7 @@
 
 mod bot;
 
-pub use bot::{Activity, BotProfile, BotStatus, Presence};
+pub use bot::{Activity, ActivityRotation, BotProfile, BotStatus, Presence};
 
 mod component;
 
