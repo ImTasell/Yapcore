@@ -1,6 +1,7 @@
 use std::future::Future;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
+use tokio::task::JoinHandle;
 
 use secrecy::SecretString;
 use serde_json::Value;
@@ -17,7 +18,7 @@ use crate::interactions::{
 };
 use crate::models::{
     BotProfile, BotStatus, CommandDefinition, InteractionResponseType, Message, PermissionTarget,
-    Presence,
+    ActivityRotation, Presence,
 };
 
 /// Handle used to request a graceful stop of a running bot.
@@ -33,6 +34,43 @@ impl ShutdownHandle {
     }
 }
 
+/// Handle for a running automatic activity rotation.
+///
+/// Dropping this handle requests cancellation. Call [`stop`](Self::stop) to
+/// cancel the rotation and await its task result.
+#[derive(Debug)]
+pub struct PresenceRotationHandle {
+    sender: watch::Sender<bool>,
+    task: Option<JoinHandle<Result<()>>>,
+}
+
+impl PresenceRotationHandle {
+    /// Request that the activity rotation stop after its current request.
+    pub fn cancel(&self) {
+        self.sender.send_replace(true);
+    }
+
+    /// Return whether the rotation task has finished.
+    pub fn is_finished(&self) -> bool {
+        self.task.as_ref().is_none_or(JoinHandle::is_finished)
+    }
+
+    /// Cancel the rotation and wait for its task to finish.
+    pub async fn stop(mut self) -> Result<()> {
+        self.cancel();
+        let Some(task) = self.task.take() else {
+            return Ok(());
+        };
+        task.await
+            .map_err(|error| Error::PresenceRotationTaskFailed(error.to_string()))?
+    }
+}
+
+impl Drop for PresenceRotationHandle {
+    fn drop(&mut self) {
+        self.sender.send_replace(true);
+    }
+}
 /// Builder for a configured Yapper bot.
 #[derive(Debug)]
 pub struct BotBuilder {
@@ -503,6 +541,87 @@ impl Bot {
         self.api.set_presence(presence).await
     }
 
+    /// Rotate through a sequence of activities until cancelled or the bot shuts down.
+    ///
+    /// The first activity is applied before this method returns. Subsequent
+    /// activities are applied at the configured interval. The rotation is
+    /// cancelled when its handle is dropped, when `stop()` is called, or when
+    /// the bot's [`ShutdownHandle`] is cancelled. API failures stop the
+    /// rotation and are returned by `PresenceRotationHandle::stop`.
+    pub async fn rotate_presence(
+        &self,
+        rotation: ActivityRotation,
+    ) -> Result<PresenceRotationHandle> {
+        let activities = rotation.activities().to_vec();
+        let interval = rotation.interval();
+        let status = rotation.bot_status();
+
+        let initial_presence = Presence::new(status).activity(activities[0].clone());
+        self.api.set_presence(&initial_presence).await?;
+
+        let api = self.api.clone();
+        let (sender, mut stop_receiver) = watch::channel(false);
+        let mut bot_shutdown = self.shutdown.subscribe();
+
+        let task = tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(interval);
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            // Tokio intervals tick immediately once; consume that tick because
+            // the first activity was already applied by the caller above.
+            ticker.tick().await;
+            let mut index = 0;
+
+            loop {
+                if *stop_receiver.borrow() || *bot_shutdown.borrow() {
+                    return Ok(());
+                }
+
+                tokio::select! {
+                    biased;
+                    changed = stop_receiver.changed() => {
+                        if changed.is_err() || *stop_receiver.borrow() {
+                            return Ok(());
+                        }
+                    }
+                    changed = bot_shutdown.changed() => {
+                        if changed.is_err() || *bot_shutdown.borrow() {
+                            return Ok(());
+                        }
+                    }
+                    _ = ticker.tick() => {
+                        index = (index + 1) % activities.len();
+                        let presence = Presence::new(status).activity(activities[index].clone());
+                        let result = tokio::select! {
+                            biased;
+                            changed = stop_receiver.changed() => {
+                                if changed.is_err() || *stop_receiver.borrow() {
+                                    return Ok(());
+                                }
+                                continue;
+                            }
+                            changed = bot_shutdown.changed() => {
+                                if changed.is_err() || *bot_shutdown.borrow() {
+                                    return Ok(());
+                                }
+                                continue;
+                            }
+                            result = api.set_presence(&presence) => result,
+                        };
+
+                        if let Err(error) = result {
+                            tracing::error!(error = %error, "activity rotation stopped after a presence update failed");
+                            return Err(error);
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok(PresenceRotationHandle {
+            sender,
+            task: Some(task),
+        })
+    }
     /// Fetch a member's effective server permissions (experimental API route).
     pub async fn get_member_permissions(
         &self,
