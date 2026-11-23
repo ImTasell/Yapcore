@@ -53,7 +53,7 @@ bot.command_with_options(
 )?;
 ~~~
 
-Options support string, integer, number, boolean, user ID, channel ID and role ID values; at most 10 options per command; required options must precede optional ones; up to 25 typed choices per option; positional arguments; named `name=value` arguments; and single/double-quoted values. User, channel and role arguments accept UUIDs or their normal Yapper mention forms and are exposed as validated ID types or canonical UUID strings. Invalid, duplicate, missing or unknown arguments fail validation before the handler runs. This is a local prefix-argument parser only: publishing structured option metadata and parsing the platform's structured slash-command payload remain unverified until the upstream wire contract is confirmed.
+Options support string, integer, number, boolean, user ID, channel ID and role ID values; at most 10 options per command; required options must precede optional ones; up to 25 typed choices per option; positional arguments; named `name=value` arguments; and single/double-quoted values. User, channel and role arguments accept UUIDs or their normal Yapper mention forms and are exposed as validated ID types or canonical UUID strings. Invalid, duplicate, missing or unknown arguments fail validation before the handler runs; the reply includes a generated usage hint showing required, optional, choice and trailing-text arguments. This is a local prefix-argument parser only: publishing structured option metadata and parsing the platform's structured slash-command payload remain unverified until the upstream wire contract is confirmed.
 
 ## 2. Documented endpoint inventory
 
