@@ -6,7 +6,8 @@ use serde_json::Value;
 use crate::ids::{CategoryId, ChannelId, RoleId, ServerId, UserId};
 
 /// Filter for text or voice channel listings.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum ChannelType {
     /// Text channels.
     Text,
@@ -20,6 +21,180 @@ impl ChannelType {
             Self::Text => "text",
             Self::Voice => "voice",
         }
+    }
+}
+
+
+/// Options used to create a channel.
+///
+/// Access lists are optional and are only sent when explicitly supplied. A
+/// private channel can therefore be created with its initial role/user access
+/// in the same request instead of briefly exposing it as public.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChannelCreateOptions {
+    name: String,
+    #[serde(rename = "kind")]
+    channel_type: ChannelType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    category_id: Option<CategoryId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    private: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    role_ids: Option<Vec<RoleId>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    user_ids: Option<Vec<UserId>>,
+}
+
+impl ChannelCreateOptions {
+    /// Start a channel creation request with a name and text/voice kind.
+    pub fn new(name: impl Into<String>, channel_type: ChannelType) -> Self {
+        Self { name: name.into(), channel_type, category_id: None, private: None, role_ids: None, user_ids: None }
+    }
+
+    /// Place the new channel in a category.
+    pub fn category(mut self, category_id: CategoryId) -> Self {
+        self.category_id = Some(category_id);
+        self
+    }
+
+    /// Set whether the channel is private.
+    pub fn private(mut self, private: bool) -> Self {
+        self.private = Some(private);
+        self
+    }
+
+    /// Set the roles allowed to access a private channel.
+    pub fn role_ids(mut self, role_ids: impl IntoIterator<Item = RoleId>) -> Self {
+        self.role_ids = Some(role_ids.into_iter().collect());
+        self
+    }
+
+    /// Set the users allowed to access a private channel (maximum 50).
+    pub fn user_ids(mut self, user_ids: impl IntoIterator<Item = UserId>) -> Self {
+        self.user_ids = Some(user_ids.into_iter().collect());
+        self
+    }
+
+    pub(crate) fn validate(&self) -> crate::error::Result<()> {
+        if self.name.trim().is_empty() {
+            return Err(crate::error::Error::EmptyChannelName);
+        }
+        if let Some(users) = &self.user_ids {
+            if users.len() > 50 {
+                return Err(crate::error::Error::TooManyChannelUsers { actual: users.len() });
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Fields that may be changed on an existing channel.
+///
+/// Unset fields are omitted. clear_category() explicitly sends a JSON null,
+/// and empty access lists are preserved so callers can revoke all listed access.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct ChannelEditOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    category_id: Option<Option<CategoryId>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    private: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    role_ids: Option<Vec<RoleId>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    read_only: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    post_role_ids: Option<Vec<RoleId>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    slowmode: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    user_ids: Option<Vec<UserId>>,
+}
+
+impl ChannelEditOptions {
+    /// Start an empty channel edit.
+    pub fn new() -> Self { Self::default() }
+
+    /// Rename the channel.
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Move the channel to a category.
+    pub fn category(mut self, category_id: CategoryId) -> Self {
+        self.category_id = Some(Some(category_id));
+        self
+    }
+
+    /// Remove the channel from its current category.
+    pub fn clear_category(mut self) -> Self {
+        self.category_id = Some(None);
+        self
+    }
+
+    /// Set whether the channel is private.
+    pub fn private(mut self, private: bool) -> Self {
+        self.private = Some(private);
+        self
+    }
+
+    /// Replace the roles allowed to view a private channel.
+    pub fn role_ids(mut self, role_ids: impl IntoIterator<Item = RoleId>) -> Self {
+        self.role_ids = Some(role_ids.into_iter().collect());
+        self
+    }
+
+    /// Set whether the channel is read-only for ordinary members.
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = Some(read_only);
+        self
+    }
+
+    /// Replace the roles allowed to post in a read-only channel.
+    pub fn post_role_ids(mut self, role_ids: impl IntoIterator<Item = RoleId>) -> Self {
+        self.post_role_ids = Some(role_ids.into_iter().collect());
+        self
+    }
+
+    /// Set slowmode in seconds (maximum 21,600).
+    pub fn slowmode(mut self, seconds: u64) -> Self {
+        self.slowmode = Some(seconds);
+        self
+    }
+
+    /// Replace the users allowed to view a private channel (maximum 50).
+    pub fn user_ids(mut self, user_ids: impl IntoIterator<Item = UserId>) -> Self {
+        self.user_ids = Some(user_ids.into_iter().collect());
+        self
+    }
+
+    /// Whether this edit contains any fields.
+    pub fn is_empty(&self) -> bool {
+        self.name.is_none() && self.category_id.is_none() && self.private.is_none()
+            && self.role_ids.is_none() && self.read_only.is_none()
+            && self.post_role_ids.is_none() && self.slowmode.is_none() && self.user_ids.is_none()
+    }
+
+    pub(crate) fn validate(&self) -> crate::error::Result<()> {
+        if self.is_empty() {
+            return Err(crate::error::Error::EmptyChannelEditOptions);
+        }
+        if self.name.as_deref().is_some_and(|name| name.trim().is_empty()) {
+            return Err(crate::error::Error::EmptyChannelName);
+        }
+        if let Some(seconds) = self.slowmode {
+            if seconds > 21_600 {
+                return Err(crate::error::Error::InvalidChannelSlowmode { actual: seconds });
+            }
+        }
+        if let Some(users) = &self.user_ids {
+            if users.len() > 50 {
+                return Err(crate::error::Error::TooManyChannelUsers { actual: users.len() });
+            }
+        }
+        Ok(())
     }
 }
 
