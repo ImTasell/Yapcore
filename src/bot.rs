@@ -309,10 +309,12 @@ impl Bot {
         let commands = self.commands.clone();
         let events = self.events.clone();
         let buttons = self.buttons.clone();
+        let cog_names = self.cog_names.clone();
         if let Err(reason) = cog.register(self) {
             self.commands = commands;
             self.events = events;
             self.buttons = buttons;
+            self.cog_names = cog_names;
             return Err(crate::cogs::CogRegistrationError::SetupFailed { name, reason });
         }
 
@@ -1218,7 +1220,12 @@ impl Bot {
     /// Slash-command interactions, components and general event listeners are
     /// separate follow-up features.
     pub async fn run(&self) -> Result<()> {
-        self.run_inner(None).await.map(|_| ())
+        let result = self.run_inner(None).await;
+        if let Err(error) = &result {
+            self.report_error(ErrorEvent::new(ErrorStage::Runtime, error.to_string()))
+                .await;
+        }
+        result.map(|_| ())
     }
 
     /// Resume event polling after an externally persisted event ID.
@@ -1227,7 +1234,12 @@ impl Bot {
     /// last_event_id() while running to checkpoint progress. Yapper keeps
     /// events for one day; anything older may already have been discarded.
     pub async fn run_from(&self, last_event_id: u64) -> Result<u64> {
-        self.run_inner(Some(last_event_id)).await
+        let result = self.run_inner(Some(last_event_id)).await;
+        if let Err(error) = &result {
+            self.report_error(ErrorEvent::new(ErrorStage::Runtime, error.to_string()))
+                .await;
+        }
+        result
     }
 
     async fn run_inner(&self, saved_cursor: Option<u64>) -> Result<u64> {
