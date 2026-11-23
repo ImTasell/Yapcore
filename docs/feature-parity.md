@@ -142,6 +142,7 @@ Do not expose both a huge builder API and dozens of raw JSON methods for the sam
 | [ ] Verify | Voice state lookup and move/disconnect members | Source-only routes; verify availability and payloads |
 | [x] Documented | Set bot status and activity | `Bot::set_status` plus typed `Bot::set_presence(&Presence)`; `Activity::playing` formats the plain activity line |
 | [x] SDK feature | Automatic activity rotation | `ActivityRotation` cycles validated activities; `Bot::rotate_presence` returns a cancellable `PresenceRotationHandle` |
+| [x] SDK feature | Dynamic server-count presence | `Activity::overviewing_servers`, one-shot `refresh_server_count_presence`, and periodic `monitor_server_count_presence` only publish when the server count changes |
 | [ ] Verify | Scheduled server events | Source has list/create; verify current public API schema |
 | [ ] Verify | Thread list/create/edit/delete | Source has methods; verify endpoint availability |
 | [ ] Verify | Emoji create/edit/delete/steal/message emoji lookup | Source has methods; verify endpoint availability |
