@@ -1188,6 +1188,7 @@ impl ApiClient {
         interaction_token: &secrecy::SecretString,
         response_type: InteractionResponseType,
         content: Option<&str>,
+        modal: Option<&Value>,
     ) -> Result<Value> {
         let mut url = self
             .config
@@ -1209,6 +1210,9 @@ impl ApiClient {
         let mut body = serde_json::json!({ "type": response_type });
         if let Some(content) = content {
             body["content"] = serde_json::json!(content);
+        }
+        if let Some(modal) = modal {
+            body["modal"] = modal.clone();
         }
 
         self.request_json_url(Method::POST, url, Some(body)).await
