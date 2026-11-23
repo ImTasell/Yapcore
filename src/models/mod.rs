@@ -10,8 +10,11 @@ pub use bot::{
 mod component;
 mod components_v2;
 
-pub(crate) use component::validate_action_rows;
-pub use component::{ActionRow, Button, ButtonStyle, ComponentValidationError};
+pub(crate) use component::{validate_action_rows, validate_component_rows};
+pub use component::{
+    ActionRow, Button, ButtonStyle, ComponentValidationError, MessageComponentRow,
+    SelectActionRow, SelectMenu, SelectOption,
+};
 pub(crate) use components_v2::validate_layout;
 pub use components_v2::{
     Container, FileDisplay, LayoutComponent, LayoutValidationError,
