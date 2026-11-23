@@ -75,7 +75,12 @@ impl ButtonRegistry {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.register("button", ButtonMatcher::Exact(custom_id.into()), None, handler)
+        self.register(
+            "button",
+            ButtonMatcher::Exact(custom_id.into()),
+            None,
+            handler,
+        )
     }
 
     /// Register an exact custom ID handler with optional cog ownership metadata.
@@ -89,7 +94,12 @@ impl ButtonRegistry {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.register("button", ButtonMatcher::Exact(custom_id.into()), owner, handler)
+        self.register(
+            "button",
+            ButtonMatcher::Exact(custom_id.into()),
+            owner,
+            handler,
+        )
     }
 
     /// Register a handler for every custom ID with the given prefix.
@@ -102,7 +112,12 @@ impl ButtonRegistry {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.register("button", ButtonMatcher::Prefix(prefix.into()), None, handler)
+        self.register(
+            "button",
+            ButtonMatcher::Prefix(prefix.into()),
+            None,
+            handler,
+        )
     }
 
     /// Register a prefix handler with optional cog ownership metadata.
@@ -116,7 +131,12 @@ impl ButtonRegistry {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.register("button", ButtonMatcher::Prefix(prefix.into()), owner, handler)
+        self.register(
+            "button",
+            ButtonMatcher::Prefix(prefix.into()),
+            owner,
+            handler,
+        )
     }
 
     /// Register an exact custom ID for a select or modal-submit interaction.
@@ -183,9 +203,12 @@ impl ButtonRegistry {
     pub fn handlers_for(&self, kind: &str, custom_id: &str) -> Vec<RegisteredButton> {
         self.entries
             .iter()
-            .filter(|entry| entry.kind == kind && match &entry.matcher {
-                ButtonMatcher::Exact(expected) => expected == custom_id,
-                ButtonMatcher::Prefix(prefix) => custom_id.starts_with(prefix),
+            .filter(|entry| {
+                entry.kind == kind
+                    && match &entry.matcher {
+                        ButtonMatcher::Exact(expected) => expected == custom_id,
+                        ButtonMatcher::Prefix(prefix) => custom_id.starts_with(prefix),
+                    }
             })
             .cloned()
             .collect()
@@ -249,9 +272,7 @@ mod tests {
             .register_kind_owned("select", "shared", None, |_context| async { Ok(()) })
             .unwrap();
         registry
-            .register_kind_owned("modal_submit", "shared", None, |_context| async {
-                Ok(())
-            })
+            .register_kind_owned("modal_submit", "shared", None, |_context| async { Ok(()) })
             .unwrap();
 
         assert_eq!(registry.handlers_for("button", "shared").len(), 1);
