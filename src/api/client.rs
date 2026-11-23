@@ -10,12 +10,12 @@ use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
 use crate::ids::InteractionId;
 use crate::models::{
-    Ban, BotProfile, BotProfileEdit, BotStatus, Channel, ChannelCategory, ChannelCreateOptions,
-    ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch,
-    ImageAsset, ImageFormat, InteractionResponseType, Member, Message, PermissionTarget, Presence,
-    Role, Server, UserProfile, VoiceChannelState, validate_action_rows, validate_command_list,
-    validate_layout, validate_component_rows, LayoutComponent, MessageComponentRow,
-    COMPONENTS_V2_FLAG,
+    Ban, BotProfile, BotProfileEdit, BotStatus, COMPONENTS_V2_FLAG, Channel, ChannelCategory,
+    ChannelCreateOptions, ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition,
+    Embed, EventBatch, ImageAsset, ImageFormat, InteractionResponseType, LayoutComponent, Member,
+    Message, MessageComponentRow, PermissionTarget, Presence, Role, Server, UserProfile,
+    VoiceChannelState, validate_action_rows, validate_command_list, validate_component_rows,
+    validate_layout,
 };
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
@@ -1759,9 +1759,11 @@ mod tests {
         );
         let client = test_client(&server, 2048).await;
         let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
-        let button_row = crate::models::ActionRow::new([
-            crate::models::Button::primary("Other", "choice:other").unwrap(),
-        ])
+        let button_row = crate::models::ActionRow::new([crate::models::Button::primary(
+            "Other",
+            "choice:other",
+        )
+        .unwrap()])
         .unwrap();
         let select_row = crate::models::SelectActionRow::new(
             crate::models::SelectMenu::new("food")
@@ -1797,10 +1799,19 @@ mod tests {
         let request = server.finish();
         let body = request.split_once("\r\n\r\n").unwrap().1;
         let payload: Value = serde_json::from_str(body).unwrap();
-        assert_eq!(payload["components"][0]["components"][0]["custom_id"], "choice:other");
+        assert_eq!(
+            payload["components"][0]["components"][0]["custom_id"],
+            "choice:other"
+        );
         assert_eq!(payload["components"][1]["components"][0]["type"], "select");
-        assert_eq!(payload["components"][1]["components"][0]["custom_id"], "food");
-        assert_eq!(payload["components"][1]["components"][0]["options"][0]["value"], "pizza");
+        assert_eq!(
+            payload["components"][1]["components"][0]["custom_id"],
+            "food"
+        );
+        assert_eq!(
+            payload["components"][1]["components"][0]["options"][0]["value"],
+            "pizza"
+        );
         assert_eq!(payload["components"][1]["components"][0]["max_values"], 2);
     }
 
@@ -1826,11 +1837,7 @@ mod tests {
             crate::models::TextDisplay::new("# Hello").unwrap().into(),
             crate::models::Container::new([
                 crate::models::TextDisplay::new("A V2 card").unwrap().into(),
-                crate::models::Separator::new(
-                    true,
-                    crate::models::SeparatorSpacing::Small,
-                )
-                .into(),
+                crate::models::Separator::new(true, crate::models::SeparatorSpacing::Small).into(),
             ])
             .into(),
         ];
