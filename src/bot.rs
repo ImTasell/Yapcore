@@ -17,8 +17,8 @@ use crate::interactions::{
     ButtonRegistry, InteractionContext, InteractionInvocation, InteractionRegistrationError,
 };
 use crate::models::{
-    ActivityRotation, BotProfile, BotStatus, CommandDefinition, InteractionResponseType, Message,
-    PermissionTarget, Presence,
+    Activity, ActivityRotation, BotProfile, BotStatus, CommandDefinition,
+    InteractionResponseType, Message, PermissionTarget, Presence,
 };
 
 /// Handle used to request a graceful stop of a running bot.
@@ -72,6 +72,44 @@ impl Drop for PresenceRotationHandle {
     }
 }
 
+/// Handle for a task that keeps the activity's server count up to date.
+///
+/// Dropping the handle requests cancellation. Use [`stop`](Self::stop) to
+/// cancel the monitor and wait for its task to finish.
+#[derive(Debug)]
+pub struct ServerPresenceMonitorHandle {
+    sender: watch::Sender<bool>,
+    task: Option<JoinHandle<Result<()>>>,
+}
+
+impl ServerPresenceMonitorHandle {
+    /// Request that the server-presence monitor stop promptly.
+    pub fn cancel(&self) {
+        self.sender.send_replace(true);
+    }
+
+    /// Return whether the monitor task has finished.
+    pub fn is_finished(&self) -> bool {
+        self.task.as_ref().is_none_or(JoinHandle::is_finished)
+    }
+
+    /// Cancel the monitor and wait for its task to finish.
+    pub async fn stop(mut self) -> Result<()> {
+        self.cancel();
+        let Some(task) = self.task.take() else {
+            return Ok(());
+        };
+        task.await.map_err(|error| {
+            Error::ServerPresenceMonitorTaskFailed(error.to_string())
+        })?
+    }
+}
+
+impl Drop for ServerPresenceMonitorHandle {
+    fn drop(&mut self) {
+        self.sender.send_replace(true);
+    }
+}
 /// Builder for a configured Yapper bot.
 #[derive(Debug)]
 pub struct BotBuilder {
@@ -619,6 +657,125 @@ impl Bot {
         });
 
         Ok(PresenceRotationHandle {
+            sender,
+            task: Some(task),
+        })
+    }
+    /// Fetch the bot's current server count and publish it as its activity.
+    ///
+    /// Returns the number of servers reported by Yapper. The activity is
+    /// formatted as `Overviewing N servers` (singular when N is one).
+    pub async fn refresh_server_count_presence(&self, status: BotStatus) -> Result<usize> {
+        let servers = self.api.list_servers().await?;
+        let count = servers.len();
+        let activity = Activity::overviewing_servers(count)?;
+        self.api
+            .set_presence(&Presence::new(status).activity(activity))
+            .await?;
+        Ok(count)
+    }
+
+    /// Keep `Overviewing N servers` synchronized with the bot's server list.
+    ///
+    /// The current count is published immediately. The server list is then
+    /// refreshed at the supplied interval, and presence is updated only when
+    /// the count changes. Transient API failures are logged and retried on the
+    /// next interval. The returned handle stops the monitor when dropped or
+    /// cancelled; bot shutdown also stops it.
+    pub async fn monitor_server_count_presence(
+        &self,
+        interval: Duration,
+        status: BotStatus,
+    ) -> Result<ServerPresenceMonitorHandle> {
+        if interval.is_zero() {
+            return Err(Error::InvalidServerPresenceMonitorInterval);
+        }
+
+        let mut last_count = self.refresh_server_count_presence(status).await?;
+        let api = self.api.clone();
+        let (sender, mut stop_receiver) = watch::channel(false);
+        let mut bot_shutdown = self.shutdown.subscribe();
+
+        let task = tokio::spawn(async move {
+            let first_tick = tokio::time::Instant::now() + interval;
+            let mut ticker = tokio::time::interval_at(first_tick, interval);
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+            loop {
+                if *stop_receiver.borrow() || *bot_shutdown.borrow() {
+                    return Ok(());
+                }
+
+                tokio::select! {
+                    biased;
+                    changed = stop_receiver.changed() => {
+                        if changed.is_err() || *stop_receiver.borrow() {
+                            return Ok(());
+                        }
+                    }
+                    changed = bot_shutdown.changed() => {
+                        if changed.is_err() || *bot_shutdown.borrow() {
+                            return Ok(());
+                        }
+                    }
+                    _ = ticker.tick() => {
+                        let servers = tokio::select! {
+                            biased;
+                            changed = stop_receiver.changed() => {
+                                if changed.is_err() || *stop_receiver.borrow() {
+                                    return Ok(());
+                                }
+                                continue;
+                            }
+                            changed = bot_shutdown.changed() => {
+                                if changed.is_err() || *bot_shutdown.borrow() {
+                                    return Ok(());
+                                }
+                                continue;
+                            }
+                            result = api.list_servers() => match result {
+                                Ok(servers) => servers,
+                                Err(error) => {
+                                    tracing::warn!(error = %error, "could not refresh server count for bot presence");
+                                    continue;
+                                }
+                            },
+                        };
+
+                        let count = servers.len();
+                        if count == last_count {
+                            continue;
+                        }
+
+                        let activity = Activity::overviewing_servers(count)?;
+                        let presence = Presence::new(status).activity(activity);
+                        let result = tokio::select! {
+                            biased;
+                            changed = stop_receiver.changed() => {
+                                if changed.is_err() || *stop_receiver.borrow() {
+                                    return Ok(());
+                                }
+                                continue;
+                            }
+                            changed = bot_shutdown.changed() => {
+                                if changed.is_err() || *bot_shutdown.borrow() {
+                                    return Ok(());
+                                }
+                                continue;
+                            }
+                            result = api.set_presence(&presence) => result,
+                        };
+
+                        match result {
+                            Ok(_) => last_count = count,
+                            Err(error) => tracing::warn!(error = %error, "could not publish updated server count presence; will retry"),
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok(ServerPresenceMonitorHandle {
             sender,
             task: Some(task),
         })
