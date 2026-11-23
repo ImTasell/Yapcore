@@ -220,6 +220,14 @@ pub enum Error {
     #[error("activity rotation requires at least 2 entries; received {actual}")]
     TooFewRotationActivities { actual: usize },
 
+    /// A server-presence monitor interval must be greater than zero.
+    #[error("server presence monitor interval must be greater than zero")]
+    InvalidServerPresenceMonitorInterval,
+
+    /// A server-presence monitor task panicked while running.
+    #[error("server presence monitor task failed: {0}")]
+    ServerPresenceMonitorTaskFailed(String),
+
     /// An activity rotation interval must be greater than zero.
     #[error("activity rotation interval must be greater than zero")]
     InvalidPresenceRotationInterval,
