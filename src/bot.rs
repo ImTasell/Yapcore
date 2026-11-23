@@ -2675,6 +2675,17 @@ mod tests {
         })
         .unwrap();
 
+        let public_invoked = Arc::new(AtomicBool::new(false));
+        let public_invoked_by_handler = public_invoked.clone();
+        bot.command("public", "A command outside the guarded cog", move |_context| {
+            let invoked = public_invoked_by_handler.clone();
+            async move {
+                invoked.store(true, Ordering::SeqCst);
+                Ok(())
+            }
+        })
+        .unwrap();
+
         let event = crate::models::EventEnvelope {
             id: 4,
             event_type: "message".to_owned(),
@@ -2690,6 +2701,21 @@ mod tests {
 
         bot.dispatch_event(&event, None).await.unwrap();
         assert!(!invoked.load(Ordering::SeqCst));
+
+        let public_event = crate::models::EventEnvelope {
+            id: 5,
+            event_type: "message".to_owned(),
+            data: serde_json::json!({
+                "id": "123e4567-e89b-12d3-a456-426614174006",
+                "channel_id": "123e4567-e89b-12d3-a456-426614174002",
+                "author_id": "123e4567-e89b-12d3-a456-426614174003",
+                "author_bot": false,
+                "content": "!public"
+            }),
+            created_at: None,
+        };
+        bot.dispatch_event(&public_event, None).await.unwrap();
+        assert!(public_invoked.load(Ordering::SeqCst));
     }
 
     #[tokio::test]
