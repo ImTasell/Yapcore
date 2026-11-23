@@ -452,8 +452,8 @@ impl Bot {
                     Ok(context) => context,
                     Err(error) => {
                         let usage = crate::models::CommandOption::usage(
-                            &original_context.command,
-                            &schema,
+                            original_context.command(),
+                            schema.as_slice(),
                         );
                         let message = format!(
                             "Invalid arguments: {} Use it like this: `{usage}`",
