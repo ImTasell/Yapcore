@@ -10,9 +10,10 @@ use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
 use crate::ids::InteractionId;
 use crate::models::{
-    Ban, BotProfile, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions,
+    Ban, BotProfile, BotStatus, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions,
     ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch, InteractionResponseType,
-    BotStatus, Member, Message, PermissionTarget, Role, Server, UserProfile, validate_action_rows, validate_command_list,
+    Member, Message, PermissionTarget, Role, Server, UserProfile, validate_action_rows,
+    validate_command_list,
 };
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
@@ -84,60 +85,115 @@ impl ApiClient {
         if let Some(activity) = activity {
             body.insert("activity".to_owned(), serde_json::json!(activity));
         }
-        self.request_json(Method::PUT, "me/status", Some(Value::Object(body))).await
+        self.request_json(Method::PUT, "me/status", Some(Value::Object(body)))
+            .await
     }
 
     /// Fetch a member's effective server permissions (experimental source-parity route).
-    pub async fn get_member_permissions(&self, server_id: &crate::ids::ServerId, user_id: &crate::ids::UserId) -> Result<Value> {
+    pub async fn get_member_permissions(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &crate::ids::UserId,
+    ) -> Result<Value> {
         let route = format!("servers/{server_id}/members/{user_id}/permissions");
         let response = self.request_json(Method::GET, &route, None).await?;
         Ok(response.get("permissions").cloned().unwrap_or(response))
     }
 
     /// Fetch a member's effective channel permissions (experimental source-parity route).
-    pub async fn get_channel_member_permissions(&self, channel_id: &crate::ids::ChannelId, user_id: &crate::ids::UserId) -> Result<Value> {
+    pub async fn get_channel_member_permissions(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        user_id: &crate::ids::UserId,
+    ) -> Result<Value> {
         let route = format!("channels/{channel_id}/permissions/{user_id}");
         let response = self.request_json(Method::GET, &route, None).await?;
         Ok(response.get("permissions").cloned().unwrap_or(response))
     }
 
     /// List channel permission overrides (experimental source-parity route).
-    pub async fn list_channel_permission_overrides(&self, channel_id: &crate::ids::ChannelId) -> Result<Value> {
+    pub async fn list_channel_permission_overrides(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+    ) -> Result<Value> {
         let route = format!("channels/{channel_id}/permissions");
         let response = self.request_json(Method::GET, &route, None).await?;
         Ok(response.get("overrides").cloned().unwrap_or(response))
     }
 
     /// Set a channel permission override (experimental source-parity route).
-    pub async fn set_channel_permissions(&self, channel_id: &crate::ids::ChannelId, target: &PermissionTarget, allow: &[String], deny: &[String]) -> Result<Value> {
-        let route = format!("channels/{channel_id}/permissions/{}", target.as_path_segment());
+    pub async fn set_channel_permissions(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        target: &PermissionTarget,
+        allow: &[String],
+        deny: &[String],
+    ) -> Result<Value> {
+        let route = format!(
+            "channels/{channel_id}/permissions/{}",
+            target.as_path_segment()
+        );
         let body = serde_json::json!({ "allow": allow, "deny": deny });
         self.request_json(Method::PUT, &route, Some(body)).await
     }
 
     /// Clear a channel permission override (experimental source-parity route).
-    pub async fn clear_channel_permissions(&self, channel_id: &crate::ids::ChannelId, target: &PermissionTarget) -> Result<()> {
-        let route = format!("channels/{channel_id}/permissions/{}", target.as_path_segment());
+    pub async fn clear_channel_permissions(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        target: &PermissionTarget,
+    ) -> Result<()> {
+        let route = format!(
+            "channels/{channel_id}/permissions/{}",
+            target.as_path_segment()
+        );
         self.request_json(Method::DELETE, &route, None).await?;
         Ok(())
     }
 
     /// Set server-wide @everyone permissions (experimental source-parity route).
-    pub async fn set_everyone_permissions(&self, server_id: &crate::ids::ServerId, permissions: &Value) -> Result<Value> {
+    pub async fn set_everyone_permissions(
+        &self,
+        server_id: &crate::ids::ServerId,
+        permissions: &Value,
+    ) -> Result<Value> {
         let route = format!("servers/{server_id}/roles/everyone");
-        self.request_json(Method::PATCH, &route, Some(serde_json::json!({ "permissions": permissions }))).await
+        self.request_json(
+            Method::PATCH,
+            &route,
+            Some(serde_json::json!({ "permissions": permissions })),
+        )
+        .await
     }
 
     /// Set a category permission override (experimental source-parity route).
-    pub async fn set_category_permissions(&self, server_id: &crate::ids::ServerId, category_id: &crate::ids::CategoryId, target: &PermissionTarget, allow: &[String], deny: &[String]) -> Result<Value> {
-        let route = format!("servers/{server_id}/categories/{category_id}/permissions/{}", target.as_path_segment());
+    pub async fn set_category_permissions(
+        &self,
+        server_id: &crate::ids::ServerId,
+        category_id: &crate::ids::CategoryId,
+        target: &PermissionTarget,
+        allow: &[String],
+        deny: &[String],
+    ) -> Result<Value> {
+        let route = format!(
+            "servers/{server_id}/categories/{category_id}/permissions/{}",
+            target.as_path_segment()
+        );
         let body = serde_json::json!({ "allow": allow, "deny": deny });
         self.request_json(Method::PUT, &route, Some(body)).await
     }
 
     /// Clear a category permission override (experimental source-parity route).
-    pub async fn clear_category_permissions(&self, server_id: &crate::ids::ServerId, category_id: &crate::ids::CategoryId, target: &PermissionTarget) -> Result<()> {
-        let route = format!("servers/{server_id}/categories/{category_id}/permissions/{}", target.as_path_segment());
+    pub async fn clear_category_permissions(
+        &self,
+        server_id: &crate::ids::ServerId,
+        category_id: &crate::ids::CategoryId,
+        target: &PermissionTarget,
+    ) -> Result<()> {
+        let route = format!(
+            "servers/{server_id}/categories/{category_id}/permissions/{}",
+            target.as_path_segment()
+        );
         self.request_json(Method::DELETE, &route, None).await?;
         Ok(())
     }
@@ -2788,11 +2844,15 @@ mod tests {
         let server = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
         let client = test_client(&server, 1024).await;
 
-        client.set_status(BotStatus::Online, Some("Playing chess")).await.unwrap();
+        client
+            .set_status(BotStatus::Online, Some("Playing chess"))
+            .await
+            .unwrap();
         let request = server.finish();
 
         assert!(request.starts_with("PUT /api/bot/v1/me/status HTTP/1.1"));
-        let payload: Value = serde_json::from_str(request.split_once("\\r\\n\\r\\n").unwrap().1).unwrap();
+        let payload: Value =
+            serde_json::from_str(request.split_once("\\r\\n\\r\\n").unwrap().1).unwrap();
         assert_eq!(payload["status"], "online");
         assert_eq!(payload["activity"], "Playing chess");
     }
@@ -2803,7 +2863,9 @@ mod tests {
         let client = ApiClient::new(config).unwrap();
 
         assert!(matches!(
-            client.set_status(BotStatus::Dnd, Some(&"x".repeat(61))).await,
+            client
+                .set_status(BotStatus::Dnd, Some(&"x".repeat(61)))
+                .await,
             Err(Error::BotActivityTooLong { actual: 61 })
         ));
     }
@@ -2821,7 +2883,10 @@ mod tests {
         let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
         let user_id = crate::ids::UserId::new(USER_ID).unwrap();
 
-        let permissions = client.get_member_permissions(&server_id, &user_id).await.unwrap();
+        let permissions = client
+            .get_member_permissions(&server_id, &user_id)
+            .await
+            .unwrap();
         let request = server.finish();
 
         assert!(request.starts_with(
@@ -2841,7 +2906,10 @@ mod tests {
         let set = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
         let client = test_client(&set, 1024).await;
         let target = PermissionTarget::Everyone;
-        client.set_channel_permissions(&channel_id, &target, &allow, &deny).await.unwrap();
+        client
+            .set_channel_permissions(&channel_id, &target, &allow, &deny)
+            .await
+            .unwrap();
         let request = set.finish();
         assert!(request.starts_with(
             "PUT /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174021/permissions/everyone HTTP/1.1"
@@ -2852,7 +2920,10 @@ mod tests {
 
         let clear = LocalMockServer::start(204, &[], String::new());
         let client = test_client(&clear, 1024).await;
-        client.clear_channel_permissions(&channel_id, &target).await.unwrap();
+        client
+            .clear_channel_permissions(&channel_id, &target)
+            .await
+            .unwrap();
         let request = clear.finish();
         assert!(request.starts_with(
             "DELETE /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174021/permissions/everyone HTTP/1.1"
