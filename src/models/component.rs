@@ -262,7 +262,10 @@ impl SelectOption {
     }
 
     /// Add descriptive text beneath the option label.
-    pub fn description(mut self, description: impl Into<String>) -> Result<Self, ComponentValidationError> {
+    pub fn description(
+        mut self,
+        description: impl Into<String>,
+    ) -> Result<Self, ComponentValidationError> {
         let description = description.into();
         if description.chars().count() > 100 {
             return Err(ComponentValidationError::SelectOptionDescriptionTooLong);
