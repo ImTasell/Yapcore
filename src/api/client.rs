@@ -2852,7 +2852,7 @@ mod tests {
 
         assert!(request.starts_with("PUT /api/bot/v1/me/status HTTP/1.1"));
         let payload: Value =
-            serde_json::from_str(request.split_once("\\r\\n\\r\\n").unwrap().1).unwrap();
+            serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
         assert_eq!(payload["status"], "online");
         assert_eq!(payload["activity"], "Playing chess");
     }
@@ -2915,7 +2915,7 @@ mod tests {
             "PUT /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174021/permissions/everyone HTTP/1.1"
         ));
         let payload: Value =
-            serde_json::from_str(request.split_once("\\r\\n\\r\\n").unwrap().1).unwrap();
+            serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
         assert_eq!(payload["allow"][0], "send_messages");
         assert_eq!(payload["deny"][0], "view_channel");
 
