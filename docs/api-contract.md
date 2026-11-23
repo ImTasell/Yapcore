@@ -22,6 +22,10 @@
 
 Yapcore's `edit_me`, avatar and banner operations, DM open/send, voice state methods, and `GET /commands` reader are implemented and mock-tested. Avatar/banner uploads support both raw image bodies and multipart form requests using the documented `file` field. Do not use the Python package's alternate configured hostnames as the Rust default. Its current source names `https://bots.yapper.website/api/bot/v1` as `BASE` and `https://www.yapin.gg/api/bot/v1` as a fallback; the current public developer guide explicitly gives the `www.yapper.website` base above. Any compatibility host should be added only after independent verification.
 
+### Cog-wide command checks
+
+A Rust cog may override `check(&CommandContext) -> bool`. Yapcore runs this synchronous predicate for every command owned by that cog, for both prefix and slash invocations, before the command-specific asynchronous check and handler. Returning `false` skips the command without sending a response, matching the upstream cog guard behavior.
+
 ## Typed command arguments
 
 Prefix commands can opt into local typed parsing without changing the documented remote command registration payload:
@@ -69,7 +73,7 @@ The following is the human-readable REST endpoint index as exposed by the develo
 | GET | `/commands` | Read registered commands; exposed as `Bot::list_commands`. |
 | PUT | `/commands` | Replace the entire command list: `{ "commands": [{ "name": "ping", "description": "..." }] }` |
 
-Command registration constraints: the current official developer guide allows up to 100 commands; names are 1–32 lowercase letters, numbers, hyphens or underscores; descriptions max 100 characters; names must be unique. The Python upstream source also allows 100 locally. Yapcore validates to the documented 100-command cap. `GET /commands` reads the current registration; `PUT /commands` replaces the entire list, so Yapcore synchronizes the complete registry rather than one command at a time.
+Command registration constraints: the current official developer guide states a maximum of 50 commands per bot; names are 1–32 lowercase letters, numbers, hyphens or underscores; descriptions max 100 characters; names must be unique. The upstream Python source currently defines a 100-command local limit, so its local acceptance limit conflicts with the public API guide. Yapcore follows the documented 50-command API cap to avoid sending command lists the published contract does not promise to accept. `GET /commands` reads the current registration; `PUT /commands` replaces the entire list, so Yapcore synchronizes the complete registry rather than one command at a time.
 
 Typed presence example:
 
@@ -342,7 +346,7 @@ This is distinct from a channel webhook URL used by external services to post me
 | --- | --- |
 | Polling | 100 events per response; wait up to 25 seconds; event retention one day |
 | Catch-up | `max_age` up to 86,400 seconds |
-| Commands | 100 commands per bot; name 1–32 chars; description max 100 |
+| Commands | 50 commands per bot; name 1–32 chars; description max 100 |
 | Message content | 2,000 characters |
 | Messages | 30/minute per server and 30/minute overall per bot; verified bots may send 300/minute overall; DM limit is per DM |
 | Message history | Default 50; max 100 |
