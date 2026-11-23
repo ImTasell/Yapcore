@@ -713,17 +713,17 @@ mod tests {
     fn formats_usage_with_required_optional_and_choice_arguments() {
         let schema = [
             CommandOption::user("member", "Member").unwrap().required(true),
-            CommandOption::string("reason", "Reason").unwrap(),
             CommandOption::string("mode", "Mode")
                 .unwrap()
                 .choice(CommandOptionChoice::string("Fast", "fast"))
                 .unwrap()
                 .choice(CommandOptionChoice::string("Slow", "slow"))
                 .unwrap(),
+            CommandOption::string("reason", "Reason").unwrap(),
         ];
         assert_eq!(
             CommandOption::usage("ban", &schema),
-            "/ban <member> [reason…] [fast|slow]"
+            "/ban <member> [fast|slow] [reason…]"
         );
     }
 
