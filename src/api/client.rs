@@ -12,7 +12,7 @@ use crate::ids::InteractionId;
 use crate::models::{
     Ban, BotProfile, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions,
     ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch, InteractionResponseType,
-    Member, Message, Role, Server, UserProfile, validate_action_rows, validate_command_list,
+    BotStatus, Member, Message, PermissionTarget, Role, Server, UserProfile, validate_action_rows, validate_command_list,
 };
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
@@ -66,6 +66,80 @@ impl ApiClient {
     pub async fn get_me(&self) -> Result<BotProfile> {
         let value = self.request_json(Method::GET, "me", None).await?;
         serde_json::from_value(value).map_err(Error::from)
+    }
+
+    /// Set the bot's online state and optional activity line.
+    ///
+    /// Yapper keeps this presence while the bot polls. This is the documented
+    /// HTTP presence API, not a Discord-compatible local RPC/IPC connection.
+    pub async fn set_status(&self, status: BotStatus, activity: Option<&str>) -> Result<Value> {
+        if let Some(activity) = activity {
+            let actual = activity.chars().count();
+            if actual > 60 {
+                return Err(Error::BotActivityTooLong { actual });
+            }
+        }
+        let mut body = serde_json::Map::new();
+        body.insert("status".to_owned(), serde_json::to_value(status)?);
+        if let Some(activity) = activity {
+            body.insert("activity".to_owned(), serde_json::json!(activity));
+        }
+        self.request_json(Method::PUT, "me/status", Some(Value::Object(body))).await
+    }
+
+    /// Fetch a member's effective server permissions (experimental source-parity route).
+    pub async fn get_member_permissions(&self, server_id: &crate::ids::ServerId, user_id: &crate::ids::UserId) -> Result<Value> {
+        let route = format!("servers/{server_id}/members/{user_id}/permissions");
+        let response = self.request_json(Method::GET, &route, None).await?;
+        Ok(response.get("permissions").cloned().unwrap_or(response))
+    }
+
+    /// Fetch a member's effective channel permissions (experimental source-parity route).
+    pub async fn get_channel_member_permissions(&self, channel_id: &crate::ids::ChannelId, user_id: &crate::ids::UserId) -> Result<Value> {
+        let route = format!("channels/{channel_id}/permissions/{user_id}");
+        let response = self.request_json(Method::GET, &route, None).await?;
+        Ok(response.get("permissions").cloned().unwrap_or(response))
+    }
+
+    /// List channel permission overrides (experimental source-parity route).
+    pub async fn list_channel_permission_overrides(&self, channel_id: &crate::ids::ChannelId) -> Result<Value> {
+        let route = format!("channels/{channel_id}/permissions");
+        let response = self.request_json(Method::GET, &route, None).await?;
+        Ok(response.get("overrides").cloned().unwrap_or(response))
+    }
+
+    /// Set a channel permission override (experimental source-parity route).
+    pub async fn set_channel_permissions(&self, channel_id: &crate::ids::ChannelId, target: &PermissionTarget, allow: &[String], deny: &[String]) -> Result<Value> {
+        let route = format!("channels/{channel_id}/permissions/{}", target.as_path_segment());
+        let body = serde_json::json!({ "allow": allow, "deny": deny });
+        self.request_json(Method::PUT, &route, Some(body)).await
+    }
+
+    /// Clear a channel permission override (experimental source-parity route).
+    pub async fn clear_channel_permissions(&self, channel_id: &crate::ids::ChannelId, target: &PermissionTarget) -> Result<()> {
+        let route = format!("channels/{channel_id}/permissions/{}", target.as_path_segment());
+        self.request_json(Method::DELETE, &route, None).await?;
+        Ok(())
+    }
+
+    /// Set server-wide @everyone permissions (experimental source-parity route).
+    pub async fn set_everyone_permissions(&self, server_id: &crate::ids::ServerId, permissions: &Value) -> Result<Value> {
+        let route = format!("servers/{server_id}/roles/everyone");
+        self.request_json(Method::PATCH, &route, Some(serde_json::json!({ "permissions": permissions }))).await
+    }
+
+    /// Set a category permission override (experimental source-parity route).
+    pub async fn set_category_permissions(&self, server_id: &crate::ids::ServerId, category_id: &crate::ids::CategoryId, target: &PermissionTarget, allow: &[String], deny: &[String]) -> Result<Value> {
+        let route = format!("servers/{server_id}/categories/{category_id}/permissions/{}", target.as_path_segment());
+        let body = serde_json::json!({ "allow": allow, "deny": deny });
+        self.request_json(Method::PUT, &route, Some(body)).await
+    }
+
+    /// Clear a category permission override (experimental source-parity route).
+    pub async fn clear_category_permissions(&self, server_id: &crate::ids::ServerId, category_id: &crate::ids::CategoryId, target: &PermissionTarget) -> Result<()> {
+        let route = format!("servers/{server_id}/categories/{category_id}/permissions/{}", target.as_path_segment());
+        self.request_json(Method::DELETE, &route, None).await?;
+        Ok(())
     }
 
     /// Send a plain-text message to a channel.
