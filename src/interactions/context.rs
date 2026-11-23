@@ -128,6 +128,9 @@ impl InteractionContext {
     ///
     /// Modals are only accepted as the first interaction response.
     pub async fn show_modal(&self, modal: &Modal) -> crate::Result<()> {
+        if self.kind == "modal_submit" {
+            return Err(crate::Error::ModalNotAllowedFromModalSubmit);
+        }
         self.session.respond_with_modal(&self.api, modal).await
     }
 
