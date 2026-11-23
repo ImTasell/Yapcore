@@ -2368,7 +2368,9 @@ mod presence_rotation_tests {
 
         struct FailingListenerCog;
         impl crate::cogs::Cog for FailingListenerCog {
-            fn name(&self) -> &str { "welcome" }
+            fn name(&self) -> &str {
+                "welcome"
+            }
 
             fn register(&self, bot: &mut Bot) -> std::result::Result<(), String> {
                 bot.on_event("member_join", |_event| async {
