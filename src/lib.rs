@@ -29,9 +29,10 @@ pub use ids::{
 };
 pub use interactions::{InteractionContext, InteractionRegistrationError};
 pub use models::{
-    ActionRow, Activity, ActivityRotation, Ban, BotProfile, BotStatus, Button, ButtonStyle, Channel, ChannelCategory,
-    ChannelCreateOptions, ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition,
-    CommandDefinitionError, ComponentValidationError, Embed, EmbedAuthor, EmbedBuilder, EmbedField,
-    EmbedFooter, EmbedValidationError, EventBatch, EventEnvelope, InteractionResponseType, Member,
-    Message, PermissionTarget, Presence, Role, RoleEditOptions, Server, UserProfile,
+    ActionRow, Activity, ActivityRotation, Ban, BotProfile, BotStatus, Button, ButtonStyle,
+    Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions, ChannelListing, ChannelType,
+    CommandDefinition, CommandDefinitionError, ComponentValidationError, Embed, EmbedAuthor,
+    EmbedBuilder, EmbedField, EmbedFooter, EmbedValidationError, EventBatch, EventEnvelope,
+    InteractionResponseType, Member, Message, PermissionTarget, Presence, Role, RoleEditOptions,
+    Server, UserProfile,
 };
