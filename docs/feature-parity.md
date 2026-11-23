@@ -14,7 +14,7 @@ This matrix separates the Python framework's API surface from what the current o
 - **Verify**: Python source supports it, but official docs do not clearly guarantee it
 - **Defer**: requires clarification, platform support or a separate design decision
 
-Implementation status updated 2026-11-22. Stable REST primitives, prefix-command dispatch and the initial polling runtime now exist; parity remains partial and unverified API families stay deferred.
+Implementation status updated 2026-11-23. Stable REST primitives, prefix-command dispatch and the initial polling runtime now exist; permission routes are exposed as experimental source-parity methods pending live confirmation. Documented bot presence/status is implemented.
 
 ## 1. Configuration and lifecycle
 
@@ -133,13 +133,14 @@ Do not expose both a huge builder API and dozens of raw JSON methods for the sam
 | [x] Documented | List members with pagination / fetch one member | `list_members(limit, after)` and `get_member`; validates 1–500 page size |
 | [~] Mixed | Roles list/get/create/edit/delete/reorder | `list_roles` is documented; get/create/edit/delete/reorder are implemented from upstream source, mock-tested, and await live contract verification. `RoleEditOptions` provides a typed patch builder |
 | [x] Documented | Add/remove role | `add_role` / `remove_role` with shared 403 error handling |
-| [ ] Documented | Get and set permissions/overrides | Documented permission endpoints first |
+| [~] Verify | Get effective permissions, @everyone permissions and channel/category overrides | Source-parity routes added as experimental; some are testing-only and a separate SDK report observed `feature_off`; require live confirmation before stable support |
 | [x] Documented | Kick/ban/unban/list bans/timeout | Typed ban models, role-safe REST methods and local timeout/reason validation |
 | [x] Documented | Edit nickname | `set_nickname` validates 32 characters; empty string clears |
 | [x] Documented | Create/edit/delete channel | `create_channel`, `edit_channel` and `delete_channel`; typed create/edit options validate names, private access lists and the 21,600-second slowmode cap |
 | [x] Documented | Create/rename/delete category | `create_category`, `rename_category` and `delete_category` |
 | [ ] Documented | Open DM/send DM | User DM endpoints |
-| [ ] Documented | Voice state lookup and move/disconnect members | Voice management endpoints |
+| [ ] Verify | Voice state lookup and move/disconnect members | Source-only routes; verify availability and payloads |
+| [x] Documented | Set bot status and activity | `Bot::set_status(BotStatus, activity)` via `PUT /me/status` |
 | [ ] Verify | Scheduled server events | Source has list/create; verify current public API schema |
 | [ ] Verify | Thread list/create/edit/delete | Source has methods; verify endpoint availability |
 | [ ] Verify | Emoji create/edit/delete/steal/message emoji lookup | Source has methods; verify endpoint availability |
