@@ -41,6 +41,8 @@ pub struct ErrorEvent {
     pub event_type: Option<String>,
     /// Registered command name, when available.
     pub command: Option<String>,
+    /// Owning cog for failures from cog-registered handlers.
+    pub cog: Option<String>,
     /// Button custom ID, when available.
     pub custom_id: Option<String>,
     /// Human-readable error message.
@@ -54,6 +56,7 @@ impl ErrorEvent {
             event_id: None,
             event_type: None,
             command: None,
+            cog: None,
             custom_id: None,
             message: message.into(),
         }
@@ -78,10 +81,16 @@ pub enum EventRegistrationError {
 type HandlerFuture = Pin<Box<dyn Future<Output = HandlerResult> + Send + 'static>>;
 pub(crate) type EventHandler = Arc<dyn Fn(EventEnvelope) -> HandlerFuture + Send + Sync + 'static>;
 
+#[derive(Clone)]
+pub(crate) struct RegisteredEventHandler {
+    pub(crate) owner: Option<String>,
+    pub(crate) handler: EventHandler,
+}
+
 /// Ordered event-listener registry.
 #[derive(Default, Clone)]
 pub(crate) struct EventRegistry {
-    handlers: BTreeMap<String, Vec<EventHandler>>,
+    handlers: BTreeMap<String, Vec<RegisteredEventHandler>>,
     error_handlers: Vec<ErrorHandler>,
 }
 
@@ -112,6 +121,20 @@ impl EventRegistry {
         F: Fn(EventEnvelope) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
+        self.register_owned(event_type, None, handler)
+    }
+
+    /// Register an event listener with optional cog ownership metadata.
+    pub fn register_owned<F, Fut>(
+        &mut self,
+        event_type: impl Into<String>,
+        owner: Option<String>,
+        handler: F,
+    ) -> Result<(), EventRegistrationError>
+    where
+        F: Fn(EventEnvelope) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
         let event_type = event_type.into();
 
         if event_type.chars().count() > 64 {
@@ -127,7 +150,10 @@ impl EventRegistry {
         }
 
         let handler: EventHandler = Arc::new(move |event| Box::pin(handler(event)));
-        self.handlers.entry(event_type).or_default().push(handler);
+        self.handlers
+            .entry(event_type)
+            .or_default()
+            .push(RegisteredEventHandler { owner, handler });
         Ok(())
     }
 
@@ -147,7 +173,7 @@ impl EventRegistry {
     }
 
     /// Return handlers for an event in registration order.
-    pub fn handlers_for(&self, event_type: &str) -> Vec<EventHandler> {
+    pub fn handlers_for(&self, event_type: &str) -> Vec<RegisteredEventHandler> {
         self.handlers.get(event_type).cloned().unwrap_or_default()
     }
 }
@@ -192,6 +218,19 @@ mod tests {
         assert_eq!(registry.handlers_for("reaction_add").len(), 1);
         assert!(registry.handlers_for("unknown").is_empty());
     }
+    #[test]
+    fn preserves_cog_ownership_for_event_handlers() {
+        let mut registry = EventRegistry::default();
+        registry
+            .register_owned("member_join", Some("welcome".to_owned()), |_event| async {
+                Ok(())
+            })
+            .unwrap();
+        let handlers = registry.handlers_for("member_join");
+        assert_eq!(handlers.len(), 1);
+        assert_eq!(handlers[0].owner.as_deref(), Some("welcome"));
+    }
+
     #[test]
     fn registers_lifecycle_error_handlers_in_order() {
         let mut registry = EventRegistry::default();
