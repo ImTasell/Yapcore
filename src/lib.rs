@@ -33,6 +33,5 @@ pub use models::{
     ChannelCreateOptions, ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition,
     CommandDefinitionError, ComponentValidationError, Embed, EmbedAuthor, EmbedBuilder, EmbedField,
     EmbedFooter, EmbedValidationError, EventBatch, EventEnvelope, InteractionResponseType, Member,
-    PermissionTarget,
-    Message, Role, RoleEditOptions, Server, UserProfile,
+    Message, PermissionTarget, Role, RoleEditOptions, Server, UserProfile,
 };
