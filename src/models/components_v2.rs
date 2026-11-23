@@ -376,9 +376,7 @@ struct MediaReference {
 }
 
 /// Validate the top-level layout before sending it to Yapper.
-pub(crate) fn validate_layout(
-    components: &[LayoutComponent],
-) -> Result<(), LayoutValidationError> {
+pub(crate) fn validate_layout(components: &[LayoutComponent]) -> Result<(), LayoutValidationError> {
     if components.is_empty() {
         return Err(LayoutValidationError::EmptyLayout);
     }
@@ -442,7 +440,7 @@ mod tests {
 
     #[test]
     fn serializes_v2_components_in_upstream_shape() {
-        let layout = vec![
+        let layout: Vec<LayoutComponent> = vec![
             TextDisplay::new("# Welcome").unwrap().into(),
             Section::new(
                 [TextDisplay::new("Ready to continue?").unwrap()],
@@ -450,11 +448,9 @@ mod tests {
             )
             .unwrap()
             .into(),
-            MediaGallery::new([
-                MediaGalleryItem::new("https://cdn.example/image.png")
-                    .unwrap()
-                    .spoiler(true),
-            ])
+            MediaGallery::new([MediaGalleryItem::new("https://cdn.example/image.png")
+                .unwrap()
+                .spoiler(true)])
             .unwrap()
             .into(),
             Separator::new(true, SeparatorSpacing::Large).into(),
@@ -466,9 +462,7 @@ mod tests {
                 SelectActionRow::new(
                     crate::models::SelectMenu::new("container:select")
                         .unwrap()
-                        .option(
-                            crate::models::SelectOption::new("One", "one").unwrap(),
-                        )
+                        .option(crate::models::SelectOption::new("One", "one").unwrap())
                         .unwrap(),
                 )
                 .unwrap()
@@ -486,7 +480,10 @@ mod tests {
         assert_eq!(value[1]["components"][0]["type"], 10);
         assert_eq!(value[1]["accessory"]["custom_id"], "continue");
         assert_eq!(value[2]["type"], 12);
-        assert_eq!(value[2]["items"][0]["media"]["url"], "https://cdn.example/image.png");
+        assert_eq!(
+            value[2]["items"][0]["media"]["url"],
+            "https://cdn.example/image.png"
+        );
         assert_eq!(value[2]["items"][0]["spoiler"].as_bool(), Some(true));
         assert_eq!(value[3]["type"], 14);
         assert_eq!(value[3]["spacing"], 2);
@@ -498,10 +495,7 @@ mod tests {
             "container:go"
         );
         assert_eq!(value[4]["components"][2]["type"], "row");
-        assert_eq!(
-            value[4]["components"][2]["components"][0]["type"],
-            "select"
-        );
+        assert_eq!(value[4]["components"][2]["components"][0]["type"], "select");
         assert_eq!(value[4]["accent_color"], 0x5865f2);
     }
 
