@@ -79,7 +79,7 @@ The official docs say event history is retained for one day. A persistent cursor
 | [x] Documented | Read and synchronize registered commands | `Bot::list_commands` reads GET `/commands`; `Bot::run` synchronizes the full registry with PUT before polling |
 | [x] Documented | Prefix-command parsing | Longest matching prefix, case-insensitive name handling |
 | [x] Documented | `args` and `argv` | Typed `CommandContext` argument access |
-| [x] Documented | 100 command maximum per bot | `validate_command_list` enforces the current official 100-command cap before full-list sync |
+| [x] Documented | 50 command maximum per bot | `validate_command_list` enforces the current official 50-command cap; the upstream Python source still contains a 100-command local limit, so the API/source discrepancy remains documented |
 | [x] Documented | Per-command permission/check callback | `Bot::command_with_check` runs an async allow/deny predicate before prefix or slash handlers |
 | [~] Verify | Typed options: string/integer/number/boolean/user/channel/role | `CommandOption` schemas, required flags, up to 25 choices, named `key=value` and quoted positional parsing, and typed getters are implemented through `Bot::command_with_options`; this validates local command input and does not yet publish option metadata to the remote slash-command registry |
 | [~] Verify | Choices and named `key=value` input | Choice validation and named/positional parsing are implemented locally; upstream Python compatibility and slash-option wire schema remain unverified |
@@ -172,6 +172,7 @@ Do not treat voice presence management as equivalent to voice media streaming. T
 | Status | Python feature | Rust target |
 | --- | --- | --- |
 | [x] SDK feature | Cog groups commands/listeners/buttons | `Cog` trait plus `Bot::add_cog`; compiled cogs register commands, listeners and buttons as an all-or-nothing transaction |
+| [x] SDK feature | Cog-wide command check | `Cog::check(&CommandContext)` runs before each owned prefix/slash command; returning `false` skips the handler |
 | [x] SDK feature | Setup function/extensions | `Cog::register(&mut Bot)` is the explicit Rust setup entry point |
 | [x] SDK adaptation | Load/unload/replace command groups | `Bot::add_cog`, `remove_cog` and transactional `replace_cog` manage statically compiled registrations; replacing handlers does not dynamically reload Rust code or mutate registries while `run` borrows the bot |
 | [ ] Verify | File-system discovery of `.py` cogs | Rust cannot import source files dynamically; defer or design plugin ABI separately |
