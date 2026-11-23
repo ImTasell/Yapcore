@@ -103,6 +103,18 @@ impl CommandContext {
         &self.argv
     }
 
+    /// Parse this invocation against a typed option schema.
+    ///
+    /// This parser is local to Yapcore and does not alter the remote command
+    /// synchronization payload. Named `name=value` and positional arguments
+    /// are both accepted.
+    pub fn parse_options(
+        &self,
+        schema: &[crate::models::CommandOption],
+    ) -> std::result::Result<crate::models::ParsedCommandOptions, crate::models::CommandOptionError> {
+        crate::models::ParsedCommandOptions::parse(schema, &self.args)
+    }
+
     /// ID of the message that invoked this command, or None for slash commands.
     pub fn message_id(&self) -> Option<&MessageId> {
         self.message_id.as_ref()
