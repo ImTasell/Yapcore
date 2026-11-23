@@ -277,6 +277,58 @@ impl Bot {
         self.api.get_channel(channel_id).await
     }
 
+
+    /// Create a text or voice channel in a server.
+    pub async fn create_channel(
+        &self,
+        server_id: &crate::ids::ServerId,
+        options: &crate::models::ChannelCreateOptions,
+    ) -> Result<crate::models::Channel> {
+        self.api.create_channel(server_id, options).await
+    }
+
+    /// Edit selected fields of a channel.
+    pub async fn edit_channel(
+        &self,
+        channel_id: &ChannelId,
+        changes: &crate::models::ChannelEditOptions,
+    ) -> Result<crate::models::Channel> {
+        self.api.edit_channel(channel_id, changes).await
+    }
+
+    /// Delete a channel.
+    pub async fn delete_channel(&self, channel_id: &ChannelId) -> Result<()> {
+        self.api.delete_channel(channel_id).await
+    }
+
+    /// Create a category in a server.
+    pub async fn create_category(
+        &self,
+        server_id: &crate::ids::ServerId,
+        name: &str,
+    ) -> Result<crate::models::ChannelCategory> {
+        self.api.create_category(server_id, name).await
+    }
+
+    /// Rename a category in a server.
+    pub async fn rename_category(
+        &self,
+        server_id: &crate::ids::ServerId,
+        category_id: &crate::ids::CategoryId,
+        name: &str,
+    ) -> Result<crate::models::ChannelCategory> {
+        self.api.rename_category(server_id, category_id, name).await
+    }
+
+    /// Delete a category in a server.
+    pub async fn delete_category(
+        &self,
+        server_id: &crate::ids::ServerId,
+        category_id: &crate::ids::CategoryId,
+    ) -> Result<()> {
+        self.api.delete_category(server_id, category_id).await
+    }
+
     /// List server members in user-ID order.
     pub async fn list_members(
         &self,
