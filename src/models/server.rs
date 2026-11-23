@@ -24,7 +24,6 @@ impl ChannelType {
     }
 }
 
-
 /// Options used to create a channel.
 ///
 /// Access lists are optional and are only sent when explicitly supplied. A
@@ -48,7 +47,14 @@ pub struct ChannelCreateOptions {
 impl ChannelCreateOptions {
     /// Start a channel creation request with a name and text/voice kind.
     pub fn new(name: impl Into<String>, channel_type: ChannelType) -> Self {
-        Self { name: name.into(), channel_type, category_id: None, private: None, role_ids: None, user_ids: None }
+        Self {
+            name: name.into(),
+            channel_type,
+            category_id: None,
+            private: None,
+            role_ids: None,
+            user_ids: None,
+        }
     }
 
     /// Place the new channel in a category.
@@ -81,7 +87,9 @@ impl ChannelCreateOptions {
         }
         if let Some(users) = &self.user_ids {
             if users.len() > 50 {
-                return Err(crate::error::Error::TooManyChannelUsers { actual: users.len() });
+                return Err(crate::error::Error::TooManyChannelUsers {
+                    actual: users.len(),
+                });
             }
         }
         Ok(())
@@ -114,7 +122,9 @@ pub struct ChannelEditOptions {
 
 impl ChannelEditOptions {
     /// Start an empty channel edit.
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Rename the channel.
     pub fn name(mut self, name: impl Into<String>) -> Self {
@@ -172,16 +182,25 @@ impl ChannelEditOptions {
 
     /// Whether this edit contains any fields.
     pub fn is_empty(&self) -> bool {
-        self.name.is_none() && self.category_id.is_none() && self.private.is_none()
-            && self.role_ids.is_none() && self.read_only.is_none()
-            && self.post_role_ids.is_none() && self.slowmode.is_none() && self.user_ids.is_none()
+        self.name.is_none()
+            && self.category_id.is_none()
+            && self.private.is_none()
+            && self.role_ids.is_none()
+            && self.read_only.is_none()
+            && self.post_role_ids.is_none()
+            && self.slowmode.is_none()
+            && self.user_ids.is_none()
     }
 
     pub(crate) fn validate(&self) -> crate::error::Result<()> {
         if self.is_empty() {
             return Err(crate::error::Error::EmptyChannelEditOptions);
         }
-        if self.name.as_deref().is_some_and(|name| name.trim().is_empty()) {
+        if self
+            .name
+            .as_deref()
+            .is_some_and(|name| name.trim().is_empty())
+        {
             return Err(crate::error::Error::EmptyChannelName);
         }
         if let Some(seconds) = self.slowmode {
