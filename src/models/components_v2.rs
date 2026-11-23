@@ -463,6 +463,16 @@ mod tests {
                 ActionRow::new([Button::primary("Go", "container:go").unwrap()])
                     .unwrap()
                     .into(),
+                SelectActionRow::new(
+                    crate::models::SelectMenu::new("container:select")
+                        .unwrap()
+                        .option(
+                            crate::models::SelectOption::new("One", "one").unwrap(),
+                        )
+                        .unwrap(),
+                )
+                .unwrap()
+                .into(),
             ])
             .accent_color(0x5865f2)
             .unwrap()
@@ -486,6 +496,11 @@ mod tests {
         assert_eq!(
             value[4]["components"][1]["components"][0]["custom_id"],
             "container:go"
+        );
+        assert_eq!(value[4]["components"][2]["type"], "row");
+        assert_eq!(
+            value[4]["components"][2]["components"][0]["type"],
+            "select"
         );
         assert_eq!(value[4]["accent_color"], 0x5865f2);
     }
