@@ -351,6 +351,24 @@ mod tests {
     }
 
     #[test]
+    fn validates_platform_ids_and_returns_typed_id_values() {
+        let schema = [CommandOption::user("member", "Member").unwrap()];
+        assert!(matches!(
+            ParsedCommandOptions::parse(&schema, "not-an-id"),
+            Err(CommandOptionError::InvalidValue(_))
+        ));
+        let parsed = ParsedCommandOptions::parse(
+            &schema,
+            "123e4567-e89b-12d3-a456-426614174003",
+        )
+        .unwrap();
+        assert_eq!(
+            parsed.get_user("member").unwrap().as_str(),
+            "123e4567-e89b-12d3-a456-426614174003"
+        );
+    }
+
+    #[test]
     fn validates_required_choices_and_bad_values() {
         let schema = [CommandOption::string("mode", "Mode")
             .unwrap()
