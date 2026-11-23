@@ -224,14 +224,10 @@ mod tests {
             .build()
             .unwrap();
         let api = crate::api::ApiClient::new(config).unwrap();
-        let message_id = crate::ids::MessageId::new(
-            "123e4567-e89b-12d3-a456-426614174010",
-        )
-        .unwrap();
-        let channel_id = crate::ids::ChannelId::new(
-            "123e4567-e89b-12d3-a456-426614174011",
-        )
-        .unwrap();
+        let message_id =
+            crate::ids::MessageId::new("123e4567-e89b-12d3-a456-426614174010").unwrap();
+        let channel_id =
+            crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174011").unwrap();
         let context = CommandContext::new(
             api,
             "allowed".to_owned(),
