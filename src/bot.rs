@@ -2322,9 +2322,10 @@ mod tests {
         })
         .unwrap();
 
-        bot.dispatch_event(&slash_command_event(), None)
-            .await
-            .unwrap();
+        let mut event = slash_command_event();
+        event.data["command"] = serde_json::json!("apply");
+        event.data["args"] = serde_json::json!("");
+        bot.dispatch_event(&event, None).await.unwrap();
 
         let request = server.finish();
         let body = request.split_once("\r\n\r\n").unwrap().1;
