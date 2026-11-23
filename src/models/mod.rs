@@ -2,7 +2,10 @@
 
 mod bot;
 
-pub use bot::{Activity, ActivityRotation, BotProfile, BotStatus, Presence};
+pub use bot::{
+    Activity, ActivityRotation, BotProfile, BotProfileEdit, BotStatus, ImageAsset, ImageFormat,
+    Presence,
+};
 
 mod component;
 
@@ -35,4 +38,5 @@ mod server;
 pub use server::{
     Ban, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions, ChannelListing,
     ChannelType, Member, PermissionTarget, Role, RoleEditOptions, Server, UserProfile,
+    VoiceChannelState,
 };
