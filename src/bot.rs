@@ -327,6 +327,53 @@ impl Bot {
         Ok(self)
     }
 
+    /// Remove a cog and all of the handlers it owns.
+    ///
+    /// This is intended for setup-time/module management before `run` starts.
+    /// It removes registrations, not compiled code or any other independently
+    /// registered cog.
+    pub fn remove_cog(&mut self, name: &str) -> bool {
+        if !self.cog_names.iter().any(|registered| registered == name) {
+            return false;
+        }
+        self.commands.remove_owner(name);
+        self.events.remove_owner(name);
+        self.buttons.remove_owner(name);
+        self.cog_names.retain(|registered| registered != name);
+        true
+    }
+
+    /// Replace one cog's registrations with those from another compiled instance.
+    ///
+    /// If registration fails, the previous cog and all its handlers are restored.
+    /// This replaces registrations only; it does not dynamically reload Rust code.
+    pub fn replace_cog<C: crate::cogs::Cog>(
+        &mut self,
+        cog: C,
+    ) -> std::result::Result<&mut Self, crate::cogs::CogRegistrationError> {
+        let name = cog.name().to_owned();
+        if !self.cog_names.iter().any(|registered| registered == &name) {
+            return self.add_cog(cog);
+        }
+
+        let commands = self.commands.clone();
+        let events = self.events.clone();
+        let buttons = self.buttons.clone();
+        let cog_names = self.cog_names.clone();
+        self.remove_cog(&name);
+
+        if let Err(error) = self.add_cog(cog) {
+            self.commands = commands;
+            self.events = events;
+            self.buttons = buttons;
+            self.cog_names = cog_names;
+            self.registering_cog = None;
+            return Err(error);
+        }
+
+        Ok(self)
+    }
+
     /// Names of cogs registered on this bot in registration order.
     pub fn cogs(&self) -> Vec<&str> {
         self.cog_names.iter().map(String::as_str).collect()
