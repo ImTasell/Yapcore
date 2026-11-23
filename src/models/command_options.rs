@@ -359,7 +359,7 @@ fn parse_value(
         CommandOptionType::Boolean => match raw.to_ascii_lowercase().as_str() {
             "true" | "yes" | "on" => Ok(Value::Bool(true)),
             "false" | "no" | "off" => Ok(Value::Bool(false)),
-            _ => Err(CommandOptionError::InvalidValue(raw.to_owned())),
+            _ => Err(CommandOptionError::InvalidValue(option_name.to_owned())),
         },
     }
 }
@@ -586,9 +586,14 @@ mod tests {
 
     #[test]
     fn user_facing_errors_never_echo_untrusted_argument_text() {
-        let error = CommandOptionError::InvalidNamedArgument("@everyone".to_owned());
-        assert_eq!(error.user_message(), "A named option is malformed.");
-        assert!(!error.user_message().contains("@everyone"));
+        let named_error = CommandOptionError::InvalidNamedArgument("@everyone".to_owned());
+        assert_eq!(named_error.user_message(), "A named option is malformed.");
+        assert!(!named_error.user_message().contains("@everyone"));
+
+        let schema = [CommandOption::boolean("enabled", "Enabled").unwrap()];
+        let value_error = ParsedCommandOptions::parse(&schema, "enabled=@everyone").unwrap_err();
+        assert_eq!(value_error.user_message(), "Option enabled has an invalid value.");
+        assert!(!value_error.user_message().contains("@everyone"));
     }
 
     #[test]
