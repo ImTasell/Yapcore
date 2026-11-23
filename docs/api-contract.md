@@ -76,6 +76,26 @@ rotation_handle.stop().await?;
 
 Dropping the returned `PresenceRotationHandle` or calling `cancel()` requests cancellation; awaiting `stop()` cancels and waits for the task, returning any API update error. Cancellation wakes the timer or interrupts an in-flight status request. Cancelling the bot's `ShutdownHandle` also stops the rotation.
 
+For a presence based on the bot's current server count, use the documented `GET /servers` endpoint through the built-in helper:
+
+```rust
+use std::time::Duration;
+use yapcore::BotStatus;
+
+// One-shot refresh: publishes `Overviewing N servers` and returns N.
+let count = bot.refresh_server_count_presence(BotStatus::Online).await?;
+
+// Or keep it synchronized automatically, checking the server list every 60s.
+let monitor = bot
+    .monitor_server_count_presence(Duration::from_secs(60), BotStatus::Online)
+    .await?;
+
+// Stop and await it when no longer needed.
+monitor.stop().await?;
+```
+
+The monitor publishes the current count immediately, then refreshes it on each interval. It only sends a status update when the count changes. Temporary list/status request errors are logged and retried on the next interval. Dropping or cancelling the `ServerPresenceMonitorHandle`, or shutting down the bot, stops the monitor.
+
 ### Event polling
 | Method | Route | Contract |
 | --- | --- | --- |
