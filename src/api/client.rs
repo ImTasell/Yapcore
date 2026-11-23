@@ -3132,4 +3132,134 @@ mod tests {
             "DELETE /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174021/permissions/everyone HTTP/1.1"
         ));
     }
+    #[tokio::test]
+    async fn patches_bot_profile_fields() {
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "id": BOT_ID,
+                "username": "profile-test",
+                "display_name": "Yapcore",
+                "bio": "A Rust bot"
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let edit = BotProfileEdit::new().display_name("Yapcore").bio("A Rust bot");
+        let profile = client.edit_me(&edit).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with("PATCH /api/bot/v1/me HTTP/1.1"));
+        let payload: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert_eq!(payload["display_name"], "Yapcore");
+        assert_eq!(payload["bio"], "A Rust bot");
+        assert_eq!(profile.username.as_deref(), Some("profile-test"));
+    }
+
+    #[tokio::test]
+    async fn uploads_and_deletes_bot_avatar_and_banner() {
+        let avatar = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({ "path": "avatar/path.png", "url": "https://files.yapper.website/avatars/avatar/path.png" }).to_string(),
+        );
+        let client = test_client(&avatar, 1024).await;
+        let asset = client.set_avatar(b"png-bytes", ImageFormat::Png).await.unwrap();
+        let request = avatar.finish();
+        assert!(request.starts_with("PUT /api/bot/v1/me/avatar HTTP/1.1"));
+        assert!(request.to_ascii_lowercase().contains("content-type: image/png"));
+        assert!(request.ends_with("png-bytes"));
+        assert_eq!(asset.path, "avatar/path.png");
+
+        let banner = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({ "path": "banner/path.webp", "url": "https://files.yapper.website/banners/banner/path.webp" }).to_string(),
+        );
+        let client = test_client(&banner, 1024).await;
+        let asset = client.set_banner(b"webp-bytes", ImageFormat::Webp).await.unwrap();
+        let request = banner.finish();
+        assert!(request.starts_with("PUT /api/bot/v1/me/banner HTTP/1.1"));
+        assert!(request.to_ascii_lowercase().contains("content-type: image/webp"));
+        assert_eq!(asset.path, "banner/path.webp");
+
+        let delete_avatar = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
+        let client = test_client(&delete_avatar, 1024).await;
+        client.delete_avatar().await.unwrap();
+        assert!(delete_avatar.finish().starts_with("DELETE /api/bot/v1/me/avatar HTTP/1.1"));
+
+        let delete_banner = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
+        let client = test_client(&delete_banner, 1024).await;
+        client.delete_banner().await.unwrap();
+        assert!(delete_banner.finish().starts_with("DELETE /api/bot/v1/me/banner HTTP/1.1"));
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_profile_and_image_uploads_before_networking() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        assert!(matches!(client.edit_me(&BotProfileEdit::new()).await, Err(Error::EmptyBotProfileEdit)));
+        assert!(matches!(client.set_avatar(b"", ImageFormat::Png).await, Err(Error::EmptyImageUpload)));
+        assert!(matches!(client.set_avatar(&vec![0; 8 * 1024 * 1024 + 1], ImageFormat::Png).await, Err(Error::ImageUploadTooLarge { max: 8_388_608, .. })));
+        assert!(matches!(client.set_banner(&vec![0; 10 * 1024 * 1024 + 1], ImageFormat::Jpeg).await, Err(Error::ImageUploadTooLarge { max: 10_485_760, .. })));
+    }
+
+    #[tokio::test]
+    async fn opens_direct_message_channel() {
+        const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174031";
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({ "channel_id": CHANNEL_ID }).to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let user_id = crate::ids::UserId::new(USER_ID).unwrap();
+        let channel_id = client.open_dm(&user_id).await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with("POST /api/bot/v1/users/123e4567-e89b-12d3-a456-426614174022/dm HTTP/1.1"));
+        assert_eq!(channel_id.as_str(), CHANNEL_ID);
+    }
+
+    #[tokio::test]
+    async fn reads_and_manages_voice_state() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174021";
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+        let user_id = crate::ids::UserId::new(USER_ID).unwrap();
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+
+        let list = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({ "voice": [{ "channel_id": CHANNEL_ID, "user_ids": [USER_ID] }] }).to_string(),
+        );
+        let client = test_client(&list, 1024).await;
+        let voice = client.get_voice_states(&server_id).await.unwrap();
+        let request = list.finish();
+        assert!(request.starts_with("GET /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/voice HTTP/1.1"));
+        assert_eq!(voice.len(), 1);
+        assert_eq!(voice[0].channel_id, channel_id);
+        assert_eq!(voice[0].user_ids, vec![user_id.clone()]);
+
+        let move_server = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
+        let client = test_client(&move_server, 1024).await;
+        client.move_member_to_voice(&server_id, &user_id, &channel_id).await.unwrap();
+        let request = move_server.finish();
+        assert!(request.starts_with("POST /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/voice/move HTTP/1.1"));
+        let payload: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert_eq!(payload["user_id"], USER_ID);
+        assert_eq!(payload["channel_id"], CHANNEL_ID);
+
+        let disconnect = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
+        let client = test_client(&disconnect, 1024).await;
+        client.disconnect_member_from_voice(&server_id, &user_id).await.unwrap();
+        let request = disconnect.finish();
+        assert!(request.starts_with("POST /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/voice/disconnect HTTP/1.1"));
+        let payload: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert_eq!(payload["user_id"], USER_ID);
+    }
+
 }
