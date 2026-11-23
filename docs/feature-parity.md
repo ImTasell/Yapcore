@@ -64,8 +64,9 @@ Retry safety rules:
 | [ ] Verify | WebSocket gateway `wss://rt.yapper.website/bot` | Defer; current public guide does not document its protocol |
 | [x] Documented | Member, reaction, voice and test events | Generic `Bot::on_event` supports the documented `member_join`, `member_leave`, `reaction_add`, `reaction_remove`, `voice_join`, `voice_leave` and `test` envelopes |
 | [ ] Verify | Invite/channel/thread/category/message/server extra event kinds | Preserve unknown event payloads; add typed events only after endpoint confirmation |
-| [ ] Verify | DM message event | Official docs say ordinary DMs are not delivered as bot events |
+| [~] Verify | DM message event / `on_dm` shortcut | `Bot::on_dm` aliases `on_event("dm_message", ...)`; the public contract still does not guarantee ordinary incoming DM event delivery |
 | [x] Documented | Generic asynchronous event listeners | `Bot::on_event` delivers the full event envelope in registration order |
+| [~] Verify | Reactions on the bot's own messages | `Bot::on_reaction_on_mine` filters add/remove events using the runtime bot ID and adds `data.added`; event payload availability outside the documented reaction contract remains unverified |
 | [x] Documented | Filter bot-authored messages | Configurable bot-message filter, default on |
 | [x] Documented | Ignore duplicate/out-of-order event IDs | Deduplicates against the committed cursor; `run_from` enables recovery when the application persists `last_event_id()` externally |
 
