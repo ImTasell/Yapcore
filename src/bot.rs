@@ -362,8 +362,12 @@ impl Bot {
         F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.commands
-            .register_owned(name, description, self.registering_cog.clone(), handler)?;
+        if let Some(owner) = self.registering_cog.clone() {
+            self.commands
+                .register_owned(name, description, Some(owner), handler)?;
+        } else {
+            self.commands.register(name, description, handler)?;
+        }
         Ok(self)
     }
 
@@ -385,13 +389,18 @@ impl Bot {
         F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.commands.register_with_check_owned(
-            name,
-            description,
-            check,
-            self.registering_cog.clone(),
-            handler,
-        )?;
+        if let Some(owner) = self.registering_cog.clone() {
+            self.commands.register_with_check_owned(
+                name,
+                description,
+                check,
+                Some(owner),
+                handler,
+            )?;
+        } else {
+            self.commands
+                .register_with_check(name, description, check, handler)?;
+        }
         Ok(self)
     }
 
@@ -415,8 +424,12 @@ impl Bot {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.buttons
-            .register_exact_owned(custom_id, self.registering_cog.clone(), handler)?;
+        if let Some(owner) = self.registering_cog.clone() {
+            self.buttons
+                .register_exact_owned(custom_id, Some(owner), handler)?;
+        } else {
+            self.buttons.register_exact(custom_id, handler)?;
+        }
         Ok(self)
     }
 
@@ -430,8 +443,11 @@ impl Bot {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.buttons
-            .register_prefix_owned(prefix, self.registering_cog.clone(), handler)?;
+        if let Some(owner) = self.registering_cog.clone() {
+            self.buttons.register_prefix_owned(prefix, Some(owner), handler)?;
+        } else {
+            self.buttons.register_prefix(prefix, handler)?;
+        }
         Ok(self)
     }
 
@@ -448,8 +464,11 @@ impl Bot {
         F: Fn(crate::models::EventEnvelope) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.events
-            .register_owned(event_type, self.registering_cog.clone(), handler)?;
+        if let Some(owner) = self.registering_cog.clone() {
+            self.events.register_owned(event_type, Some(owner), handler)?;
+        } else {
+            self.events.register(event_type, handler)?;
+        }
         Ok(self)
     }
 
@@ -2364,8 +2383,6 @@ mod presence_rotation_tests {
     }
     #[tokio::test]
     async fn cog_owned_event_errors_include_the_cog_name() {
-        use std::sync::Mutex;
-
         struct FailingListenerCog;
         impl crate::cogs::Cog for FailingListenerCog {
             fn name(&self) -> &str {
@@ -2374,7 +2391,7 @@ mod presence_rotation_tests {
 
             fn register(&self, bot: &mut Bot) -> std::result::Result<(), String> {
                 bot.on_event("member_join", |_event| async {
-                    Err(Box::new(std::io::Error::other("listener failed")) as HandlerError)
+                    Err(Box::new(std::io::Error::other("listener failed")) as crate::HandlerError)
                 })
                 .map_err(|error| error.to_string())?;
                 Ok(())
