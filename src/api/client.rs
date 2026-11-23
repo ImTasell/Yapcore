@@ -10,7 +10,7 @@ use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
 use crate::ids::InteractionId;
 use crate::models::{
-    Activity, Ban, BotProfile, BotStatus, Channel, ChannelCategory, ChannelCreateOptions,
+    Ban, BotProfile, BotStatus, Channel, ChannelCategory, ChannelCreateOptions,
     ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch,
     InteractionResponseType, Member, Message, PermissionTarget, Presence, Role, Server,
     UserProfile, validate_action_rows,
@@ -2876,6 +2876,21 @@ mod tests {
         assert_eq!(payload["activity"], "Playing chess");
     }
 
+    #[tokio::test]
+    async fn sets_typed_presence_with_a_formatted_activity_line() {
+        let server = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
+        let client = test_client(&server, 1024).await;
+        let presence = Presence::dnd().activity(crate::models::Activity::playing("Minecraft").unwrap());
+
+        client.set_presence(&presence).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with("PUT /api/bot/v1/me/status HTTP/1.1"));
+        let payload: Value =
+            serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert_eq!(payload["status"], "dnd");
+        assert_eq!(payload["activity"], "Playing Minecraft");
+    }
     #[tokio::test]
     async fn rejects_overlong_bot_activity_before_networking() {
         let config = Config::builder().token("yb_test-token").build().unwrap();
