@@ -990,6 +990,11 @@ impl Bot {
             .await
     }
 
+    /// Fetch the commands currently registered with Yapper.
+    pub async fn list_commands(&self) -> Result<Vec<CommandDefinition>> {
+        self.api.list_commands().await
+    }
+
     /// Return the currently registered command definitions in name order.
     ///
     /// This is useful for inspection and for synchronizing the registry once
