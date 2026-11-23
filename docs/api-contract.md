@@ -204,6 +204,10 @@ When a bot is hosted behind a public HTTPS URL, Yapper can POST the same events 
 
 Yapcore's `verify_event_webhook(secret, raw_body, signature_header)` validates the HMAC before parsing the envelope and converts it to the common `EventEnvelope` model. It deliberately does not run an HTTP server, choose a web framework, send the 200 response, or maintain a cross-transport deduplication store. The caller must pass the original, unmodified raw body to the verifier.
 
+### Convenience event listeners (source-parity)
+
+`Bot::on_dm(handler)` is a convenience alias for `Bot::on_event("dm_message", handler)`. The upstream Python helper `on_reaction_on_mine(handler)` filters `reaction_add` and `reaction_remove` events to messages whose `message_author_id` matches the bot profile ID and adds `data.added` (`true` for add, `false` for remove). Yapcore exposes the same behavior through `Bot::on_reaction_on_mine`; it becomes active after the runtime has loaded the bot identity. These helpers do not make undocumented DM event delivery part of the stable API contract.
+
 ### Lifecycle error callbacks
 
 The SDK surface also exposes an `error` callback for runtime and handler failures. Yapcore reports these through `Bot::on_error`, using an `ErrorEvent` with a stage, optional event ID/type, command name, button custom ID, optional owning cog name (`cog`), and the error message. Failures inside an error callback are logged and are not recursively reported.
