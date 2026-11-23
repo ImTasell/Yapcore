@@ -395,11 +395,17 @@ impl SelectMenu {
         }
         let mut values = HashSet::new();
         for option in &self.options {
-            if option.label.is_empty() || option.label.chars().count() > 100 {
+            if option.label.is_empty() {
                 return Err(ComponentValidationError::EmptySelectOptionLabel);
             }
-            if option.value.is_empty() || option.value.chars().count() > 100 {
+            if option.label.chars().count() > 100 {
+                return Err(ComponentValidationError::SelectOptionLabelTooLong);
+            }
+            if option.value.is_empty() {
                 return Err(ComponentValidationError::EmptySelectOptionValue);
+            }
+            if option.value.chars().count() > 100 {
+                return Err(ComponentValidationError::SelectOptionValueTooLong);
             }
             if !values.insert(option.value.as_str()) {
                 return Err(ComponentValidationError::DuplicateSelectOptionValue);
