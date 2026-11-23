@@ -134,7 +134,7 @@ impl CommandOption {
             || name.len() > 32
             || !name
                 .bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'_' | b'-'))
         {
             return Err(CommandOptionError::InvalidName);
         }
@@ -208,11 +208,22 @@ impl ParsedCommandOptions {
     /// Quoted values support single or double quotes. User, channel and role
     /// arguments are retained as strings because Yapper IDs are opaque.
     pub fn parse(schema: &[CommandOption], input: &str) -> Result<Self, CommandOptionError> {
+        if schema.len() > 10 {
+            return Err(CommandOptionError::TooManyOptions);
+        }
+
         let mut schema_names = std::collections::BTreeSet::new();
+        let mut optional_seen = false;
         for option in schema {
             if !schema_names.insert(option.name.as_str()) {
                 return Err(CommandOptionError::DuplicateOption(option.name.clone()));
             }
+            if option.required && optional_seen {
+                return Err(CommandOptionError::RequiredOptionAfterOptional(
+                    option.name.clone(),
+                ));
+            }
+            optional_seen |= !option.required;
         }
         let tokens = tokenize(input)?;
         let mut positional = Vec::new();
@@ -406,6 +417,10 @@ pub enum CommandOptionError {
     DuplicateChoice,
     #[error("option names must be unique within a command schema")]
     DuplicateOption(String),
+    #[error("a command may declare at most 10 options")]
+    TooManyOptions,
+    #[error("required option {0} must appear before all optional options")]
+    RequiredOptionAfterOptional(String),
     #[error("required argument '{0}' is missing")]
     MissingRequired(String),
     #[error("unknown named argument '{0}'")]
@@ -511,6 +526,28 @@ mod tests {
                 .get_number("ratio"),
             Some(2.0)
         );
+    }
+
+    #[test]
+    fn validates_option_count_and_required_order() {
+        let too_many = (0..11)
+            .map(|index| CommandOption::string(format!("option-{index}"), "Option").unwrap())
+            .collect::<Vec<_>>();
+        assert!(matches!(
+            ParsedCommandOptions::parse(&too_many, ""),
+            Err(CommandOptionError::TooManyOptions)
+        ));
+
+        let required_after_optional = [
+            CommandOption::string("optional", "Optional").unwrap(),
+            CommandOption::string("required", "Required")
+                .unwrap()
+                .required(true),
+        ];
+        assert!(matches!(
+            ParsedCommandOptions::parse(&required_after_optional, ""),
+            Err(CommandOptionError::RequiredOptionAfterOptional(name)) if name == "required"
+        ));
     }
 
     #[test]
