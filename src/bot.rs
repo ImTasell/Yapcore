@@ -480,6 +480,43 @@ impl Bot {
         Ok(self)
     }
 
+    /// Register a handler for a select-menu submission with an exact custom ID.
+    ///
+    /// Submitted selections are available through InteractionContext::values.
+    pub fn on_select<F, Fut>(
+        &mut self,
+        custom_id: impl Into<String>,
+        handler: F,
+    ) -> std::result::Result<&mut Self, InteractionRegistrationError>
+    where
+        F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        let owner = self.registering_cog.clone();
+        self.buttons
+            .register_kind_owned("select", custom_id, owner, handler)?;
+        Ok(self)
+    }
+
+    /// Register a handler for a modal submission with an exact custom ID.
+    ///
+    /// Submitted text/select fields are available through InteractionContext::values
+    /// as a forward-compatible JSON value.
+    pub fn on_modal<F, Fut>(
+        &mut self,
+        custom_id: impl Into<String>,
+        handler: F,
+    ) -> std::result::Result<&mut Self, InteractionRegistrationError>
+    where
+        F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        let owner = self.registering_cog.clone();
+        self.buttons
+            .register_kind_owned("modal_submit", custom_id, owner, handler)?;
+        Ok(self)
+    }
+
     /// Register a button handler for every custom ID beginning with prefix.
     pub fn button<F, Fut>(
         &mut self,
@@ -1802,13 +1839,11 @@ impl Bot {
             .unwrap_or("button")
             .to_owned();
 
-        // The first interaction milestone handles button events. Select and
-        // modal submissions can reuse the same context/session in later slices.
-        if kind != "button" {
+        if !matches!(kind.as_str(), "button" | "select" | "modal_submit") {
             return Ok(());
         }
 
-        let handlers = self.buttons.handlers_for(custom_id);
+        let handlers = self.buttons.handlers_for(&kind, custom_id);
         if handlers.is_empty() {
             return Ok(());
         }
@@ -1834,6 +1869,7 @@ impl Bot {
                 .get("username")
                 .and_then(Value::as_str)
                 .map(str::to_owned),
+            values: data.get("values").cloned().unwrap_or(Value::Null),
         };
         let context = InteractionContext::new(self.api.clone(), invocation);
         let response_count = context.response_count();
