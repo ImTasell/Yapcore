@@ -53,11 +53,12 @@ The first working runtime is intentionally narrower than the long-term architect
 - Unanswered slash/button handlers are acknowledged after two seconds, leaving margin before Yapper's three-second deadline.
 - `Bot::on_event` registers ordered asynchronous listeners for any event type; listeners receive the full raw-preserving event envelope.
 - A synthetic `ready` event is dispatched after profile retrieval and command synchronization.
-- `Bot::run` starts from the newest cursor and stops through a clonable watch-channel shutdown handle.
-- Poll transport failures use bounded exponential backoff; 429/503 are retried only when Yapper supplies `Retry-After`.
+- `Bot::run` starts from the newest cursor by default; `Bot::run_from(saved_cursor)` resumes after an application-supplied cursor, and `Bot::last_event_id()` exposes the latest checkpoint. Applications own persistence. Both modes stop through a clonable watch-channel shutdown handle.
+- `BotBuilder::logging(false)` suppresses Yapcore lifecycle and handler logs without changing the application's global tracing subscriber.
+- Poll transport failures use bounded exponential backoff; HTTP 429/503 responses are retried only when Yapper supplies `Retry-After`, with a two-retry ceiling. Transport errors are not blindly replayed.
 - Command, button and generic event-handler failures are logged and isolated from later listeners/polling.
 
-The current dispatcher is sequential. Select-menu and modal-submit handlers, persistent cursor storage, bounded-concurrency dispatch and typed wrappers for individual server events remain future milestones.
+The current dispatcher is sequential. Cursor persistence remains caller-owned: store `last_event_id()` externally and pass it to `run_from()` when restarting. Select-menu and modal-submit handlers, an error lifecycle callback, bounded-concurrency dispatch and typed wrappers for individual server events remain future milestones.
 
 ### Explicitly deferred
 
