@@ -103,6 +103,44 @@ mod tests {
     }
 
     #[test]
+    fn removes_cog_registrations_as_a_unit() {
+        let mut bot = BotBuilder::new().token("yb_test-token").build().unwrap();
+        bot.add_cog(GoodCog).unwrap();
+        assert!(bot.remove_cog("welcome"));
+        assert!(bot.cogs().is_empty());
+        assert!(bot.command_definitions().is_empty());
+        assert!(!bot.remove_cog("welcome"));
+    }
+
+    #[test]
+    fn replaces_cog_registration_without_reloading_compiled_code() {
+        struct RevisedCog;
+        impl Cog for RevisedCog {
+            fn name(&self) -> &str {
+                "welcome"
+            }
+            fn register(&self, bot: &mut Bot) -> std::result::Result<(), String> {
+                bot.command("greet", "Use the revised greeting", |_context| async {
+                    Ok(())
+                })
+                .map_err(|error| error.to_string())?;
+                Ok(())
+            }
+        }
+
+        let mut bot = BotBuilder::new().token("yb_test-token").build().unwrap();
+        bot.add_cog(GoodCog).unwrap();
+        bot.replace_cog(RevisedCog).unwrap();
+        assert_eq!(bot.cogs(), vec!["welcome"]);
+        let names = bot
+            .command_definitions()
+            .into_iter()
+            .map(|definition| definition.name().to_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(names, ["greet"]);
+    }
+
+    #[test]
     fn rolls_back_all_registrations_when_cog_setup_fails() {
         let mut bot = BotBuilder::new().token("yb_test-token").build().unwrap();
         bot.command("duplicate", "Already registered", |_context| async {
