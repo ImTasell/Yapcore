@@ -3448,4 +3448,33 @@ mod tests {
         assert!(request.starts_with("GET /api/bot/v1/me HTTP/1.1"));
         assert!(matches!(error, Error::Api(api) if api.retry_after().is_none()));
     }
+    #[tokio::test]
+    async fn raw_api_uses_authenticated_relative_routes_only() {
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({ "username": "raw-api" }).to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let response = client.api(Method::GET, "me", None).await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with("GET /api/bot/v1/me HTTP/1.1"));
+        assert!(request.to_ascii_lowercase().contains("authorization: bot yb_test-token"));
+        assert_eq!(response["username"], "raw-api");
+
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        assert!(matches!(
+            client.api(Method::GET, "https://attacker.invalid/steal", None).await,
+            Err(Error::InvalidApiRoute(_))
+        ));
+        assert!(matches!(
+            client.api(Method::GET, "../outside", None).await,
+            Err(Error::InvalidApiRoute(_))
+        ));
+        assert!(matches!(
+            client.api(Method::GET, "/me", None).await,
+            Err(Error::InvalidApiRoute(_))
+        ));
+    }
 }
