@@ -216,7 +216,7 @@ pub enum Error {
     #[error("a channel may list at most 50 allowed users; received {actual}")]
     TooManyChannelUsers { actual: usize },
 
-    /// An activity rotation must contain at least two different entries.
+    /// An activity rotation must contain at least two entries.
     #[error("activity rotation requires at least 2 entries; received {actual}")]
     TooFewRotationActivities { actual: usize },
 
