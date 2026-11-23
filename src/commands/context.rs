@@ -33,6 +33,7 @@ pub struct CommandContext {
     channel_id: ChannelId,
     author_id: Option<UserId>,
     interaction: Option<InteractionSession>,
+    parsed_options: Option<crate::models::ParsedCommandOptions>,
 }
 
 impl CommandContext {
@@ -57,6 +58,7 @@ impl CommandContext {
             channel_id,
             author_id,
             interaction: None,
+            parsed_options: None,
         }
     }
 
@@ -80,6 +82,7 @@ impl CommandContext {
             channel_id: invocation.channel_id,
             author_id: invocation.author_id,
             interaction: Some(interaction),
+            parsed_options: None,
         }
     }
 
@@ -113,6 +116,20 @@ impl CommandContext {
         schema: &[crate::models::CommandOption],
     ) -> std::result::Result<crate::models::ParsedCommandOptions, crate::models::CommandOptionError> {
         crate::models::ParsedCommandOptions::parse(schema, &self.args)
+    }
+
+    /// Parsed options installed by `Bot::command_with_options`, if this
+    /// command was registered with a typed schema.
+    pub fn options(&self) -> Option<&crate::models::ParsedCommandOptions> {
+        self.parsed_options.as_ref()
+    }
+
+    pub(crate) fn with_option_schema(
+        mut self,
+        schema: &[crate::models::CommandOption],
+    ) -> std::result::Result<Self, crate::models::CommandOptionError> {
+        self.parsed_options = Some(self.parse_options(schema)?);
+        Ok(self)
     }
 
     /// ID of the message that invoked this command, or None for slash commands.
