@@ -230,7 +230,7 @@ impl ParsedCommandOptions {
     /// Parse whitespace-separated positional values and named `name=value` pairs.
     ///
     /// Quoted values support single or double quotes. User, channel and role
-    /// arguments are retained as strings because Yapper IDs are opaque.
+    /// arguments are stored as canonical UUID strings after validation.
     pub fn parse(schema: &[CommandOption], input: &str) -> Result<Self, CommandOptionError> {
         Self::validate_schema(schema)?;
         let tokens = tokenize(input)?;
@@ -478,7 +478,7 @@ pub enum CommandOptionError {
     InvalidNamedArgument(String),
     #[error("too many positional arguments")]
     TooManyArguments,
-    #[error("invalid value '{0}'")]
+    #[error("invalid value for option {0}")]
     InvalidValue(String),
     #[error("argument '{0}' is not one of its declared choices")]
     InvalidChoice(String),
