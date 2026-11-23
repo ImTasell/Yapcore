@@ -8,6 +8,59 @@ use thiserror::Error;
 use crate::commands::HandlerResult;
 use crate::models::EventEnvelope;
 
+/// Stage at which a bot runtime or user handler failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ErrorStage {
+    /// Event dispatch failed before or during built-in handling.
+    EventDispatch,
+    /// A generic event listener returned an error.
+    EventListener,
+    /// A prefix command handler returned an error.
+    CommandHandler,
+    /// A slash command handler returned an error.
+    SlashCommandHandler,
+    /// A slash command handler failed after automatic acknowledgement.
+    SlashCommandAfterAck,
+    /// A button handler returned an error.
+    ButtonHandler,
+    /// An error listener itself returned an error.
+    ErrorHandler,
+}
+
+/// Context for an error observed by the bot runtime.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErrorEvent {
+    /// Runtime stage that produced the error.
+    pub stage: ErrorStage,
+    /// Yapper event cursor, when the error came from an event.
+    pub event_id: Option<u64>,
+    /// Original event type, when available.
+    pub event_type: Option<String>,
+    /// Registered command name, when available.
+    pub command: Option<String>,
+    /// Button custom ID, when available.
+    pub custom_id: Option<String>,
+    /// Human-readable error message.
+    pub message: String,
+}
+
+impl ErrorEvent {
+    pub(crate) fn new(stage: ErrorStage, message: impl Into<String>) -> Self {
+        Self {
+            stage,
+            event_id: None,
+            event_type: None,
+            command: None,
+            custom_id: None,
+            message: message.into(),
+        }
+    }
+}
+
+type ErrorFuture = Pin<Box<dyn Future<Output = HandlerResult> + Send + 'static>>;
+pub(crate) type ErrorHandler = Arc<dyn Fn(ErrorEvent) -> ErrorFuture + Send + Sync + 'static>;
+
 /// Invalid event-listener registration details.
 #[derive(Debug, Clone, Copy, Error, PartialEq, Eq)]
 #[non_exhaustive]
@@ -27,6 +80,7 @@ pub(crate) type EventHandler = Arc<dyn Fn(EventEnvelope) -> HandlerFuture + Send
 #[derive(Default)]
 pub(crate) struct EventRegistry {
     handlers: BTreeMap<String, Vec<EventHandler>>,
+    error_handlers: Vec<ErrorHandler>,
 }
 
 impl std::fmt::Debug for EventRegistry {
@@ -40,6 +94,7 @@ impl std::fmt::Debug for EventRegistry {
         formatter
             .debug_struct("EventRegistry")
             .field("event_handlers", &counts)
+            .field("error_handlers", &self.error_handlers.len())
             .finish()
     }
 }
@@ -72,6 +127,21 @@ impl EventRegistry {
         let handler: EventHandler = Arc::new(move |event| Box::pin(handler(event)));
         self.handlers.entry(event_type).or_default().push(handler);
         Ok(())
+    }
+
+    /// Register an asynchronous lifecycle error listener.
+    pub fn register_error<F, Fut>(&mut self, handler: F)
+    where
+        F: Fn(ErrorEvent) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        self.error_handlers
+            .push(Arc::new(move |event| Box::pin(handler(event))));
+    }
+
+    /// Clone error listeners in registration order.
+    pub fn error_handlers(&self) -> Vec<ErrorHandler> {
+        self.error_handlers.clone()
     }
 
     /// Return handlers for an event in registration order.
