@@ -16,10 +16,13 @@ pub type HandlerResult = std::result::Result<(), HandlerError>;
 
 type HandlerFuture = Pin<Box<dyn Future<Output = HandlerResult> + Send + 'static>>;
 type Handler = Arc<dyn Fn(CommandContext) -> HandlerFuture + Send + Sync + 'static>;
+type CheckFuture = Pin<Box<dyn Future<Output = bool> + Send + 'static>>;
+type Check = Arc<dyn Fn(CommandContext) -> CheckFuture + Send + Sync + 'static>;
 
 struct RegisteredCommand {
     definition: CommandDefinition,
     handler: Handler,
+    check: Option<Check>,
 }
 
 /// Local registry of prefix commands and their asynchronous handlers.
@@ -48,6 +51,43 @@ impl CommandRegistry {
         F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
+        self.register_inner(
+            name,
+            description,
+            None::<fn(CommandContext) -> std::future::Ready<bool>>,
+            handler,
+        )
+    }
+
+    pub fn register_with_check<C, CFut, F, Fut>(
+        &mut self,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        check: C,
+        handler: F,
+    ) -> Result<(), CommandDefinitionError>
+    where
+        C: Fn(CommandContext) -> CFut + Send + Sync + 'static,
+        CFut: Future<Output = bool> + Send + 'static,
+        F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        self.register_inner(name, description, Some(check), handler)
+    }
+
+    fn register_inner<C, CFut, F, Fut>(
+        &mut self,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        check: Option<C>,
+        handler: F,
+    ) -> Result<(), CommandDefinitionError>
+    where
+        C: Fn(CommandContext) -> CFut + Send + Sync + 'static,
+        CFut: Future<Output = bool> + Send + 'static,
+        F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
         let definition = CommandDefinition::new(name, description)?;
         let name = definition.name().to_owned();
 
@@ -56,12 +96,16 @@ impl CommandRegistry {
         }
 
         let handler: Handler = Arc::new(move |context| Box::pin(handler(context)));
+        let check = check.map(|check| -> Check {
+            Arc::new(move |context| Box::pin(check(context)))
+        });
 
         self.entries.insert(
             name,
             RegisteredCommand {
                 definition,
                 handler,
+                check,
             },
         );
 
@@ -80,8 +124,13 @@ impl CommandRegistry {
     }
 
     pub async fn dispatch(&self, name: &str, context: CommandContext) -> Option<HandlerResult> {
-        let handler = self.entries.get(name)?.handler.clone();
-        Some(handler(context).await)
+        let entry = self.entries.get(name)?;
+        if let Some(check) = &entry.check {
+            if !check(context.clone()).await {
+                return Some(Ok(()));
+            }
+        }
+        Some((entry.handler.clone())(context).await)
     }
 }
 
