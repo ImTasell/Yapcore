@@ -2,5 +2,5 @@
 
 mod registry;
 
-pub use registry::{ErrorEvent, ErrorStage, EventRegistrationError};
 pub(crate) use registry::EventRegistry;
+pub use registry::{ErrorEvent, ErrorStage, EventRegistrationError};
