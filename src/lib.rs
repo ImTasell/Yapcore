@@ -18,7 +18,7 @@ pub mod interactions;
 pub mod models;
 
 pub use api::ApiClient;
-pub use bot::{Bot, BotBuilder, PresenceRotationHandle, ShutdownHandle};
+pub use bot::{Bot, BotBuilder, PresenceRotationHandle, ServerPresenceMonitorHandle, ShutdownHandle};
 pub use commands::{CommandContext, HandlerError, HandlerResult};
 pub use config::{Config, ConfigBuilder, ConfigError, DEFAULT_API_BASE_URL};
 pub use error::{ApiError, Error, Result};
