@@ -1848,6 +1848,12 @@ impl Bot {
             return Ok(());
         }
 
+        let error_stage = if kind == "button" {
+            ErrorStage::ButtonHandler
+        } else {
+            ErrorStage::InteractionHandler
+        };
+
         let invocation = InteractionInvocation {
             id: interaction_id,
             token: SecretString::from(token.to_owned()),
@@ -1885,7 +1891,7 @@ impl Bot {
                         error = %error,
                         "button interaction handler failed"
                     );
-                    let mut report = ErrorEvent::new(ErrorStage::ButtonHandler, error.to_string());
+                    let mut report = ErrorEvent::new(error_stage, error.to_string());
                     report.event_id = Some(event.id);
                     report.event_type = Some(event.event_type.clone());
                     report.custom_id = Some(custom_id_for_log.clone());
