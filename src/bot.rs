@@ -2220,7 +2220,10 @@ mod tests {
         let body = request.split_once("\r\n\r\n").unwrap().1;
         let payload: Value = serde_json::from_str(body).unwrap();
         assert_eq!(payload["type"], "reply");
-        assert_eq!(*observed.lock().unwrap(), Some(serde_json::json!(["pizza", "taco"])));
+        assert_eq!(
+            *observed.lock().unwrap(),
+            Some(serde_json::json!(["pizza", "taco"]))
+        );
     }
 
     #[tokio::test]
