@@ -31,11 +31,11 @@ pub use ids::{
 };
 pub use interactions::{InteractionContext, InteractionRegistrationError};
 pub use models::{
-    ActionRow, Activity, ActivityRotation, Ban, BotProfile, BotProfileEdit, BotStatus, Button, ButtonStyle,
-    Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions, ChannelListing,
-    ChannelType, CommandDefinition, CommandDefinitionError, ComponentValidationError, Embed, ImageAsset,
-    ImageFormat,
-    EmbedAuthor, EmbedBuilder, EmbedField, EmbedFooter, EmbedValidationError, EventBatch,
-    EventEnvelope, InteractionResponseType, Member, Message, PermissionTarget, Presence, Role,
-    RoleEditOptions, Server, UserProfile, VoiceChannelState,
+    ActionRow, Activity, ActivityRotation, Ban, BotProfile, BotProfileEdit, BotStatus, Button,
+    ButtonStyle, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions,
+    ChannelListing, ChannelType, CommandDefinition, CommandDefinitionError,
+    ComponentValidationError, Embed, EmbedAuthor, EmbedBuilder, EmbedField, EmbedFooter,
+    EmbedValidationError, EventBatch, EventEnvelope, ImageAsset, ImageFormat,
+    InteractionResponseType, Member, Message, PermissionTarget, Presence, Role, RoleEditOptions,
+    Server, UserProfile, VoiceChannelState,
 };
