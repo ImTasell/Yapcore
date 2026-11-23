@@ -170,7 +170,7 @@ mod tests {
         let modal = Modal::new(
             "follow-up",
             "Follow up",
-            [TextInput::short("answer", "Answer").unwrap()],
+            [crate::models::TextInput::short("answer", "Answer").unwrap()],
         )
         .unwrap();
 
