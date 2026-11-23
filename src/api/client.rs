@@ -3417,5 +3417,4 @@ mod tests {
         assert!(request.starts_with("GET /api/bot/v1/me HTTP/1.1"));
         assert!(matches!(error, Error::Api(api) if api.retry_after().is_none()));
     }
-
 }
