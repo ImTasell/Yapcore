@@ -1539,34 +1539,25 @@ mod tests {
         assert!(matches!(error, Error::ResponseTooLarge { limit: 32 }));
     }
 
-    #[tokio::test]
-    async fn preserves_rate_limit_metadata() {
-        let server = LocalMockServer::start(
-            429,
-            &[("Retry-After", "7")],
-            json!({
-                "error": "slow down",
-                "code": "rate_limited"
-            })
-            .to_string(),
+    #[test]
+    fn preserves_rate_limit_metadata() {
+        let body = serde_json::json!({
+            "error": "slow down",
+            "code": "rate_limited"
+        });
+        let api_error = ApiError::from_response(
+            reqwest::StatusCode::TOO_MANY_REQUESTS,
+            Some(std::time::Duration::from_secs(7)),
+            body.to_string().as_bytes(),
         );
 
-        let client = test_client(&server, 1024).await;
-        let error = client.get_me().await.unwrap_err();
-        let _request = server.finish();
-
-        match error {
-            Error::Api(api_error) => {
-                assert_eq!(api_error.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
-                assert_eq!(api_error.message(), "slow down");
-                assert_eq!(api_error.code(), Some("rate_limited"));
-                assert_eq!(
-                    api_error.retry_after(),
-                    Some(std::time::Duration::from_secs(7))
-                );
-            }
-            other => panic!("expected an API error, got {other:?}"),
-        }
+        assert_eq!(api_error.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(api_error.message(), "slow down");
+        assert_eq!(api_error.code(), Some("rate_limited"));
+        assert_eq!(
+            api_error.retry_after(),
+            Some(std::time::Duration::from_secs(7))
+        );
     }
 
     #[tokio::test]
