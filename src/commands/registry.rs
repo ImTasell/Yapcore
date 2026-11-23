@@ -24,6 +24,7 @@ struct RegisteredCommand {
     definition: CommandDefinition,
     handler: Handler,
     check: Option<Check>,
+    owner: Option<String>,
 }
 
 /// Local registry of prefix commands and their asynchronous handlers.
@@ -56,6 +57,27 @@ impl CommandRegistry {
             name,
             description,
             None::<fn(CommandContext) -> std::future::Ready<bool>>,
+            None,
+            handler,
+        )
+    }
+
+    pub fn register_owned<F, Fut>(
+        &mut self,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        owner: Option<String>,
+        handler: F,
+    ) -> Result<(), CommandDefinitionError>
+    where
+        F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        self.register_inner(
+            name,
+            description,
+            None::<fn(CommandContext) -> std::future::Ready<bool>>,
+            owner,
             handler,
         )
     }
@@ -73,7 +95,24 @@ impl CommandRegistry {
         F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.register_inner(name, description, Some(check), handler)
+        self.register_inner(name, description, Some(check), None, handler)
+    }
+
+    pub fn register_with_check_owned<C, CFut, F, Fut>(
+        &mut self,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        check: C,
+        owner: Option<String>,
+        handler: F,
+    ) -> Result<(), CommandDefinitionError>
+    where
+        C: Fn(CommandContext) -> CFut + Send + Sync + 'static,
+        CFut: Future<Output = bool> + Send + 'static,
+        F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        self.register_inner(name, description, Some(check), owner, handler)
     }
 
     fn register_inner<C, CFut, F, Fut>(
@@ -81,6 +120,7 @@ impl CommandRegistry {
         name: impl Into<String>,
         description: impl Into<String>,
         check: Option<C>,
+        owner: Option<String>,
         handler: F,
     ) -> Result<(), CommandDefinitionError>
     where
@@ -106,10 +146,15 @@ impl CommandRegistry {
                 definition,
                 handler,
                 check,
+                owner,
             },
         );
 
         Ok(())
+    }
+
+    pub fn owner(&self, name: &str) -> Option<&str> {
+        self.entries.get(name)?.owner.as_deref()
     }
 
     pub fn contains(&self, name: &str) -> bool {
@@ -156,6 +201,18 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(names, ["alpha", "zeta"]);
+    }
+
+    #[test]
+    fn preserves_cog_ownership_for_registered_commands() {
+        let mut registry = CommandRegistry::default();
+        registry
+            .register_owned("ping", "Ping", Some("utility".to_owned()), |_context| async {
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(registry.owner("ping"), Some("utility"));
+        assert_eq!(registry.owner("missing"), None);
     }
 
     #[test]
