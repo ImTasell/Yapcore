@@ -13,9 +13,14 @@ pub(crate) use component::validate_action_rows;
 pub use component::{ActionRow, Button, ButtonStyle, ComponentValidationError};
 
 mod command;
+mod command_options;
 
 pub(crate) use command::validate_command_list;
 pub use command::{CommandDefinition, CommandDefinitionError};
+pub use command_options::{
+    CommandOption, CommandOptionChoice, CommandOptionError, CommandOptionType,
+    ParsedCommandOptions,
+};
 
 mod embed;
 
