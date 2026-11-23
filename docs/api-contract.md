@@ -165,6 +165,12 @@ Send payload fields documented: `content`, `reply_to`, `embeds`, `components`. C
 
 The developer guide does not describe ordinary message-file uploads in its bot message endpoint summary. The Python source implements multipart attachments, sticker IDs, nonce handling and a Components V2 send format. Treat those as unverified extensions until the detailed API schema or live test-bot calls confirm them.
 
+### Signed event webhooks
+
+When a bot is hosted behind a public HTTPS URL, Yapper can POST the same events configured for polling. The request carries `X-Yapper-Bot` and `X-Yapper-Signature: sha256=<hex HMAC-SHA256 of the raw request body>`, keyed with the webhook secret from Settings → Developer → Advanced. The envelope is `{ "id": 1234, "event": "message", "data": { ... } }`; it uses `event` rather than the polling envelope's `type`. Yapper waits three seconds for HTTP 200 and does not retry failed deliveries. The ID is shared with polling, so use event-ID deduplication and keep polling as a recovery path when missing events is unacceptable.
+
+Yapcore's `verify_event_webhook(secret, raw_body, signature_header)` validates the HMAC before parsing the envelope and converts it to the common `EventEnvelope` model. It deliberately does not run an HTTP server, choose a web framework, send the 200 response, or maintain a cross-transport deduplication store. The caller must pass the original, unmodified raw body to the verifier.
+
 ### Lifecycle error callbacks
 
 The SDK surface also exposes an `error` callback for runtime and handler failures. Yapcore reports these through `Bot::on_error`, using an `ErrorEvent` with a stage, optional event ID/type, command name or button custom ID, and the error message. Failures inside an error callback are logged and are not recursively reported.
