@@ -35,6 +35,15 @@ pub trait Cog: Send + Sync {
     /// Stable lowercase identifier for this cog.
     fn name(&self) -> &str;
 
+    /// Return whether this command invocation is allowed by the cog.
+    ///
+    /// The check runs before any command owned by this cog, for both prefix
+    /// and slash invocations. Returning false silently skips the command.
+    /// Override this to share one authorization rule across the cog's commands.
+    fn check(&self, _context: &crate::commands::CommandContext) -> bool {
+        true
+    }
+
     /// Register this cog's handlers on the supplied bot.
     ///
     /// Return an error string when any required registration fails. Yapcore
