@@ -65,7 +65,10 @@ pub struct Presence {
 impl Presence {
     /// Start a presence with an explicit online state.
     pub fn new(status: BotStatus) -> Self {
-        Self { status, activity: None }
+        Self {
+            status,
+            activity: None,
+        }
     }
 
     /// Start an online presence.
@@ -147,14 +150,31 @@ mod tests {
             Some(&serde_json::json!({ "enabled": true }))
         );
     }
+
     #[test]
     fn formats_and_validates_activity_lines() {
         let activity = Activity::playing("Minecraft").unwrap();
         assert_eq!(activity.as_str(), "Playing Minecraft");
-        assert_eq!(Activity::new("x".repeat(60)).unwrap().as_str().chars().count(), 60);
-        assert!(matches!(Activity::new(" "), Err(crate::error::Error::EmptyBotActivity)));
-        assert!(matches!(Activity::new("x".repeat(61)), Err(crate::error::Error::BotActivityTooLong { actual: 61 })));
-        assert!(matches!(Activity::playing("x".repeat(53)), Err(crate::error::Error::BotActivityTooLong { actual: 61 })));
+        assert_eq!(
+            Activity::new("x".repeat(60))
+                .unwrap()
+                .as_str()
+                .chars()
+                .count(),
+            60
+        );
+        assert!(matches!(
+            Activity::new(" "),
+            Err(crate::error::Error::EmptyBotActivity)
+        ));
+        assert!(matches!(
+            Activity::new("x".repeat(61)),
+            Err(crate::error::Error::BotActivityTooLong { actual: 61 })
+        ));
+        assert!(matches!(
+            Activity::playing("x".repeat(53)),
+            Err(crate::error::Error::BotActivityTooLong { actual: 61 })
+        ));
     }
 
     #[test]
