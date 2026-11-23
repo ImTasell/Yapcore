@@ -3269,4 +3269,88 @@ mod tests {
         assert_eq!(payload["user_id"], USER_ID);
     }
 
+    #[tokio::test]
+    async fn lists_registered_commands() {
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "commands": [
+                    { "name": "ping", "description": "Check latency" },
+                    { "name": "help", "description": "Show help" }
+                ]
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 1024).await;
+        let commands = client.list_commands().await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with("GET /api/bot/v1/commands HTTP/1.1"));
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[0].name(), "ping");
+        assert_eq!(commands[1].name(), "help");
+    }
+
+    #[tokio::test]
+    async fn retries_a_429_only_when_retry_after_is_present() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server_thread = thread::spawn(move || {
+            for (status, body, retry_after) in [
+                (429, r#"{ "error": "slow down" }"#, Some("0")),
+                (200, r#"{ "username": "retry-ok" }"#, None),
+            ] {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut bytes = Vec::new();
+                let mut buffer = [0_u8; 512];
+                loop {
+                    let read = stream.read(&mut buffer).unwrap();
+                    if read == 0 { break; }
+                    bytes.extend_from_slice(&buffer[..read]);
+                    if bytes.windows(4).any(|window| window == b"\r\n\r\n") { break; }
+                }
+                let reason = if status == 429 { "Too Many Requests" } else { "OK" };
+                let mut response = format!(
+                    "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n",
+                    body.len()
+                );
+                if let Some(delay) = retry_after {
+                    response.push_str(&format!("Retry-After: {delay}\r\n"));
+                }
+                response.push_str("\r\n");
+                response.push_str(body);
+                stream.write_all(response.as_bytes()).unwrap();
+            }
+        });
+
+        let config = Config::builder()
+            .token("yb_test-token")
+            .api_base_url(format!("http://{address}/api/bot/v1"))
+            .allow_insecure_http_for_tests(true)
+            .build()
+            .unwrap();
+        let client = ApiClient::new(config).unwrap();
+        let profile = client.get_me().await.unwrap();
+        server_thread.join().unwrap();
+        assert_eq!(profile.username.as_deref(), Some("retry-ok"));
+    }
+
+    #[tokio::test]
+    async fn does_not_retry_a_429_without_retry_after() {
+        let server = LocalMockServer::start(
+            429,
+            &[],
+            r#"{ "error": "not retryable" }"#.to_owned(),
+        );
+        let client = test_client(&server, 1024).await;
+        let error = client.get_me().await.unwrap_err();
+        let request = server.finish();
+        assert!(request.starts_with("GET /api/bot/v1/me HTTP/1.1"));
+        assert!(matches!(error, Error::Api(api) if api.retry_after().is_none()));
+    }
+
 }
