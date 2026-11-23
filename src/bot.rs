@@ -509,7 +509,9 @@ impl Bot {
         channel_id: &ChannelId,
         user_id: &UserId,
     ) -> Result<Value> {
-        self.api.get_channel_member_permissions(channel_id, user_id).await
+        self.api
+            .get_channel_member_permissions(channel_id, user_id)
+            .await
     }
 
     /// List channel permission overrides (experimental API route).
@@ -525,7 +527,9 @@ impl Bot {
         allow: &[String],
         deny: &[String],
     ) -> Result<Value> {
-        self.api.set_channel_permissions(channel_id, target, allow, deny).await
+        self.api
+            .set_channel_permissions(channel_id, target, allow, deny)
+            .await
     }
 
     /// Clear a channel permission override (experimental API route).
@@ -543,7 +547,9 @@ impl Bot {
         server_id: &crate::ids::ServerId,
         permissions: &Value,
     ) -> Result<Value> {
-        self.api.set_everyone_permissions(server_id, permissions).await
+        self.api
+            .set_everyone_permissions(server_id, permissions)
+            .await
     }
 
     /// Set a category permission override (experimental API route).
@@ -555,7 +561,9 @@ impl Bot {
         allow: &[String],
         deny: &[String],
     ) -> Result<Value> {
-        self.api.set_category_permissions(server_id, category_id, target, allow, deny).await
+        self.api
+            .set_category_permissions(server_id, category_id, target, allow, deny)
+            .await
     }
 
     /// Clear a category permission override (experimental API route).
@@ -565,7 +573,9 @@ impl Bot {
         category_id: &crate::ids::CategoryId,
         target: &PermissionTarget,
     ) -> Result<()> {
-        self.api.clear_category_permissions(server_id, category_id, target).await
+        self.api
+            .clear_category_permissions(server_id, category_id, target)
+            .await
     }
 
     /// Fetch one public user profile.
