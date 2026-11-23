@@ -1,7 +1,7 @@
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::models::Button;
+use crate::models::{ActionRow, Button};
 
 /// Flag required when sending or editing a Components V2 layout message.
 pub const COMPONENTS_V2_FLAG: u64 = 1 << 15;
@@ -304,6 +304,8 @@ impl Container {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
 pub enum LayoutComponent {
+    /// Button action row.
+    ActionRow(ActionRow),
     /// Markdown text.
     TextDisplay(TextDisplay),
     /// Text section with an accessory.
@@ -316,6 +318,12 @@ pub enum LayoutComponent {
     FileDisplay(FileDisplay),
     /// Nested card/container.
     Container(Container),
+}
+
+impl From<ActionRow> for LayoutComponent {
+    fn from(value: ActionRow) -> Self {
+        Self::ActionRow(value)
+    }
 }
 
 impl From<TextDisplay> for LayoutComponent {
