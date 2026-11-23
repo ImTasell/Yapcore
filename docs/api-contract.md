@@ -22,6 +22,35 @@
 
 Yapcore's `edit_me`, avatar and banner operations, DM open/send, voice state methods, and `GET /commands` reader are implemented and mock-tested. Avatar/banner uploads support both raw image bodies and multipart form requests using the documented `file` field. Do not use the Python package's alternate configured hostnames as the Rust default. Its current source names `https://bots.yapper.website/api/bot/v1` as `BASE` and `https://www.yapin.gg/api/bot/v1` as a fallback; the current public developer guide explicitly gives the `www.yapper.website` base above. Any compatibility host should be added only after independent verification.
 
+## Typed command arguments
+
+Prefix commands can opt into local typed parsing without changing the documented remote command registration payload:
+
+~~~rust
+use yapcore::{CommandOption};
+
+bot.command_with_options(
+    "profile",
+    "Update a profile",
+    vec![
+        CommandOption::string("display_name", "New display name")?.required(true),
+        CommandOption::integer("age", "Age in years")?,
+        CommandOption::boolean("public", "Make the profile public")?,
+        CommandOption::user("member", "Target member")?,
+    ],
+    |context| async move {
+        let options = context.options().expect("typed schema was registered");
+        let name = options.get_string("display_name").unwrap();
+        let age = options.get_integer("age");
+        let public = options.get_boolean("public").unwrap_or(false);
+        context.reply(format!("Updating {name}; age={age:?}; public={public}")).await?;
+        Ok(())
+    },
+)?;
+~~~
+
+Options support string, integer, number, boolean, user ID, channel ID and role ID values; required flags; up to 25 typed choices; positional arguments; named `name=value` arguments; and single/double-quoted values. User/channel/role values remain opaque strings. Invalid, duplicate, missing or unknown arguments fail validation before the handler runs. This is a local prefix-argument parser only: publishing structured option metadata and parsing the platform's structured slash-command payload remain unverified until the upstream wire contract is confirmed.
+
 ## 2. Documented endpoint inventory
 
 The following is the human-readable REST endpoint index as exposed by the developer guide. Path parameters are shown in braces for readability; actual routes use their ID values.
