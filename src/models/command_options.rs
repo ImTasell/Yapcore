@@ -222,13 +222,31 @@ impl ParsedCommandOptions {
         self.values.get(name)?.as_bool()
     }
 
+    /// Return a validated Yapper user ID.
+    pub fn get_user(&self, name: &str) -> Option<crate::ids::UserId> {
+        crate::ids::UserId::new(self.get_string(name)?.to_owned()).ok()
+    }
+
+    /// Return a validated Yapper channel ID.
+    pub fn get_channel(&self, name: &str) -> Option<crate::ids::ChannelId> {
+        crate::ids::ChannelId::new(self.get_string(name)?.to_owned()).ok()
+    }
+
+    /// Return a validated Yapper role ID.
+    pub fn get_role(&self, name: &str) -> Option<crate::ids::RoleId> {
+        crate::ids::RoleId::new(self.get_string(name)?.to_owned()).ok()
+    }
+
     /// Return the complete parsed value map.
     pub fn as_map(&self) -> &BTreeMap<String, Value> { &self.values }
 }
 
 fn parse_value(kind: CommandOptionType, raw: &str) -> Result<Value, CommandOptionError> {
     match kind {
-        CommandOptionType::String | CommandOptionType::User | CommandOptionType::Channel | CommandOptionType::Role => Ok(Value::String(raw.to_owned())),
+        CommandOptionType::String => Ok(Value::String(raw.to_owned())),
+        CommandOptionType::User => crate::ids::UserId::new(raw.to_owned()).map(|id| Value::String(id.into_string())).map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
+        CommandOptionType::Channel => crate::ids::ChannelId::new(raw.to_owned()).map(|id| Value::String(id.into_string())).map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
+        CommandOptionType::Role => crate::ids::RoleId::new(raw.to_owned()).map(|id| Value::String(id.into_string())).map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
         CommandOptionType::Integer => raw.parse::<i64>().map(Value::from).map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
         CommandOptionType::Number => {
             let number = raw.parse::<f64>().map_err(|_| CommandOptionError::InvalidValue(raw.to_owned()))?;
