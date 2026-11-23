@@ -2190,6 +2190,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn button_handler_can_open_a_typed_modal() {
+        let server = CallbackServer::start();
+        let mut bot = test_bot(&server);
+
+        bot.on_button("apply", |context| async move {
+            let modal = crate::models::Modal::new(
+                "application",
+                "Apply",
+                [crate::models::TextInput::paragraph("why", "Why?")?],
+            )
+            .map_err(|error| -> crate::HandlerError { Box::new(error) })?;
+            context
+                .show_modal(&modal)
+                .await
+                .map_err(|error| -> crate::HandlerError { Box::new(error) })?;
+            Ok(())
+        })
+        .unwrap();
+
+        bot.dispatch_event(&button_interaction_event("apply"), None)
+            .await
+            .unwrap();
+
+        let request = server.finish();
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["type"], "modal");
+        assert_eq!(payload["modal"]["custom_id"], "application");
+        assert_eq!(payload["modal"]["components"][0]["custom_id"], "why");
+        assert_eq!(payload["modal"]["components"][0]["type"], "text_input");
+    }
+
+    #[tokio::test]
     async fn dispatches_select_submission_with_selected_values() {
         use std::sync::{Arc, Mutex};
 
