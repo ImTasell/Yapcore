@@ -106,7 +106,7 @@ Rust API should favor explicit typed command registration and async handlers. It
 | [~] Documented | Interaction expiry and answer count limits | Enforces ten-response cap and auto-ack margin; explicit expires_at tracking remains |
 | [x] Verify | Select menu handlers | `Bot::on_select` dispatches `type: select` submissions and preserves selected values in `InteractionContext::values`; source-parity implementation, public schema/live verification still pending |
 | [x] Verify | Modal submission handlers | `Bot::on_modal` dispatches `type: modal_submit` and preserves submitted field values as JSON; source-parity implementation, public schema/live verification still pending |
-| [x] Verify | Modal and text-input builders / opening modals | `Modal`, `TextInput`, and `InteractionContext::show_modal` provide typed modal responses; schema/live verification remains pending |
+| [x] Verify | Modal and text-input builders / opening modals | `Modal`, `TextInput`, `InteractionContext::show_modal`, and `CommandContext::show_modal` provide typed modal responses; schema/live verification remains pending |
 | [ ] Verify | Components V2 layouts | Present in Python source; confirm official schema before finalizing |
 | [x] Documented | Unknown message/event JSON fields | Preserve unknown fields in message models and raw event payloads |
 
