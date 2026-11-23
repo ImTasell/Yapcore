@@ -3278,6 +3278,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn uploads_profile_images_with_the_multipart_file_field() {
+        let avatar = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "path": "avatar/multipart.png",
+                "url": "https://files.yapper.website/avatars/avatar/multipart.png"
+            })
+            .to_string(),
+        );
+        let client = test_client(&avatar, 1024).await;
+        let asset = client
+            .set_avatar_multipart(b"avatar-image", ImageFormat::Png)
+            .await
+            .unwrap();
+        let request = avatar.finish();
+        assert!(request.starts_with("PUT /api/bot/v1/me/avatar HTTP/1.1"));
+        assert!(
+            request
+                .to_ascii_lowercase()
+                .contains("content-type: multipart/form-data; boundary=")
+        );
+        assert!(request.contains("name=\"file\""));
+        assert!(request.contains("filename=\"avatar.png\""));
+        assert!(request.contains("Content-Type: image/png"));
+        assert!(request.contains("avatar-image"));
+        assert_eq!(asset.path, "avatar/multipart.png");
+
+        let banner = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "path": "banner/multipart.webp",
+                "url": "https://files.yapper.website/banners/banner/multipart.webp"
+            })
+            .to_string(),
+        );
+        let client = test_client(&banner, 1024).await;
+        let asset = client
+            .set_banner_multipart(b"banner-image", ImageFormat::Webp)
+            .await
+            .unwrap();
+        let request = banner.finish();
+        assert!(request.starts_with("PUT /api/bot/v1/me/banner HTTP/1.1"));
+        assert!(request.contains("name=\"file\""));
+        assert!(request.contains("filename=\"banner.webp\""));
+        assert!(request.contains("Content-Type: image/webp"));
+        assert!(request.contains("banner-image"));
+        assert_eq!(asset.path, "banner/multipart.webp");
+    }
+
+    #[tokio::test]
     async fn rejects_invalid_profile_and_image_uploads_before_networking() {
         let config = Config::builder().token("yb_test-token").build().unwrap();
         let client = ApiClient::new(config).unwrap();
