@@ -1,5 +1,9 @@
+use std::collections::HashSet;
+
 use serde::Serialize;
 use thiserror::Error;
+
+use super::{ComponentValidationError, SelectMenu};
 
 /// Supported initial interaction callback types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -136,23 +140,78 @@ impl TextInput {
     }
 }
 
+/// A component that can appear directly inside a modal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(untagged)]
+pub enum ModalComponent {
+    /// A single-line or paragraph text field.
+    TextInput(TextInput),
+    /// A dropdown field. It must have a label set with SelectMenu::label.
+    SelectMenu(SelectMenu),
+}
+
+impl From<TextInput> for ModalComponent {
+    fn from(value: TextInput) -> Self {
+        Self::TextInput(value)
+    }
+}
+
+impl From<SelectMenu> for ModalComponent {
+    fn from(value: SelectMenu) -> Self {
+        Self::SelectMenu(value)
+    }
+}
+
+impl ModalComponent {
+    fn validate(&self) -> Result<(), ModalValidationError> {
+        match self {
+            Self::TextInput(input) => {
+                if input.custom_id.is_empty() || input.custom_id.chars().count() > 100 {
+                    return Err(ModalValidationError::InvalidCustomId);
+                }
+                if input.label.is_empty() {
+                    return Err(ModalValidationError::EmptyLabel);
+                }
+            }
+            Self::SelectMenu(menu) => {
+                menu.validate()?;
+                if !menu.label.as_deref().is_some_and(|label| !label.is_empty()) {
+                    return Err(ModalValidationError::SelectMissingLabel);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn custom_id(&self) -> &str {
+        match self {
+            Self::TextInput(input) => &input.custom_id,
+            Self::SelectMenu(menu) => menu.custom_id(),
+        }
+    }
+}
+
 /// A modal form that can be opened as an interaction's first response.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Modal {
     custom_id: String,
     title: String,
-    components: Vec<TextInput>,
+    components: Vec<ModalComponent>,
 }
 
 impl Modal {
-    /// Create a modal from up to five text inputs.
-    pub fn new<I>(
+    /// Create a modal from up to five text or select inputs.
+    ///
+    /// Existing arrays of TextInput remain supported. To mix field kinds,
+    /// pass a collection of ModalComponent values.
+    pub fn new<I, T>(
         custom_id: impl Into<String>,
         title: impl Into<String>,
         inputs: I,
     ) -> Result<Self, ModalValidationError>
     where
-        I: IntoIterator<Item = TextInput>,
+        I: IntoIterator<Item = T>,
+        T: Into<ModalComponent>,
     {
         let custom_id = custom_id.into();
         if custom_id.is_empty() || custom_id.chars().count() > 100 {
@@ -162,12 +221,21 @@ impl Modal {
         if title.is_empty() {
             return Err(ModalValidationError::EmptyTitle);
         }
-        let components = inputs.into_iter().collect::<Vec<_>>();
+        let components = inputs.into_iter().map(Into::into).collect::<Vec<_>>();
         if components.len() > 5 {
             return Err(ModalValidationError::TooManyInputs {
                 actual: components.len(),
             });
         }
+
+        let mut custom_ids = HashSet::new();
+        for component in &components {
+            component.validate()?;
+            if !custom_ids.insert(component.custom_id()) {
+                return Err(ModalValidationError::DuplicateInputCustomId);
+            }
+        }
+
         Ok(Self {
             custom_id,
             title,
@@ -198,6 +266,15 @@ pub enum ModalValidationError {
     /// Text-input lengths must be at most 4000 and min must not exceed max.
     #[error("text-input lengths must be at most 4000 and minimum must not exceed maximum")]
     InvalidLength,
+    /// A select field in a modal must have a non-empty label.
+    #[error("a select field in a modal must have a non-empty label")]
+    SelectMissingLabel,
+    /// Input custom IDs must be unique within a modal.
+    #[error("modal input custom IDs must be unique")]
+    DuplicateInputCustomId,
+    /// A select menu violates its component constraints.
+    #[error(transparent)]
+    Component(#[from] ComponentValidationError),
 }
 
 #[cfg(test)]
@@ -230,6 +307,58 @@ mod tests {
         assert_eq!(value["components"][0]["required"].as_bool(), Some(true));
         assert_eq!(value["components"][1]["style"], "paragraph");
         assert_eq!(value["components"][1]["max_length"], 4000);
+    }
+
+    #[test]
+    fn serializes_select_fields_inside_a_modal_without_a_row_wrapper() {
+        let select = SelectMenu::new("plan")
+            .unwrap()
+            .option(crate::models::SelectOption::new("Free", "free").unwrap())
+            .unwrap()
+            .option(crate::models::SelectOption::new("Pro", "pro").unwrap())
+            .unwrap()
+            .label("Choose a plan")
+            .required(false)
+            .description("Pick the tier for this account");
+
+        let modal = Modal::new(
+            "settings",
+            "Account settings",
+            vec![
+                ModalComponent::TextInput(TextInput::short("name", "Display name").unwrap()),
+                ModalComponent::SelectMenu(select),
+            ],
+        )
+        .unwrap();
+
+        let value = serde_json::to_value(modal).unwrap();
+        let field = &value["components"][1];
+        assert_eq!(field["type"], "select");
+        assert_eq!(field["custom_id"], "plan");
+        assert_eq!(field["label"], "Choose a plan");
+        assert_eq!(field["required"], false);
+        assert_eq!(field["description"], "Pick the tier for this account");
+        assert_eq!(field["options"][0]["value"], "free");
+        assert!(field.get("components").is_none());
+    }
+
+    #[test]
+    fn rejects_modal_selects_without_labels_and_duplicate_field_ids() {
+        let unlabeled = SelectMenu::new("plan")
+            .unwrap()
+            .option(crate::models::SelectOption::new("Free", "free").unwrap())
+            .unwrap();
+        assert!(matches!(
+            Modal::new("settings", "Settings", [unlabeled]),
+            Err(ModalValidationError::SelectMissingLabel)
+        ));
+
+        let first = TextInput::short("same", "First").unwrap();
+        let second = TextInput::short("same", "Second").unwrap();
+        assert!(matches!(
+            Modal::new("settings", "Settings", [first, second]),
+            Err(ModalValidationError::DuplicateInputCustomId)
+        ));
     }
 
     #[test]
