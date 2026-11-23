@@ -40,8 +40,9 @@ pub use models::{
     ChannelListing, ChannelType, CommandDefinition, CommandDefinitionError,
     ComponentValidationError, Embed, EmbedAuthor, EmbedBuilder, EmbedField, EmbedFooter,
     EmbedValidationError, EventBatch, EventEnvelope, ImageAsset, ImageFormat,
-    InteractionResponseType, Member, Message, PermissionTarget, Presence, Role, RoleEditOptions,
-    Server, UserProfile, VoiceChannelState,
+    InteractionResponseType, Member, Message, Modal, ModalValidationError, PermissionTarget,
+    Presence, Role, RoleEditOptions, Server, TextInput, TextInputStyle, UserProfile,
+    VoiceChannelState,
 };
 
 pub use webhooks::{EventWebhook, WebhookVerificationError, verify_event_webhook};
