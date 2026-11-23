@@ -198,6 +198,26 @@ The documented event schema is for button clicks (`type: "button"`). Interaction
 
 The current public guide documents buttons. It does not document the Python package's select-menu and modal-submit interaction paths in this endpoint summary; keep those behind an unverified/experimental boundary.
 
+Yapcore now exposes source-parity event handlers for those two upstream event types, without claiming they are part of the stable public API contract:
+
+```rust
+bot.on_select("food", |interaction| async move {
+    // A select submission exposes its selected values as a JSON array.
+    let selected = interaction.values().as_array().cloned().unwrap_or_default();
+    interaction.reply(format!("Selected: {selected:?}")).await?;
+    Ok(())
+})?;
+
+bot.on_modal("application", |interaction| async move {
+    // Modal values are preserved as JSON keyed by each input's custom ID.
+    let fields = interaction.values();
+    interaction.reply(format!("Received application fields: {fields}")).await?;
+    Ok(())
+})?;
+```
+
+These handlers are matched by both interaction kind and exact custom ID, so a button with the same ID cannot accidentally trigger a select or modal callback. Select values and modal field payloads are retained as raw JSON for forward compatibility. The upstream Python source describes these payloads, but the current official public interaction summary does not; treat the Rust support as experimental until the full schema or a live test bot confirms it.
+
 ### Generic authenticated API escape hatch
 
 The official SDKs expose `bot.api(method, path, body?)` for endpoints not wrapped by convenience methods. Yapcore exposes the same capability as `ApiClient::api` and `Bot::api`. The path is relative to the configured bot API base; absolute URLs, origin-relative paths, and traversal segments are rejected so the bot token cannot be redirected to an unrelated host. The response is returned as `serde_json::Value`.
