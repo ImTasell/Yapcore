@@ -114,7 +114,10 @@ impl CommandContext {
     pub fn parse_options(
         &self,
         schema: &[crate::models::CommandOption],
-    ) -> std::result::Result<crate::models::ParsedCommandOptions, crate::models::CommandOptionError> {
+    ) -> std::result::Result<
+        crate::models::ParsedCommandOptions,
+        crate::models::CommandOptionError,
+    > {
         crate::models::ParsedCommandOptions::parse(schema, &self.args)
     }
 
