@@ -41,7 +41,7 @@ Implementation status updated 2026-11-23. Stable REST primitives, prefix-command
 | [x] Documented | 429 / 503 Retry-After handling | Shared request layer retries 429/503 only when `Retry-After` is present; at most two retries, no transport-error replay |
 | [ ] Verify | Proxy retry/fallback behavior | Retry only when safe; never duplicate a message send |
 | [x] Documented | Configurable request timeout | Builder/config option; 40-second default |
-| [ ] Documented | Multipart/file sending | Bounded streaming upload; verify current per-file/total limits |
+| [~] Documented | Multipart profile image upload | Raw-body avatar/banner upload is implemented; multipart field `file` remains unimplemented. Message attachments are not in the published bot-message endpoint contract. |
 
 Retry safety rules:
 - GET can be retried for transient transport/server failures.
@@ -60,7 +60,7 @@ Retry safety rules:
 | [x] Documented | Optional `max_age` catch-up filter | `poll_events` validates one-day maximum |
 | [x] Documented | Ready lifecycle callback | Synthetic `ready` event after profile retrieval and command synchronization |
 | [x] Documented | Error lifecycle callback | `Bot::on_error` receives typed `ErrorEvent` values for fatal startup/poll failures and dispatch, listener, command and button-handler failures |
-| [ ] Documented | Event webhooks as a server-side delivery option | Not needed for normal outbound-only client; document as deployment mode |
+| [x] Documented | Event webhooks as a server-side delivery option | `verify_event_webhook` authenticates the raw body using the documented HMAC-SHA256 header and parses `EventWebhook`; the application owns its HTTPS receiver, fast acknowledgement and deduplication |
 | [ ] Verify | WebSocket gateway `wss://rt.yapper.website/bot` | Defer; current public guide does not document its protocol |
 | [x] Documented | Member, reaction, voice and test events | Generic `Bot::on_event` supports the documented `member_join`, `member_leave`, `reaction_add`, `reaction_remove`, `voice_join`, `voice_leave` and `test` envelopes |
 | [ ] Verify | Invite/channel/thread/category/message/server extra event kinds | Preserve unknown event payloads; add typed events only after endpoint confirmation |
@@ -157,7 +157,7 @@ All permission-dependent actions must return a useful structured 403 error. The 
 
 | Status | Python feature | Rust target |
 | --- | --- | --- |
-| [ ] Documented | Event webhooks (inbound HTTPS POST to user's server) | Documentation/reference only unless user wants a webhook server helper |
+| [x] Documented | Event webhooks (inbound HTTPS POST to user's server) | Reusable signature verifier and typed envelope are provided; no HTTP server framework is imposed on library users |
 | [ ] Verify | Bot-managed channel webhooks: create/list/send/delete | Validate source endpoints and permission requirements |
 | [ ] Verify | Webhook wrapper `send` and `delete` | Include after API confirmation |
 | [x] Documented | Voice presence, member move and disconnect | Typed `VoiceChannelState` plus REST lookup, move and disconnect methods; bots still cannot join audio calls |
