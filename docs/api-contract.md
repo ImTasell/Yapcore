@@ -332,6 +332,31 @@ bot.on_button("apply", |interaction| async move {
 
 A modal response is claimed atomically as the interaction's first answer; trying to open one after replying or acknowledging returns InteractionAlreadyAnswered. The same Modal/TextInput builder can be passed to CommandContext::show_modal for a slash-command invocation; prefix-command contexts return InteractionRequired. Modal-submit handlers may read their values and answer normally, but cannot open another modal.
 
+The upstream Python modal builder also accepts dropdown fields. Yapcore exposes that source-parity shape through `ModalComponent::SelectMenu`; use the same `SelectMenu` builder as a field by adding a modal label and optional required/description metadata. Mixed forms use a collection of `ModalComponent` values, while the original array-of-`TextInput` constructor remains source-compatible:
+
+```rust
+use yapcore::{Modal, ModalComponent, SelectMenu, SelectOption, TextInput};
+
+let plan = SelectMenu::new("plan")?
+    .option(SelectOption::new("Free", "free")?)?
+    .option(SelectOption::new("Pro", "pro")?)?
+    .label("Which plan?")
+    .required(true)
+    .description("Choose the plan for this account");
+
+let modal = Modal::new(
+    "account-settings",
+    "Account settings",
+    vec![
+        ModalComponent::TextInput(TextInput::short("display_name", "Display name")?),
+        ModalComponent::SelectMenu(plan),
+    ],
+)?;
+interaction.show_modal(&modal).await?;
+```
+
+Select fields are serialized directly as modal components (not wrapped in an action row) and require a non-empty label. They preserve the select menu's options, placeholder and min/max selection settings. This is based on the upstream Python SDK's modal/select builders; the public interaction guide still does not publish the schema, so treat it as experimental until confirmed against the OpenAPI document or a live test bot.
+
 ### Generic authenticated API escape hatch
 
 The official SDKs expose `bot.api(method, path, body?)` for endpoints not wrapped by convenience methods. Yapcore exposes the same capability as `ApiClient::api` and `Bot::api`. The path is relative to the configured bot API base; absolute URLs, origin-relative paths, and traversal segments are rejected so the bot token cannot be redirected to an unrelated host. The response is returned as `serde_json::Value`.
