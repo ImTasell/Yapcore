@@ -49,6 +49,12 @@ impl Activity {
         Self::new(format!("Playing {thing}"))
     }
 
+    /// Format a server-count activity line such as `Overviewing 12 servers`.
+    pub fn overviewing_servers(count: usize) -> crate::error::Result<Self> {
+        let unit = if count == 1 { "server" } else { "servers" };
+        Self::new(format!("Overviewing {count} {unit}"))
+    }
+
     /// Return the exact activity line sent to Yapper.
     pub fn as_str(&self) -> &str {
         &self.0
@@ -233,6 +239,13 @@ mod tests {
             Activity::playing("x".repeat(53)),
             Err(crate::error::Error::BotActivityTooLong { actual: 61 })
         ));
+    }
+
+    #[test]
+    fn formats_server_count_activities() {
+        assert_eq!(Activity::overviewing_servers(0).unwrap().as_str(), "Overviewing 0 servers");
+        assert_eq!(Activity::overviewing_servers(1).unwrap().as_str(), "Overviewing 1 server");
+        assert_eq!(Activity::overviewing_servers(12).unwrap().as_str(), "Overviewing 12 servers");
     }
 
     #[test]
