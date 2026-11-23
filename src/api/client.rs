@@ -1341,10 +1341,7 @@ impl ApiClient {
                     .header(CONTENT_TYPE, format.content_type())
                     .body(bytes.to_vec())
             };
-            let mut response = request
-                .send()
-                .await
-                .map_err(sanitize_transport_error)?;
+            let mut response = request.send().await.map_err(sanitize_transport_error)?;
 
             let status = response.status();
             let retry_after = parse_retry_after(response.headers().get(RETRY_AFTER));
