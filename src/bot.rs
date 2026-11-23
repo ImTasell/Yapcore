@@ -418,6 +418,34 @@ impl Bot {
         Ok(self)
     }
 
+    /// Register a command with a typed positional/named argument schema.
+    ///
+    /// Invalid arguments are rejected before the handler runs. Inside the
+    /// handler, use `context.options()` to read parsed values.
+    pub fn command_with_options<F, Fut>(
+        &mut self,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        options: Vec<crate::models::CommandOption>,
+        handler: F,
+    ) -> std::result::Result<&mut Self, crate::CommandDefinitionError>
+    where
+        F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        let schema = Arc::new(options);
+        self.command(name, description, move |context| {
+            let schema = schema.clone();
+            let context = context.with_option_schema(&schema);
+            async move {
+                let context = context.map_err(|error| -> crate::HandlerError {
+                    Box::new(error)
+                })?;
+                handler(context).await
+            }
+        })
+    }
+
     /// Register a button handler for one exact component custom ID.
     /// Register a command that runs only when its asynchronous check returns true.
     ///
