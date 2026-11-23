@@ -1990,4 +1990,100 @@ mod presence_rotation_tests {
             .await
             .expect("dropping the monitor handle should wake its task");
     }
+    #[tokio::test]
+    async fn refreshes_server_count_presence_from_the_server_list() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server_thread = thread::spawn(move || {
+            let responses = [
+                serde_json::json!({
+                    "servers": [
+                        { "name": "One" },
+                        { "name": "Two" },
+                        { "name": "Three" }
+                    ]
+                })
+                .to_string(),
+                r#"{ "ok": true }"#.to_owned(),
+            ];
+            let mut requests = Vec::new();
+
+            for body in responses {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                let mut bytes = Vec::new();
+                let mut buffer = [0_u8; 1024];
+                let mut expected = None;
+
+                loop {
+                    let read = stream.read(&mut buffer).unwrap();
+                    if read == 0 {
+                        break;
+                    }
+                    bytes.extend_from_slice(&buffer[..read]);
+                    if expected.is_none() {
+                        if let Some(position) = bytes
+                            .windows(4)
+                            .position(|window| window == b"\r\n\r\n")
+                        {
+                            let headers = String::from_utf8_lossy(&bytes[..position]);
+                            let length = headers
+                                .lines()
+                                .find_map(|line| {
+                                    let (name, value) = line.split_once(':')?;
+                                    name.eq_ignore_ascii_case("content-length")
+                                        .then(|| value.trim().parse::<usize>().ok())
+                                        .flatten()
+                                })
+                                .unwrap_or(0);
+                            expected = Some(position + 4 + length);
+                        }
+                    }
+                    if expected.is_some_and(|length| bytes.len() >= length) {
+                        break;
+                    }
+                }
+
+                requests.push(String::from_utf8_lossy(&bytes).into_owned());
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                stream.write_all(response.as_bytes()).unwrap();
+            }
+
+            requests
+        });
+
+        let base_url = format!("http://{address}/api/bot/v1");
+        let bot = Bot::builder()
+            .token("yb_test-token")
+            .api_base_url(base_url)
+            .allow_insecure_http_for_tests(true)
+            .build()
+            .unwrap();
+
+        let count = bot
+            .refresh_server_count_presence(BotStatus::Online)
+            .await
+            .unwrap();
+        assert_eq!(count, 3);
+
+        let requests = server_thread.join().unwrap();
+        assert!(requests[0].starts_with("GET /api/bot/v1/servers HTTP/1.1"));
+        assert!(requests[1].starts_with("PUT /api/bot/v1/me/status HTTP/1.1"));
+        let payload: Value = serde_json::from_str(
+            requests[1].split_once("\r\n\r\n").unwrap().1,
+        )
+        .unwrap();
+        assert_eq!(payload["status"], "online");
+        assert_eq!(payload["activity"], "Overviewing 3 servers");
+    }
 }
