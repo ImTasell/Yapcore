@@ -277,7 +277,6 @@ impl Bot {
         self.api.get_channel(channel_id).await
     }
 
-
     /// Create a text or voice channel in a server.
     pub async fn create_channel(
         &self,
