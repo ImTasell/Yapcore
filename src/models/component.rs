@@ -408,6 +408,11 @@ impl SelectMenu {
         &self.custom_id
     }
 
+    /// The optional field label used when this menu is embedded in a modal.
+    pub(crate) fn modal_label(&self) -> Option<&str> {
+        self.label.as_deref()
+    }
+
     /// Re-check select menu constraints before serialization.
     pub fn validate(&self) -> Result<(), ComponentValidationError> {
         if self.custom_id.is_empty() || self.custom_id.chars().count() > 100 {
