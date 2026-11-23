@@ -690,7 +690,7 @@ impl Bot {
                         };
 
                         if let Err(error) = result {
-                            log_error!(self.logging,error = %error, "activity rotation stopped after a presence update failed");
+                            log_error!(logging, error = %error, "activity rotation stopped after a presence update failed");
                             return Err(error);
                         }
                     }
@@ -779,7 +779,7 @@ impl Bot {
                             result = api.list_servers() => match result {
                                 Ok(servers) => servers,
                                 Err(error) => {
-                                    log_warn!(self.logging,error = %error, "could not refresh server count for bot presence");
+                                    log_warn!(logging, error = %error, "could not refresh server count for bot presence");
                                     continue;
                                 }
                             },
@@ -811,7 +811,7 @@ impl Bot {
 
                         match result {
                             Ok(_) => last_count = count,
-                            Err(error) => tracing::warn!(error = %error, "could not publish updated server count presence; will retry"),
+                            Err(error) => log_warn!(logging, error = %error, "could not publish updated server count presence; will retry"),
                         }
                     }
                 }
