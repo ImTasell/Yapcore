@@ -53,7 +53,28 @@ bot.set_presence(&presence).await?;
 
 `Activity::playing` formats ordinary display text (for example, `Playing Minecraft`). Yapper currently accepts one activity line, not Discord-style structured game metadata. Presence can be changed while the bot is running by calling `set_presence` again.
 
-For automatic rotation, create an `ActivityRotation` with at least two validated activities and a non-zero interval, then pass it to `bot.rotate_presence(rotation).await?`. The first activity is applied immediately; the remaining entries cycle in order. Dropping the returned `PresenceRotationHandle`, calling `cancel()` or awaiting `stop()` cancels the task. Cancelling the bot's `ShutdownHandle` also stops the rotation. A failed API update stops the task and is returned by `stop().await`.
+For automatic rotation, create an `ActivityRotation` with at least two validated activities and a non-zero interval, then pass it to `bot.rotate_presence(rotation).await?`. The first activity is applied immediately; the remaining entries cycle in order.
+
+```rust
+use std::time::Duration;
+use yapcore::{Activity, ActivityRotation, BotStatus};
+
+let rotation = ActivityRotation::new(
+    [
+        Activity::playing("Minecraft")?,
+        Activity::new("Monitoring servers")?,
+        Activity::new("Keeping the community safe")?,
+    ],
+    Duration::from_secs(30),
+)?
+.status(BotStatus::Online);
+
+let rotation_handle = bot.rotate_presence(rotation).await?;
+// Keep the bot running, then cleanly stop the rotation when appropriate.
+rotation_handle.stop().await?;
+```
+
+Dropping the returned `PresenceRotationHandle` or calling `cancel()` requests cancellation; awaiting `stop()` cancels and waits for the task, returning any API update error. Cancellation wakes the timer or interrupts an in-flight status request. Cancelling the bot's `ShutdownHandle` also stops the rotation.
 
 ### Event polling
 | Method | Route | Contract |
