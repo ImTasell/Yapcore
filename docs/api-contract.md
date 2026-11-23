@@ -53,6 +53,8 @@ bot.set_presence(&presence).await?;
 
 `Activity::playing` formats ordinary display text (for example, `Playing Minecraft`). Yapper currently accepts one activity line, not Discord-style structured game metadata. Presence can be changed while the bot is running by calling `set_presence` again.
 
+For automatic rotation, create an `ActivityRotation` with at least two validated activities and a non-zero interval, then pass it to `bot.rotate_presence(rotation).await?`. The first activity is applied immediately; the remaining entries cycle in order. Dropping the returned `PresenceRotationHandle`, calling `cancel()` or awaiting `stop()` cancels the task. Cancelling the bot's `ShutdownHandle` also stops the rotation. A failed API update stops the task and is returned by `stop().await`.
+
 ### Event polling
 | Method | Route | Contract |
 | --- | --- | --- |
