@@ -1,11 +1,11 @@
 # Yapper bot API contract
 
-**Audit date:** 2026-11-21  
+**Audit date:** 2026-11-23  
 **Primary reference:** [Yapper developer guide](https://www.yapper.website/developers) (page last updated 18 October 2026)  
 **Python comparison target:** [our-websites/yapper.py](https://github.com/our-websites/yapper.py), default branch `main`  
 **Purpose:** record the public HTTP/event contract Yapcore should implement, and separate confirmed platform behavior from extra Python SDK behavior.
 
-> **Contract source note:** The developer guide links an OpenAPI 3.1 file at [`/openapi.json`](https://www.yapper.website/openapi.json) and a detailed API reference at [`/developers/api`](https://www.yapper.website/developers/api). Those machine-readable/detail URLs could not be retrieved through the available research browser during this pass. This document therefore captures the human-readable endpoint reference, constraints and examples currently rendered in the developer guide, then compares them with the Python source. It is a strong implementation baseline, but the raw OpenAPI document and live test-bot responses should still be checked before declaring schema parity complete.
+> **Contract source note:** The current developer guide and linked OpenAPI 3.1 document at [`/openapi.json`](https://www.yapper.website/openapi.json) were retrieved and compared on 2026-11-23, alongside the detailed API reference at [`/developers/api`](https://www.yapper.website/developers/api). This is the current documented contract baseline. No live request was made with a dedicated test bot, so endpoint behavior is covered by mock-server tests but has not yet been smoke-tested against a real Yapper bot.
 
 ## 1. Connection and authentication
 
@@ -20,7 +20,7 @@
 | Default event transport | Long polling; no public URL or port forwarding required |
 | Optional event delivery | Signed HTTPS webhook configured in the Developer settings; polling may run alongside it |
 
-Do not use the Python package's alternate configured hostnames as the Rust default. Its current source names `https://bots.yapper.website/api/bot/v1` as `BASE` and `https://www.yapin.gg/api/bot/v1` as a fallback; the current public developer guide explicitly gives the `www.yapper.website` base above. Any compatibility host should be added only after independent verification.
+Yapcore's `edit_me`, avatar and banner operations, DM open/send, voice state methods, and `GET /commands` reader are implemented and mock-tested. Image uploads currently use raw request bodies rather than the optional multipart form. Do not use the Python package's alternate configured hostnames as the Rust default. Its current source names `https://bots.yapper.website/api/bot/v1` as `BASE` and `https://www.yapin.gg/api/bot/v1` as a fallback; the current public developer guide explicitly gives the `www.yapper.website` base above. Any compatibility host should be added only after independent verification.
 
 ## 2. Documented endpoint inventory
 
@@ -32,15 +32,15 @@ The following is the human-readable REST endpoint index as exposed by the develo
 | --- | --- | --- |
 | GET | `/me` | Current bot profile/settings; includes avatar/banner URLs and bot metadata |
 | PATCH | `/me` | `display_name` (max 32) and/or `bio` (max 190) |
-| PUT | `/me/avatar` | Raw image body with image Content-Type or multipart field `file`; max 8 MB |
+| PUT | `/me/avatar` | Raw image body with image Content-Type or multipart field `file`; max 8 MB. Yapcore supports raw image bodies and validates the limit locally. |
 | DELETE | `/me/avatar` | Remove avatar |
-| PUT | `/me/banner` | Raw image or multipart field `file`; max 10 MB |
+| PUT | `/me/banner` | Raw image or multipart field `file`; max 10 MB. Yapcore supports raw image bodies and validates the limit locally. |
 | DELETE | `/me/banner` | Remove banner |
 | PUT | `/me/status` | `{ "status": "online" | "idle" | "dnd", "activity": "..." }`; activity max 60. Implemented as `Bot::set_status` and typed `Bot::set_presence`; this is HTTP bot presence, not Discord RPC/IPC. |
-| GET | `/commands` | Read registered commands |
+| GET | `/commands` | Read registered commands; exposed as `Bot::list_commands`. |
 | PUT | `/commands` | Replace the entire command list: `{ "commands": [{ "name": "ping", "description": "..." }] }` |
 
-Command registration constraints: the current official guide says up to 50 commands; names are 1–32 lowercase letters, numbers, hyphens or underscores; descriptions max 100 characters; names must be unique. The Python upstream source allows 100 locally (`COMMAND_LIMIT = 100`), which exceeds the documented platform cap. Yapcore deliberately validates to 50. Since PUT replaces the whole list, Yapcore must send the complete registry, not one command at a time.
+Command registration constraints: the current official guide and OpenAPI schema allow up to 100 commands; names are 1–32 lowercase letters, numbers, hyphens or underscores; descriptions max 100 characters; names must be unique. The Python upstream source also allows 100 locally. Yapcore validates to the documented 100-command cap. `GET /commands` reads the current registration; `PUT /commands` replaces the entire list, so Yapcore synchronizes the complete registry rather than one command at a time.
 
 Typed presence example:
 
@@ -299,12 +299,13 @@ The public guide documents these statuses:
 The documented error body is `{ "error": "..." }`. A 429 with `Retry-After` is safe to retry after the specified wait. A 429 without that header may represent a non-retryable condition (for example, duplicate/saturated interaction answers), so do not blindly retry. A 503 with `Retry-After` means the request was not performed and is safe to retry after the wait.
 
 **Rust retry policy:**
-1. Retry GET on transient transport failures using bounded backoff.
-2. For 429, retry only when the server gives a usable Retry-After and the operation is documented as retryable.
-3. For 503, retry only when Retry-After is provided.
-4. Do not automatically replay side-effecting POST requests unless the endpoint explicitly provides a server-supported idempotency key or the response proves the request was not performed.
-5. Preserve status, parsed API message, Retry-After and raw response body in the public error where practical.
-6. Never log the bot token, interaction token or event-webhook secret.
+1. Yapcore retries HTTP 429 and 503 responses only when a valid `Retry-After` value is present.
+2. Retries wait for the server-provided delay and are bounded to two retries per request.
+3. A 429 without `Retry-After` is returned immediately.
+4. Transport failures are not automatically replayed; there is no blanket retry of requests whose delivery outcome is unknown.
+5. The same bounded Retry-After policy is applied to raw avatar/banner uploads.
+6. Preserve status, parsed API message and Retry-After in the public error where practical.
+7. Never log the bot token, interaction token or event-webhook secret.
 
 The Python source has richer parsing assumptions (`code`, `permission`, nested error dictionaries) than the simple error envelope in the public guide. Preserve unknown error fields if present, but do not require undocumented properties to parse a normal API error.
 
@@ -394,7 +395,7 @@ The separate telemetry receiver/panel under upstream `server/` is not part of th
 - [ ] Run mock-server contract tests in CI and manual smoke tests using a dedicated test bot.
 - [ ] Keep all real bot credentials out of Git and test output.
 
-**No live API request was made for this audit.** It is based on the current published developer guide and the public Python source; the verification checklist above is intentionally left open until the raw schema and a dedicated test bot are available.
+**No live test-bot API request was made for this audit or implementation pass.** The public OpenAPI schema and developer guide were retrieved; new route behavior is mock-tested. The final verification checklist remains open for an end-to-end smoke test using a dedicated bot.
 
 ## 9. References
 
