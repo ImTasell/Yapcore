@@ -235,7 +235,6 @@ mod tests {
         ));
     }
 
-
     #[test]
     fn validates_activity_rotation_configuration() {
         use std::time::Duration;
@@ -268,6 +267,7 @@ mod tests {
         assert_eq!(rotation.interval(), Duration::from_secs(30));
         assert_eq!(rotation.bot_status(), BotStatus::Idle);
     }
+
     #[test]
     fn builds_presence_with_a_status_and_activity() {
         let presence = Presence::online().activity(Activity::playing("Chess").unwrap());
