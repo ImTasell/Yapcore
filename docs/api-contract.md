@@ -36,14 +36,24 @@ The following is the human-readable REST endpoint index as exposed by the develo
 | DELETE | `/me/avatar` | Remove avatar |
 | PUT | `/me/banner` | Raw image or multipart field `file`; max 10 MB |
 | DELETE | `/me/banner` | Remove banner |
-| PUT | `/me/status` | `{ "status": "online" | "idle" | "dnd", "activity": "..." }`; activity max 60. Implemented as `Bot::set_status`; this is HTTP bot presence, not Discord RPC/IPC. |
+| PUT | `/me/status` | `{ "status": "online" | "idle" | "dnd", "activity": "..." }`; activity max 60. Implemented as `Bot::set_status` and typed `Bot::set_presence`; this is HTTP bot presence, not Discord RPC/IPC. |
 | GET | `/commands` | Read registered commands |
 | PUT | `/commands` | Replace the entire command list: `{ "commands": [{ "name": "ping", "description": "..." }] }` |
 
 Command registration constraints: the current official guide says up to 50 commands; names are 1–32 lowercase letters, numbers, hyphens or underscores; descriptions max 100 characters; names must be unique. The Python upstream source allows 100 locally (`COMMAND_LIMIT = 100`), which exceeds the documented platform cap. Yapcore deliberately validates to 50. Since PUT replaces the whole list, Yapcore must send the complete registry, not one command at a time.
 
-### Event polling
+Typed presence example:
 
+```rust
+use yapcore::{Activity, BotStatus, Presence};
+
+let presence = Presence::online().activity(Activity::playing("Minecraft")?);
+bot.set_presence(&presence).await?;
+```
+
+`Activity::playing` formats ordinary display text (for example, `Playing Minecraft`). Yapper currently accepts one activity line, not Discord-style structured game metadata. Presence can be changed while the bot is running by calling `set_presence` again.
+
+### Event polling
 | Method | Route | Contract |
 | --- | --- | --- |
 | GET | `/events?after=<id>&wait=<seconds>[&max_age=<seconds>]` | Fetch events after the cursor |
