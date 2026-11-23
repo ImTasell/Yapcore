@@ -3322,8 +3322,11 @@ mod tests {
             .await
             .unwrap();
         let request = disconnect.finish();
-        assert!(request.starts_with("POST /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/voice/disconnect HTTP/1.1"));
-        let payload: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert!(request.starts_with(
+            "POST /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/voice/disconnect HTTP/1.1"
+        ));
+        let payload: Value =
+            serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
         assert_eq!(payload["user_id"], USER_ID);
     }
 
