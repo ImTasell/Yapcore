@@ -33,7 +33,8 @@ pub use ids::{
     UserId, WebhookId,
 };
 pub use interactions::{InteractionContext, InteractionRegistrationError};
-pub use webhooks::{verify_event_webhook, EventWebhook, WebhookVerificationError};
+
+pub use webhooks::{EventWebhook, WebhookVerificationError, verify_event_webhook};
 pub use models::{
     ActionRow, Activity, ActivityRotation, Ban, BotProfile, BotProfileEdit, BotStatus, Button,
     ButtonStyle, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions,
