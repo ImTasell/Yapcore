@@ -251,27 +251,53 @@ impl ParsedCommandOptions {
 
         let mut values = BTreeMap::new();
         let mut positional_index = 0;
-        for option in schema {
-            let raw = if let Some(value) = named.remove(&option.name) {
-                Some(value)
+        for (option_index, option) in schema.iter().enumerate() {
+            let is_last = option_index + 1 == schema.len();
+            let (raw, positional_end) = if let Some(value) = named.remove(&option.name) {
+                (Some(value), None)
             } else if positional_index < positional.len() {
-                let value = positional[positional_index].clone();
-                positional_index += 1;
-                Some(value)
+                if is_last
+                    && option.kind == CommandOptionType::String
+                    && option.choices.is_empty()
+                {
+                    (
+                        Some(positional[positional_index..].join(" ")),
+                        Some(positional.len()),
+                    )
+                } else {
+                    (
+                        Some(positional[positional_index].clone()),
+                        Some(positional_index + 1),
+                    )
+                }
             } else {
-                None
+                (None, None)
             };
+
             let Some(raw) = raw else {
                 if option.required {
                     return Err(CommandOptionError::MissingRequired(option.name.clone()));
                 }
                 continue;
             };
-            let value = parse_value(option.kind, &raw, &option.name)?;
-            if !option.choices.is_empty()
-                && !option.choices.iter().any(|choice| choice.value == value)
-            {
-                return Err(CommandOptionError::InvalidChoice(option.name.clone()));
+
+            let parsed = parse_value(option.kind, &raw, &option.name).and_then(|value| {
+                if !option.choices.is_empty()
+                    && !option.choices.iter().any(|choice| choice.value == value)
+                {
+                    Err(CommandOptionError::InvalidChoice(option.name.clone()))
+                } else {
+                    Ok(value)
+                }
+            });
+            let value = match parsed {
+                Ok(value) => value,
+                Err(_) if positional_end.is_some() && !option.required && !is_last => continue,
+                Err(error) => return Err(error),
+            };
+
+            if let Some(positional_end) = positional_end {
+                positional_index = positional_end;
             }
             values.insert(option.name.clone(), value);
         }
@@ -561,6 +587,33 @@ mod tests {
             parsed.get_user("member").unwrap().as_str(),
             "123e4567-e89b-12d3-a456-426614174003"
         );
+    }
+
+    #[test]
+    fn final_string_option_consumes_the_remaining_positional_text() {
+        let schema = [
+            CommandOption::integer("count", "Repeat count").unwrap(),
+            CommandOption::string("reason", "Reason").unwrap().required(true),
+        ];
+        let parsed = ParsedCommandOptions::parse(&schema, "this is the full reason")
+            .unwrap();
+        assert_eq!(parsed.get_integer("count"), None);
+        assert_eq!(
+            parsed.get_string("reason"),
+            Some("this is the full reason")
+        );
+    }
+
+    #[test]
+    fn optional_invalid_positional_option_does_not_consume_the_next_value() {
+        let schema = [
+            CommandOption::integer("count", "Count").unwrap(),
+            CommandOption::string("reason", "Reason").unwrap().required(true),
+        ];
+        let parsed = ParsedCommandOptions::parse(&schema, "not-a-number because I can")
+            .unwrap();
+        assert_eq!(parsed.get_integer("count"), None);
+        assert_eq!(parsed.get_string("reason"), Some("not-a-number because I can"));
     }
 
     #[test]
