@@ -175,7 +175,7 @@ impl ModalComponent {
             }
             Self::SelectMenu(menu) => {
                 menu.validate()?;
-                if !menu.label.as_deref().is_some_and(|label| !label.is_empty()) {
+                if !menu.modal_label().is_some_and(|label| !label.is_empty()) {
                     return Err(ModalValidationError::SelectMissingLabel);
                 }
             }
