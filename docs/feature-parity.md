@@ -108,7 +108,7 @@ Rust API should favor explicit typed command registration and async handlers. It
 | [x] Verify | Select menu handlers | `Bot::on_select` dispatches `type: select` submissions and preserves selected values in `InteractionContext::values`; source-parity implementation, public schema/live verification still pending |
 | [x] Verify | Modal submission handlers | `Bot::on_modal` dispatches `type: modal_submit` and preserves submitted field values as JSON; source-parity implementation, public schema/live verification still pending |
 | [x] Verify | Modal and text-input builders / opening modals | `Modal`, `TextInput`, `InteractionContext::show_modal`, and `CommandContext::show_modal` provide typed modal responses; schema/live verification remains pending |
-| [~] Verify | Components V2 layouts | Typed experimental builders (`TextDisplay`, `Section`, `Thumbnail`, `MediaGallery`, `Separator`, `FileDisplay`, `Container`) plus `Bot`/`ApiClient::send_layout` and `edit_layout` use the V2 flag; the full schema remains absent from the public endpoint guide and requires live verification |
+| [~] Verify | Components V2 layouts | Typed experimental builders (`TextDisplay`, `Section`, `Thumbnail`, `MediaGallery`, `Separator`, `FileDisplay`, nested button rows and `Container`) plus `Bot`/`ApiClient::send_layout` and `edit_layout` use the V2 flag; the full schema remains absent from the public endpoint guide and requires live verification |
 | [x] Documented | Unknown message/event JSON fields | Preserve unknown fields in message models and raw event payloads |
 
 ## 6. Embeds, buttons and component builders
