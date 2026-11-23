@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicU8;
 
 use secrecy::SecretString;
+use serde_json::Value;
 
 use crate::api::ApiClient;
 use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
@@ -19,6 +20,7 @@ pub(crate) struct InteractionInvocation {
     pub(crate) channel_id: Option<ChannelId>,
     pub(crate) user_id: Option<UserId>,
     pub(crate) username: Option<String>,
+    pub(crate) values: Value,
 }
 
 /// Context passed to button and other component interaction handlers.
@@ -32,6 +34,7 @@ pub struct InteractionContext {
     channel_id: Option<ChannelId>,
     user_id: Option<UserId>,
     username: Option<String>,
+    values: Value,
 }
 
 impl InteractionContext {
@@ -45,6 +48,7 @@ impl InteractionContext {
             channel_id: invocation.channel_id,
             user_id: invocation.user_id,
             username: invocation.username,
+            values: invocation.values,
         }
     }
 
@@ -56,6 +60,15 @@ impl InteractionContext {
     /// Interaction kind, normally button, select, or modal_submit.
     pub fn kind(&self) -> &str {
         &self.kind
+    }
+
+    /// Selected values for a select menu, or submitted field values for a modal.
+    ///
+    /// Select submissions are represented as a JSON array of strings. Modal
+    /// submissions retain the server payload as JSON so text and select inputs
+    /// remain forward-compatible.
+    pub fn values(&self) -> &Value {
+        &self.values
     }
 
     /// ID of the user who triggered the interaction, when supplied.
