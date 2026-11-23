@@ -297,10 +297,9 @@ impl Bot {
         if name.is_empty() || name.len() > 64 {
             return Err(crate::cogs::CogRegistrationError::InvalidName);
         }
-        if !name
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_' || byte == b'-')
-        {
+        if !name.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_' || byte == b'-'
+        }) {
             return Err(crate::cogs::CogRegistrationError::InvalidName);
         }
         if self.cog_names.contains(&name) {
@@ -317,7 +316,7 @@ impl Bot {
             return Err(crate::cogs::CogRegistrationError::SetupFailed { name, reason });
         }
 
-        self.cog_names.insert(name);
+        self.cog_names.push(name);
         Ok(self)
     }
 
@@ -1611,7 +1610,8 @@ impl Bot {
             }
             Some(Some(Err(error))) => {
                 log_error!(self.logging, command = %command, error = %error, "slash command handler returned an error");
-                let mut report = ErrorEvent::new(ErrorStage::SlashCommandHandler, error.to_string());
+                let mut report =
+                    ErrorEvent::new(ErrorStage::SlashCommandHandler, error.to_string());
                 report.event_id = Some(event.id);
                 report.event_type = Some(event.event_type.clone());
                 report.command = Some(command.clone());
@@ -1636,7 +1636,8 @@ impl Bot {
 
                 if let Some(Err(error)) = handler.await {
                     log_error!(self.logging, command = %command, error = %error, "slash command handler failed after automatic acknowledgement");
-                    let mut report = ErrorEvent::new(ErrorStage::SlashCommandAfterAck, error.to_string());
+                    let mut report =
+                        ErrorEvent::new(ErrorStage::SlashCommandAfterAck, error.to_string());
                     report.event_id = Some(event.id);
                     report.event_type = Some(event.event_type.clone());
                     report.command = Some(command.clone());
