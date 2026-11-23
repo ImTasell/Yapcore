@@ -146,6 +146,14 @@ impl ButtonRegistry {
         Ok(())
     }
 
+    /// Remove every button handler registered by one cog and return the number removed.
+    pub fn remove_owner(&mut self, owner: &str) -> usize {
+        let before = self.entries.len();
+        self.entries
+            .retain(|entry| entry.owner.as_deref() != Some(owner));
+        before - self.entries.len()
+    }
+
     /// Clone all handlers matching a custom ID, preserving registration order.
     pub fn handlers_for(&self, custom_id: &str) -> Vec<RegisteredButton> {
         self.entries
