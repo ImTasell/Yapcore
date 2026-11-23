@@ -216,6 +216,10 @@ pub enum Error {
     #[error("a channel may list at most 50 allowed users; received {actual}")]
     TooManyChannelUsers { actual: usize },
 
+    /// A bot activity string is longer than Yapper's 60-character limit.
+    #[error("bot activity is {actual} characters; the maximum is 60")]
+    BotActivityTooLong { actual: usize },
+
     /// A role edit must include at least one changed field.
     #[error("role edit options must contain at least one field")]
     EmptyRoleEditOptions,
