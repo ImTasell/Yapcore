@@ -31,7 +31,9 @@ pub use message::Message;
 
 mod interaction;
 
-pub use interaction::InteractionResponseType;
+pub use interaction::{
+    InteractionResponseType, Modal, ModalValidationError, TextInput, TextInputStyle,
+};
 
 mod server;
 
