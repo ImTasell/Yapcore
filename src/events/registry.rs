@@ -230,6 +230,22 @@ mod tests {
         assert!(registry.handlers_for("unknown").is_empty());
     }
     #[test]
+    fn removes_only_event_handlers_owned_by_selected_cog() {
+        let mut registry = EventRegistry::default();
+        registry
+            .register_owned("member_join", Some("alpha".to_owned()), |_event| async {
+                Ok(())
+            })
+            .unwrap();
+        registry
+            .register("member_join", |_event| async { Ok(()) })
+            .unwrap();
+
+        assert_eq!(registry.remove_owner("alpha"), 1);
+        assert_eq!(registry.handlers_for("member_join").len(), 1);
+    }
+
+    #[test]
     fn preserves_cog_ownership_for_event_handlers() {
         let mut registry = EventRegistry::default();
         registry
