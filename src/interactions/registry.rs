@@ -253,7 +253,7 @@ mod tests {
             .register_exact("other", |_context| async { Ok(()) })
             .unwrap();
 
-        assert_eq!(registry.handlers_for("vote:yes").len(), 2);
+        assert_eq!(registry.handlers_for("button", "vote:yes").len(), 2);
         assert_eq!(registry.handlers_for("button", "vote:no").len(), 1);
         assert!(registry.handlers_for("button", "unknown").is_empty());
     }
