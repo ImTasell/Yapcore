@@ -121,7 +121,7 @@ Rust API should favor explicit typed command registration and async handlers. It
 | [x] Documented | Link buttons | Link style validates HTTPS URLs |
 | [x] Documented | Disabled buttons and emoji | `disabled` and `emoji` builder methods |
 | [~] Verify | Select menu option builders | `SelectOption`, `SelectMenu`, `SelectActionRow` and mixed `MessageComponentRow` send methods support standard select rows; server schema/live verification remains pending |
-| [ ] Verify | Modal/TextInput builders | Include after schema confirmation |
+| [~] Verify | Modal field schema confirmation | Text and select builders are implemented; full public schema and live test-bot verification remain open |
 | [~] Verify | Components V2: text, section, gallery, separator, file, container and action rows | Typed experimental `LayoutComponent` variants include nested button and select action rows; public schema/live verification remains pending |
 | [x] Documented | Plain JSON interoperability | `ApiClient::api` / `Bot::api` provide authenticated relative-route access with origin and traversal checks |
 
