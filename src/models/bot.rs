@@ -166,6 +166,67 @@ impl ActivityRotation {
         self.status
     }
 }
+/// Editable bot profile fields accepted by `PATCH /me`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct BotProfileEdit {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bio: Option<String>,
+}
+
+impl BotProfileEdit {
+    /// Start an empty profile update.
+    pub fn new() -> Self { Self::default() }
+    /// Set the bot's display name (maximum 32 characters).
+    pub fn display_name(mut self, value: impl Into<String>) -> Self {
+        self.display_name = Some(value.into()); self
+    }
+    /// Set the bot's bio (maximum 190 characters).
+    pub fn bio(mut self, value: impl Into<String>) -> Self {
+        self.bio = Some(value.into()); self
+    }
+    /// Validate this patch against the documented profile limits.
+    pub(crate) fn validate(&self) -> crate::error::Result<()> {
+        if self.display_name.is_none() && self.bio.is_none() {
+            return Err(crate::error::Error::EmptyBotProfileEdit);
+        }
+        if let Some(value) = &self.display_name {
+            let actual = value.chars().count();
+            if actual > 32 { return Err(crate::error::Error::BotDisplayNameTooLong { actual }); }
+        }
+        if let Some(value) = &self.bio {
+            let actual = value.chars().count();
+            if actual > 190 { return Err(crate::error::Error::BotBioTooLong { actual }); }
+        }
+        Ok(())
+    }
+}
+
+/// Supported image formats for bot avatar and banner uploads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImageFormat { Png, Jpeg, Gif, Webp }
+
+impl ImageFormat {
+    /// MIME type used for the raw image request body.
+    pub const fn content_type(self) -> &'static str {
+        match self {
+            Self::Png => "image/png",
+            Self::Jpeg => "image/jpeg",
+            Self::Gif => "image/gif",
+            Self::Webp => "image/webp",
+        }
+    }
+}
+
+/// Image asset returned after uploading a bot avatar or banner.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct ImageAsset {
+    /// Platform-relative image path.
+    pub path: String,
+    /// Absolute image URL.
+    pub url: String,
+}
 /// The profile returned by the Yapper GET /me endpoint.
 ///
 /// The extra map preserves fields added by the platform that are not yet
@@ -187,9 +248,15 @@ pub struct BotProfile {
     /// Optional profile-image URL.
     #[serde(default)]
     pub avatar_url: Option<String>,
+    /// Platform-relative avatar path when returned by the current API schema.
+    #[serde(default)]
+    pub avatar_path: Option<String>,
     /// Optional banner URL.
     #[serde(default)]
     pub banner_url: Option<String>,
+    /// Platform-relative banner path when returned by the current API schema.
+    #[serde(default)]
+    pub banner_path: Option<String>,
     /// Fields not yet modelled by Yapcore.
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -295,5 +362,25 @@ mod tests {
         let presence = Presence::online().activity(Activity::playing("Chess").unwrap());
         assert_eq!(presence.status(), BotStatus::Online);
         assert_eq!(presence.activity_line().unwrap().as_str(), "Playing Chess");
+    }
+}
+
+#[cfg(test)]
+mod profile_tests {
+    use super::*;
+    #[test]
+    fn validates_profile_patch_limits_and_presence() {
+        assert!(matches!(BotProfileEdit::new().validate(), Err(crate::error::Error::EmptyBotProfileEdit)));
+        assert!(BotProfileEdit::new().display_name("x".repeat(32)).validate().is_ok());
+        assert!(matches!(BotProfileEdit::new().display_name("x".repeat(33)).validate(), Err(crate::error::Error::BotDisplayNameTooLong { actual: 33 })));
+        assert!(BotProfileEdit::new().bio("x".repeat(190)).validate().is_ok());
+        assert!(matches!(BotProfileEdit::new().bio("x".repeat(191)).validate(), Err(crate::error::Error::BotBioTooLong { actual: 191 })));
+    }
+    #[test]
+    fn image_formats_have_expected_mime_types() {
+        assert_eq!(ImageFormat::Png.content_type(), "image/png");
+        assert_eq!(ImageFormat::Jpeg.content_type(), "image/jpeg");
+        assert_eq!(ImageFormat::Gif.content_type(), "image/gif");
+        assert_eq!(ImageFormat::Webp.content_type(), "image/webp");
     }
 }
