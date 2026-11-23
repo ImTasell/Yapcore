@@ -210,7 +210,9 @@ impl ChannelEditOptions {
         }
         if let Some(users) = &self.user_ids {
             if users.len() > 50 {
-                return Err(crate::error::Error::TooManyChannelUsers {\n                    actual: users.len(),\n                });
+                return Err(crate::error::Error::TooManyChannelUsers {
+                    actual: users.len(),
+                });
             }
         }
         Ok(())
