@@ -10,11 +10,10 @@ use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
 use crate::ids::InteractionId;
 use crate::models::{
-    Ban, BotProfile, BotProfileEdit, BotStatus, Channel, ChannelCategory,
-    ChannelCreateOptions, ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition,
-    Embed, EventBatch, ImageAsset, ImageFormat, InteractionResponseType, Member, Message,
-    PermissionTarget, Presence, Role, Server, UserProfile, VoiceChannelState, validate_action_rows,
-    validate_command_list,
+    Ban, BotProfile, BotProfileEdit, BotStatus, Channel, ChannelCategory, ChannelCreateOptions,
+    ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch,
+    ImageAsset, ImageFormat, InteractionResponseType, Member, Message, PermissionTarget, Presence,
+    Role, Server, UserProfile, VoiceChannelState, validate_action_rows, validate_command_list,
 };
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
@@ -110,12 +109,7 @@ impl ApiClient {
     ///
     /// Absolute URLs, origin-relative paths and path traversal are rejected to
     /// prevent accidentally sending the bot token to another host.
-    pub async fn api(
-        &self,
-        method: Method,
-        route: &str,
-        body: Option<Value>,
-    ) -> Result<Value> {
+    pub async fn api(&self, method: Method, route: &str, body: Option<Value>) -> Result<Value> {
         if route.is_empty()
             || route.starts_with('/')
             || route.contains("://")
@@ -3459,13 +3453,19 @@ mod tests {
         let response = client.api(Method::GET, "me", None).await.unwrap();
         let request = server.finish();
         assert!(request.starts_with("GET /api/bot/v1/me HTTP/1.1"));
-        assert!(request.to_ascii_lowercase().contains("authorization: bot yb_test-token"));
+        assert!(
+            request
+                .to_ascii_lowercase()
+                .contains("authorization: bot yb_test-token")
+        );
         assert_eq!(response["username"], "raw-api");
 
         let config = Config::builder().token("yb_test-token").build().unwrap();
         let client = ApiClient::new(config).unwrap();
         assert!(matches!(
-            client.api(Method::GET, "https://attacker.invalid/steal", None).await,
+            client
+                .api(Method::GET, "https://attacker.invalid/steal", None)
+                .await,
             Err(Error::InvalidApiRoute(_))
         ));
         assert!(matches!(
