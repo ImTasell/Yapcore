@@ -313,15 +313,7 @@ impl ParsedCommandOptions {
                 continue;
             };
 
-            let parsed = parse_value(option.kind, &raw, &option.name).and_then(|value| {
-                if !option.choices.is_empty()
-                    && !option.choices.iter().any(|choice| choice.value == value)
-                {
-                    Err(CommandOptionError::InvalidChoice(option.name.clone()))
-                } else {
-                    Ok(value)
-                }
-            });
+            let parsed = parse_option_value(option, &raw);
             let value = match parsed {
                 Ok(value) => value,
                 Err(_) if positional_end.is_some() && !option.required && !is_last => continue,
@@ -380,6 +372,49 @@ impl ParsedCommandOptions {
     /// Return the complete parsed value map.
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
         &self.values
+    }
+}
+
+fn parse_option_value(
+    option: &CommandOption,
+    raw: &str,
+) -> Result<Value, CommandOptionError> {
+    if option.choices.is_empty() {
+        return parse_value(option.kind, raw, &option.name);
+    }
+
+    if let Some(choice) = option.choices.iter().find(|choice| {
+        choice.name.eq_ignore_ascii_case(raw)
+            || choice
+                .value
+                .as_str()
+                .is_some_and(|value| value.eq_ignore_ascii_case(raw))
+            || choice.value.to_string().eq_ignore_ascii_case(raw)
+    }) {
+        return Ok(choice.value.clone());
+    }
+
+    let parsed = parse_value(option.kind, raw, &option.name)?;
+    if option
+        .choices
+        .iter()
+        .any(|choice| choice_values_equal(option.kind, &choice.value, &parsed))
+    {
+        Ok(parsed)
+    } else {
+        Err(CommandOptionError::InvalidChoice(option.name.clone()))
+    }
+}
+
+fn choice_values_equal(kind: CommandOptionType, expected: &Value, actual: &Value) -> bool {
+    match kind {
+        CommandOptionType::Number => expected.as_f64() == actual.as_f64(),
+        CommandOptionType::String
+        | CommandOptionType::Integer
+        | CommandOptionType::Boolean
+        | CommandOptionType::User
+        | CommandOptionType::Channel
+        | CommandOptionType::Role => expected == actual,
     }
 }
 
@@ -621,25 +656,28 @@ mod tests {
     #[test]
     fn final_string_option_consumes_the_remaining_positional_text() {
         let schema = [
-            CommandOption::integer("count", "Repeat count").unwrap(),
-            CommandOption::string("reason", "Reason")
+            CommandOption::integer("count", "Repeat count")
                 .unwrap()
                 .required(true),
+            CommandOption::string("reason", "Reason").unwrap(),
         ];
-        let parsed = ParsedCommandOptions::parse(&schema, "this is the full reason").unwrap();
-        assert_eq!(parsed.get_integer("count"), None);
+        let parsed = ParsedCommandOptions::parse(&schema, "7 this is the full reason").unwrap();
+        assert_eq!(parsed.get_integer("count"), Some(7));
         assert_eq!(parsed.get_string("reason"), Some("this is the full reason"));
     }
 
     #[test]
     fn optional_invalid_positional_option_does_not_consume_the_next_value() {
         let schema = [
-            CommandOption::integer("count", "Count").unwrap(),
-            CommandOption::string("reason", "Reason")
+            CommandOption::string("prefix", "Required prefix")
                 .unwrap()
                 .required(true),
+            CommandOption::integer("count", "Count").unwrap(),
+            CommandOption::string("reason", "Reason").unwrap(),
         ];
-        let parsed = ParsedCommandOptions::parse(&schema, "not-a-number because I can").unwrap();
+        let parsed =
+            ParsedCommandOptions::parse(&schema, "because not-a-number because I can").unwrap();
+        assert_eq!(parsed.get_string("prefix"), Some("because"));
         assert_eq!(parsed.get_integer("count"), None);
         assert_eq!(
             parsed.get_string("reason"),
