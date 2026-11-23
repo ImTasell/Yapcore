@@ -2634,6 +2634,7 @@ mod tests {
         let body = request.split_once("\r\n\r\n").unwrap().1;
         assert!(body.contains("Invalid arguments"));
         assert!(body.contains("value"));
+        assert!(body.contains("/count <value>"));
     }
 
     #[tokio::test]
