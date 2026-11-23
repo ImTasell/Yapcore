@@ -141,6 +141,7 @@ Do not expose both a huge builder API and dozens of raw JSON methods for the sam
 | [ ] Documented | Open DM/send DM | User DM endpoints |
 | [ ] Verify | Voice state lookup and move/disconnect members | Source-only routes; verify availability and payloads |
 | [x] Documented | Set bot status and activity | `Bot::set_status` plus typed `Bot::set_presence(&Presence)`; `Activity::playing` formats the plain activity line |
+| [x] SDK feature | Automatic activity rotation | `ActivityRotation` cycles validated activities; `Bot::rotate_presence` returns a cancellable `PresenceRotationHandle` |
 | [ ] Verify | Scheduled server events | Source has list/create; verify current public API schema |
 | [ ] Verify | Thread list/create/edit/delete | Source has methods; verify endpoint availability |
 | [ ] Verify | Emoji create/edit/delete/steal/message emoji lookup | Source has methods; verify endpoint availability |
