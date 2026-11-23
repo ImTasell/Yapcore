@@ -126,7 +126,7 @@ The Python framework supports:
 - Command-list synchronization after cog changes.
 - Optional checks and lifecycle hooks.
 
-Rust cannot safely recreate Python's import-and-reload behavior as a direct equivalent. The idiomatic first version should provide registered cog instances/traits and deterministic load/unload of registrations. Dynamic code hot-reload should be considered a separate plugin-system project, not a baseline parity requirement.
+Rust cannot safely recreate Python's import-and-reload behavior as a direct equivalent. Yapcore provides a `Cog` trait and transactional `Bot::add_cog` registration for statically compiled handlers. Live unload/reload and dynamic code hot-reload are intentionally not part of the initial API; a plugin ABI would be a separate project.
 
 ### REST surface exposed by the Python Bot
 
