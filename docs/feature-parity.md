@@ -41,7 +41,7 @@ Implementation status updated 2026-11-23. Stable REST primitives, prefix-command
 | [x] Documented | 429 / 503 Retry-After handling | Shared request layer retries 429/503 only when `Retry-After` is present; at most two retries, no transport-error replay |
 | [ ] Verify | Proxy retry/fallback behavior | Retry only when safe; never duplicate a message send |
 | [x] Documented | Configurable request timeout | Builder/config option; 40-second default |
-| [~] Documented | Multipart profile image upload | Raw-body avatar/banner upload is implemented; multipart field `file` remains unimplemented. Message attachments are not in the published bot-message endpoint contract. |
+| [x] Documented | Raw and multipart profile image upload | `set_avatar`/`set_banner` support raw bodies; `set_avatar_multipart`/`set_banner_multipart` use the documented `file` form field. Message attachments remain unspecified by the published bot-message endpoint contract. |
 
 Retry safety rules:
 - GET can be retried for transient transport/server failures.
