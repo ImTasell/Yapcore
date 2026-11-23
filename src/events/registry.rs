@@ -190,4 +190,11 @@ mod tests {
         assert_eq!(registry.handlers_for("reaction_add").len(), 1);
         assert!(registry.handlers_for("unknown").is_empty());
     }
+    #[test]
+    fn registers_lifecycle_error_handlers_in_order() {
+        let mut registry = EventRegistry::default();
+        registry.register_error(|_event| async { Ok(()) });
+        registry.register_error(|_event| async { Ok(()) });
+        assert_eq!(registry.error_handlers().len(), 2);
+    }
 }
