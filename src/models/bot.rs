@@ -221,7 +221,17 @@ pub enum ImageFormat {
 }
 
 impl ImageFormat {
-    /// MIME type used for the raw image request body.
+    /// File extension used by multipart upload helpers.
+    pub const fn extension(self) -> &'static str {
+        match self {
+            Self::Png => "png",
+            Self::Jpeg => "jpg",
+            Self::Gif => "gif",
+            Self::Webp => "webp",
+        }
+    }
+
+    /// MIME type used for raw or multipart image uploads.
     pub const fn content_type(self) -> &'static str {
         match self {
             Self::Png => "image/png",
