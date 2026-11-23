@@ -103,6 +103,35 @@ mod tests {
     }
 
     #[test]
+    fn restores_previous_cog_when_replacement_setup_fails() {
+        struct BrokenReplacement;
+        impl Cog for BrokenReplacement {
+            fn name(&self) -> &str {
+                "welcome"
+            }
+            fn register(&self, bot: &mut Bot) -> std::result::Result<(), String> {
+                bot.command("greet", "Partially added before failure", |_context| async {
+                    Ok(())
+                })
+                .map_err(|error| error.to_string())?;
+                Err("simulated setup failure".to_owned())
+            }
+        }
+
+        let mut bot = BotBuilder::new().token("yb_test-token").build().unwrap();
+        bot.add_cog(GoodCog).unwrap();
+        let error = bot.replace_cog(BrokenReplacement).unwrap_err();
+        assert!(matches!(error, CogRegistrationError::SetupFailed { name, .. } if name == "welcome"));
+        assert_eq!(bot.cogs(), vec!["welcome"]);
+        let names = bot
+            .command_definitions()
+            .into_iter()
+            .map(|definition| definition.name().to_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(names, ["welcome"]);
+    }
+
+    #[test]
     fn removes_cog_registrations_as_a_unit() {
         let mut bot = BotBuilder::new().token("yb_test-token").build().unwrap();
         bot.add_cog(GoodCog).unwrap();
