@@ -434,8 +434,10 @@ impl Bot {
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
         let schema = Arc::new(options);
+        let handler = Arc::new(handler);
         self.command(name, description, move |context| {
             let schema = schema.clone();
+            let handler = handler.clone();
             let context = context.with_option_schema(&schema);
             async move {
                 let context = context.map_err(|error| -> crate::HandlerError {
