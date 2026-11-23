@@ -398,7 +398,7 @@ Do not eagerly deserialize fields that are not stable in the current official co
 
 ### Cogs
 
-A Rust cog is a statically linked group of command and event registrations with an ownership token. It can register/unregister its handlers as a unit. Runtime source loading and arbitrary code hot-reload are not part of v0.1. A WASM plugin ABI or dynamic library mechanism would be a separate design with its own safety and versioning constraints.
+A Rust cog is a statically linked group of command, event-listener and button registrations. `Bot::add_cog` installs those registrations transactionally before the bot starts; if setup fails, all partial registrations are rolled back. Live unload/reload and per-cog runtime ownership attribution are not implemented in v0.1. Runtime source loading or a WASM/dynamic-library plugin ABI would be a separate design with its own safety and versioning constraints.
 
 ### Components
 
