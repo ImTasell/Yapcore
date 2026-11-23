@@ -29,7 +29,7 @@ use crate::api::ApiClient;
 use crate::commands::{CommandContext, CommandRegistry, HandlerResult, SlashCommandInvocation};
 use crate::config::{Config, ConfigBuilder, ConfigError};
 use crate::error::{Error, Result};
-use crate::events::{EventRegistrationError, EventRegistry};
+use crate::events::{ErrorEvent, ErrorStage, EventRegistrationError, EventRegistry};
 use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
 use crate::interactions::{
     ButtonRegistry, InteractionContext, InteractionInvocation, InteractionRegistrationError,
@@ -271,6 +271,16 @@ impl Bot {
         &self.api
     }
 
+    /// Perform an authenticated request to a relative bot API route.
+    pub async fn api(
+        &self,
+        method: reqwest::Method,
+        route: &str,
+        body: Option<Value>,
+    ) -> Result<Value> {
+        self.api.api(method, route, body).await
+    }
+
     /// Return the last event cursor observed by the runtime.
     ///
     /// Persist this value externally and pass it to run_from on restart to
@@ -303,6 +313,39 @@ impl Bot {
     {
         self.commands.register(name, description, handler)?;
         Ok(self)
+    }
+
+    /// Register a button handler for one exact component custom ID.
+    /// Register a command that runs only when its asynchronous check returns true.
+    ///
+    /// A rejected check silently skips the handler. The check runs before every
+    /// prefix or slash invocation.
+    pub fn command_with_check<C, CFut, F, Fut>(
+        &mut self,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        check: C,
+        handler: F,
+    ) -> std::result::Result<&mut Self, crate::CommandDefinitionError>
+    where
+        C: Fn(CommandContext) -> CFut + Send + Sync + 'static,
+        CFut: Future<Output = bool> + Send + 'static,
+        F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        self.commands
+            .register_with_check(name, description, check, handler)?;
+        Ok(self)
+    }
+
+    /// Register a lifecycle error listener. Errors from error listeners are logged only.
+    pub fn on_error<F, Fut>(&mut self, handler: F) -> &mut Self
+    where
+        F: Fn(ErrorEvent) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        self.events.register_error(handler);
+        self
     }
 
     /// Register a button handler for one exact component custom ID.
@@ -1213,12 +1256,17 @@ impl Bot {
                     continue;
                 }
                 if let Err(error) = self.dispatch_event(event, bot_id.as_ref()).await {
-                    tracing::error!(
+                    let mut report = ErrorEvent::new(ErrorStage::EventDispatch, error.to_string());
+                    report.event_id = Some(event.id);
+                    report.event_type = Some(event.event_type.clone());
+                    log_error!(
+                        self.logging,
                         event_type = %event.event_type,
                         event_id = event.id,
                         error = %error,
                         "event dispatch failed"
                     );
+                    self.report_error(report).await;
                 }
                 cursor = event.id;
                 self.last_event_id.store(cursor, Ordering::Release);
@@ -1234,6 +1282,18 @@ impl Bot {
     /// Alias for run.
     pub async fn start(&self) -> Result<()> {
         self.run().await
+    }
+
+    async fn report_error(&self, event: ErrorEvent) {
+        for handler in self.events.error_handlers() {
+            if let Err(error) = handler(event.clone()).await {
+                log_error!(
+                    self.logging,
+                    error = %error,
+                    "on_error handler returned an error"
+                );
+            }
+        }
     }
 
     async fn dispatch_event(
@@ -1257,12 +1317,17 @@ impl Bot {
 
         for handler in self.events.handlers_for(&event.event_type) {
             if let Err(error) = handler(event.clone()).await {
-                tracing::error!(
+                let mut report = ErrorEvent::new(ErrorStage::EventListener, error.to_string());
+                report.event_id = Some(event.id);
+                report.event_type = Some(event.event_type.clone());
+                log_error!(
+                    self.logging,
                     event_type = %event.event_type,
                     event_id = event.id,
                     error = %error,
                     "event listener failed"
                 );
+                self.report_error(report).await;
             }
         }
 
@@ -1359,7 +1424,12 @@ impl Bot {
         );
 
         if let Some(Err(error)) = self.commands.dispatch(&command, context).await {
-            tracing::error!(command = %command, error = %error, "command handler returned an error");
+            log_error!(self.logging, command = %command, error = %error, "command handler returned an error");
+            let mut report = ErrorEvent::new(ErrorStage::CommandHandler, error.to_string());
+            report.event_id = Some(event.id);
+            report.event_type = Some(event.event_type.clone());
+            report.command = Some(command);
+            self.report_error(report).await;
         }
 
         Ok(())
@@ -1495,7 +1565,12 @@ impl Bot {
                 }
             }
             Some(Some(Err(error))) => {
-                tracing::error!(command = %command, error = %error, "slash command handler returned an error");
+                log_error!(self.logging, command = %command, error = %error, "slash command handler returned an error");
+                let mut report = ErrorEvent::new(ErrorStage::SlashCommandHandler, error.to_string());
+                report.event_id = Some(event.id);
+                report.event_type = Some(event.event_type.clone());
+                report.command = Some(command.clone());
+                self.report_error(report).await;
                 if response_count.load(Ordering::Acquire) == 0 {
                     fallback_context
                         .ephemeral(format!("Something went wrong running /{command}"))
@@ -1515,7 +1590,12 @@ impl Bot {
                 }
 
                 if let Some(Err(error)) = handler.await {
-                    tracing::error!(command = %command, error = %error, "slash command handler failed after automatic acknowledgement");
+                    log_error!(self.logging, command = %command, error = %error, "slash command handler failed after automatic acknowledgement");
+                    let mut report = ErrorEvent::new(ErrorStage::SlashCommandAfterAck, error.to_string());
+                    report.event_id = Some(event.id);
+                    report.event_type = Some(event.event_type.clone());
+                    report.command = Some(command.clone());
+                    self.report_error(report).await;
                 }
             }
         }
@@ -1600,11 +1680,17 @@ impl Bot {
         let dispatch = async {
             for handler in handlers {
                 if let Err(error) = handler(context.clone()).await {
-                    tracing::error!(
+                    log_error!(
+                        self.logging,
                         custom_id = %custom_id_for_log,
                         error = %error,
                         "button interaction handler failed"
                     );
+                    let mut report = ErrorEvent::new(ErrorStage::ButtonHandler, error.to_string());
+                    report.event_id = Some(event.id);
+                    report.event_type = Some(event.event_type.clone());
+                    report.custom_id = Some(custom_id_for_log.clone());
+                    self.report_error(report).await;
                 }
             }
         };
