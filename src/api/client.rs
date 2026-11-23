@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue, RETRY_AFTER};
+use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue, RETRY_AFTER};
 use reqwest::redirect::Policy;
 use reqwest::{Client, Method, Response, Url};
 use secrecy::ExposeSecret;
@@ -10,9 +10,10 @@ use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
 use crate::ids::InteractionId;
 use crate::models::{
-    Ban, BotProfile, BotStatus, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions,
-    ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch, InteractionResponseType,
-    Member, Message, PermissionTarget, Presence, Role, Server, UserProfile, validate_action_rows,
+    Activity, Ban, BotProfile, BotProfileEdit, BotStatus, Channel, ChannelCategory,
+    ChannelCreateOptions, ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition, Embed,
+    EventBatch, ImageAsset, ImageFormat, InteractionResponseType, Member, Message,
+    PermissionTarget, Presence, Role, Server, UserProfile, VoiceChannelState, validate_action_rows,
     validate_command_list,
 };
 
@@ -69,6 +70,38 @@ impl ApiClient {
         serde_json::from_value(value).map_err(Error::from)
     }
 
+    /// Edit the bot's display name and/or bio through PATCH /me.
+    pub async fn edit_me(&self, changes: &BotProfileEdit) -> Result<BotProfile> {
+        changes.validate()?;
+        let value = serde_json::to_value(changes)?;
+        let response = self.request_json(Method::PATCH, "me", Some(value)).await?;
+        serde_json::from_value(response).map_err(Error::from)
+    }
+
+    /// Upload a new bot avatar using the documented raw-image request body.
+    pub async fn set_avatar(&self, bytes: &[u8], format: ImageFormat) -> Result<ImageAsset> {
+        self.upload_profile_image("me/avatar", bytes, format, 8 * 1024 * 1024)
+            .await
+    }
+
+    /// Remove the bot's avatar.
+    pub async fn delete_avatar(&self) -> Result<()> {
+        self.request_json(Method::DELETE, "me/avatar", None).await?;
+        Ok(())
+    }
+
+    /// Upload a new bot banner using the documented raw-image request body.
+    pub async fn set_banner(&self, bytes: &[u8], format: ImageFormat) -> Result<ImageAsset> {
+        self.upload_profile_image("me/banner", bytes, format, 10 * 1024 * 1024)
+            .await
+    }
+
+    /// Remove the bot's banner.
+    pub async fn delete_banner(&self) -> Result<()> {
+        self.request_json(Method::DELETE, "me/banner", None).await?;
+        Ok(())
+    }
+
     /// Set the bot's online state and optional activity line.
     ///
     /// Yapper keeps this presence while the bot polls. This is the documented
@@ -108,6 +141,43 @@ impl ApiClient {
         }
         self.request_json(Method::PUT, "me/status", Some(Value::Object(body)))
             .await
+    }
+
+    /// Return voice occupancy for every voice channel the bot can see in a server.
+    pub async fn get_voice_states(
+        &self,
+        server_id: &crate::ids::ServerId,
+    ) -> Result<Vec<VoiceChannelState>> {
+        let route = format!("servers/{server_id}/voice");
+        let response = self.request_json(Method::GET, &route, None).await?;
+        let voice = response.get("voice").cloned().unwrap_or(response);
+        serde_json::from_value(voice).map_err(Error::from)
+    }
+
+    /// Move a member who is in voice to another visible voice channel.
+    pub async fn move_member_to_voice(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &crate::ids::UserId,
+        channel_id: &crate::ids::ChannelId,
+    ) -> Result<Value> {
+        let route = format!("servers/{server_id}/voice/move");
+        let body = serde_json::json!({
+            "user_id": user_id,
+            "channel_id": channel_id,
+        });
+        self.request_json(Method::POST, &route, Some(body)).await
+    }
+
+    /// Disconnect a member from their current voice channel.
+    pub async fn disconnect_member_from_voice(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &crate::ids::UserId,
+    ) -> Result<Value> {
+        let route = format!("servers/{server_id}/voice/disconnect");
+        let body = serde_json::json!({ "user_id": user_id });
+        self.request_json(Method::POST, &route, Some(body)).await
     }
 
     /// Fetch a member's effective server permissions (experimental source-parity route).
@@ -654,6 +724,27 @@ impl ApiClient {
         serde_json::from_value(roles).map_err(Error::from)
     }
 
+    /// Open or find a direct-message channel with a user.
+    pub async fn open_dm(&self, user_id: &crate::ids::UserId) -> Result<crate::ids::ChannelId> {
+        let route = format!("users/{user_id}/dm");
+        let response = self.request_json(Method::POST, &route, None).await?;
+        let channel_id = response
+            .get("channel_id")
+            .and_then(Value::as_str)
+            .ok_or(Error::MissingDmChannelId)?;
+        crate::ids::ChannelId::new(channel_id).map_err(Error::from)
+    }
+
+    /// Open a DM and send a plain-text message to it.
+    pub async fn send_dm(
+        &self,
+        user_id: &crate::ids::UserId,
+        content: impl AsRef<str>,
+    ) -> Result<Message> {
+        let channel_id = self.open_dm(user_id).await?;
+        self.send_message(&channel_id, content.as_ref()).await
+    }
+
     /// Fetch one public user profile.
     pub async fn get_user(&self, user_id: &crate::ids::UserId) -> Result<UserProfile> {
         let route = format!("users/{user_id}");
@@ -1109,33 +1200,106 @@ impl ApiClient {
         url: Url,
         body: Option<Value>,
     ) -> Result<Value> {
-        let mut request = self.client.request(method, url);
-        if let Some(body) = body {
-            request = request.json(&body);
+        let mut retries = 0_u8;
+        loop {
+            let mut request = self.client.request(method.clone(), url.clone());
+            if let Some(body) = &body {
+                request = request.json(body);
+            }
+
+            let mut response = request.send().await.map_err(sanitize_transport_error)?;
+            let status = response.status();
+            let retry_after = parse_retry_after(response.headers().get(RETRY_AFTER));
+            let response_body =
+                read_limited_body(&mut response, self.config.max_response_bytes()).await?;
+
+            tracing::debug!(
+                http.status = status.as_u16(),
+                response.bytes = response_body.len(),
+                retry_attempt = retries,
+                "received Yapper API response"
+            );
+
+            if !status.is_success() {
+                let error = ApiError::from_response(status, retry_after, &response_body);
+                let retryable_status = status == reqwest::StatusCode::TOO_MANY_REQUESTS
+                    || status == reqwest::StatusCode::SERVICE_UNAVAILABLE;
+                if retryable_status && error.retry_after().is_some() && retries < 2 {
+                    let delay = error.retry_after().expect("checked above");
+                    retries += 1;
+                    tracing::warn!(
+                        http.status = status.as_u16(),
+                        retry_seconds = delay.as_secs_f64(),
+                        retry_attempt = retries,
+                        "Yapper supplied Retry-After; retrying request"
+                    );
+                    tokio::time::sleep(delay).await;
+                    continue;
+                }
+                return Err(error.into());
+            }
+
+            if response_body.is_empty() {
+                return Ok(Value::Null);
+            }
+            return serde_json::from_slice(&response_body).map_err(Error::from);
+        }
+    }
+
+    async fn upload_profile_image(
+        &self,
+        route: &str,
+        bytes: &[u8],
+        format: ImageFormat,
+        maximum_bytes: usize,
+    ) -> Result<ImageAsset> {
+        if bytes.is_empty() {
+            return Err(Error::EmptyImageUpload);
+        }
+        if bytes.len() > maximum_bytes {
+            return Err(Error::ImageUploadTooLarge {
+                actual: bytes.len(),
+                max: maximum_bytes,
+            });
         }
 
-        let mut response = request.send().await.map_err(sanitize_transport_error)?;
+        let url = self
+            .config
+            .api_base_url()
+            .join(route)
+            .map_err(|_| Error::InvalidApiRoute(route.to_owned()))?;
+        let mut retries = 0_u8;
 
-        let status = response.status();
-        let retry_after = parse_retry_after(response.headers().get(RETRY_AFTER));
-        let response_body =
-            read_limited_body(&mut response, self.config.max_response_bytes()).await?;
+        loop {
+            let mut response = self
+                .client
+                .put(url.clone())
+                .header(CONTENT_TYPE, format.content_type())
+                .body(bytes.to_vec())
+                .send()
+                .await
+                .map_err(sanitize_transport_error)?;
 
-        tracing::debug!(
-            http.status = status.as_u16(),
-            response.bytes = response_body.len(),
-            "received Yapper API response"
-        );
+            let status = response.status();
+            let retry_after = parse_retry_after(response.headers().get(RETRY_AFTER));
+            let response_body =
+                read_limited_body(&mut response, self.config.max_response_bytes()).await?;
 
-        if !status.is_success() {
-            return Err(ApiError::from_response(status, retry_after, &response_body).into());
+            if !status.is_success() {
+                let error = ApiError::from_response(status, retry_after, &response_body);
+                let retryable_status = status == reqwest::StatusCode::TOO_MANY_REQUESTS
+                    || status == reqwest::StatusCode::SERVICE_UNAVAILABLE;
+                if retryable_status && error.retry_after().is_some() && retries < 2 {
+                    let delay = error.retry_after().expect("checked above");
+                    retries += 1;
+                    tokio::time::sleep(delay).await;
+                    continue;
+                }
+                return Err(error.into());
+            }
+
+            return serde_json::from_slice(&response_body).map_err(Error::from);
         }
-
-        if response_body.is_empty() {
-            return Ok(Value::Null);
-        }
-
-        serde_json::from_slice(&response_body).map_err(Error::from)
     }
 }
 
