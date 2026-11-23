@@ -83,7 +83,7 @@ The official docs say event history is retained for one day. A persistent cursor
 | [x] Documented | Per-command permission/check callback | `Bot::command_with_check` runs an async allow/deny predicate before prefix or slash handlers |
 | [~] Verify | Typed options: string/integer/number/boolean/user/channel/role | `CommandOption` schemas, required flags, up to 25 choices, named `key=value` and quoted positional parsing, and typed getters are implemented through `Bot::command_with_options`; this validates local command input and does not yet publish option metadata to the remote slash-command registry |
 | [~] Verify | Choices and named `key=value` input | Choice validation and named/positional parsing are implemented locally; upstream Python compatibility and slash-option wire schema remain unverified |
-| [ ] Verify | Usage/error replies on invalid arguments | Optional built-in validation response |
+| [~] Verify | Usage/error replies on invalid arguments | `Bot::command_with_options` replies with a validation error before invoking the handler (private for slash contexts); generalized usage templates and structured slash-option validation remain pending |
 | [x] Documented | Command event distinct from regular message | Route slash `command` events to interaction-aware command contexts |
 | [~] Documented | Auto-acknowledge unanswered slash interactions | Two-second auto-ack fallback and ten-response counter; live timing still needs a test-bot smoke test |
 
