@@ -79,7 +79,17 @@ impl ApiClient {
 
     /// Upload a new bot avatar using the documented raw-image request body.
     pub async fn set_avatar(&self, bytes: &[u8], format: ImageFormat) -> Result<ImageAsset> {
-        self.upload_profile_image("me/avatar", bytes, format, 8 * 1024 * 1024)
+        self.upload_profile_image("me/avatar", bytes, format, 8 * 1024 * 1024, false)
+            .await
+    }
+
+    /// Upload a bot avatar using the documented multipart file field.
+    pub async fn set_avatar_multipart(
+        &self,
+        bytes: &[u8],
+        format: ImageFormat,
+    ) -> Result<ImageAsset> {
+        self.upload_profile_image("me/avatar", bytes, format, 8 * 1024 * 1024, true)
             .await
     }
 
@@ -91,7 +101,17 @@ impl ApiClient {
 
     /// Upload a new bot banner using the documented raw-image request body.
     pub async fn set_banner(&self, bytes: &[u8], format: ImageFormat) -> Result<ImageAsset> {
-        self.upload_profile_image("me/banner", bytes, format, 10 * 1024 * 1024)
+        self.upload_profile_image("me/banner", bytes, format, 10 * 1024 * 1024, false)
+            .await
+    }
+
+    /// Upload a bot banner using the documented multipart file field.
+    pub async fn set_banner_multipart(
+        &self,
+        bytes: &[u8],
+        format: ImageFormat,
+    ) -> Result<ImageAsset> {
+        self.upload_profile_image("me/banner", bytes, format, 10 * 1024 * 1024, true)
             .await
     }
 
@@ -1284,6 +1304,7 @@ impl ApiClient {
         bytes: &[u8],
         format: ImageFormat,
         maximum_bytes: usize,
+        multipart: bool,
     ) -> Result<ImageAsset> {
         if bytes.is_empty() {
             return Err(Error::EmptyImageUpload);
@@ -1303,11 +1324,24 @@ impl ApiClient {
         let mut retries = 0_u8;
 
         loop {
-            let mut response = self
-                .client
-                .put(url.clone())
-                .header(CONTENT_TYPE, format.content_type())
-                .body(bytes.to_vec())
+            let request = self.client.put(url.clone());
+            let request = if multipart {
+                let filename = if route.ends_with("avatar") {
+                    format!("avatar.{}", format.extension())
+                } else {
+                    format!("banner.{}", format.extension())
+                };
+                let part = reqwest::multipart::Part::bytes(bytes.to_vec())
+                    .file_name(filename)
+                    .mime_str(format.content_type())
+                    .map_err(sanitize_transport_error)?;
+                request.multipart(reqwest::multipart::Form::new().part("file", part))
+            } else {
+                request
+                    .header(CONTENT_TYPE, format.content_type())
+                    .body(bytes.to_vec())
+            };
+            let mut response = request
                 .send()
                 .await
                 .map_err(sanitize_transport_error)?;
