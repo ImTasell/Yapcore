@@ -38,10 +38,12 @@ pub use models::{
     ActionRow, Activity, ActivityRotation, Ban, BotProfile, BotProfileEdit, BotStatus, Button,
     ButtonStyle, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions,
     ChannelListing, ChannelType, CommandDefinition, CommandDefinitionError,
+    CommandOption, CommandOptionChoice, CommandOptionError, CommandOptionType,
     ComponentValidationError, Embed, EmbedAuthor, EmbedBuilder, EmbedField, EmbedFooter,
     EmbedValidationError, EventBatch, EventEnvelope, ImageAsset, ImageFormat,
     InteractionResponseType, Member, Message, Modal, ModalValidationError, PermissionTarget,
-    Presence, Role, RoleEditOptions, Server, TextInput, TextInputStyle, UserProfile,
+    ParsedCommandOptions, Presence, Role, RoleEditOptions, Server, TextInput, TextInputStyle,
+    UserProfile,
     VoiceChannelState,
 };
 
