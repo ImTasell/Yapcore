@@ -240,6 +240,27 @@ mod tests {
     }
 
     #[test]
+    fn isolates_handlers_by_interaction_kind() {
+        let mut registry = ButtonRegistry::default();
+        registry
+            .register_exact("shared", |_context| async { Ok(()) })
+            .unwrap();
+        registry
+            .register_kind_owned("select", "shared", None, |_context| async { Ok(()) })
+            .unwrap();
+        registry
+            .register_kind_owned("modal_submit", "shared", None, |_context| async {
+                Ok(())
+            })
+            .unwrap();
+
+        assert_eq!(registry.handlers_for("button", "shared").len(), 1);
+        assert_eq!(registry.handlers_for("select", "shared").len(), 1);
+        assert_eq!(registry.handlers_for("modal_submit", "shared").len(), 1);
+        assert!(registry.handlers_for("unknown", "shared").is_empty());
+    }
+
+    #[test]
     fn matches_exact_and_prefix_handlers_in_registration_order() {
         let mut registry = ButtonRegistry::default();
 
