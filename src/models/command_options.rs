@@ -35,72 +35,119 @@ pub struct CommandOptionChoice {
 impl CommandOptionChoice {
     /// Create a string choice.
     pub fn string(name: impl Into<String>, value: impl Into<String>) -> Self {
-        Self { name: name.into(), value: Value::String(value.into()) }
+        Self {
+            name: name.into(),
+            value: Value::String(value.into()),
+        }
     }
 
     /// Create an integer choice.
     pub fn integer(name: impl Into<String>, value: i64) -> Self {
-        Self { name: name.into(), value: Value::from(value) }
+        Self {
+            name: name.into(),
+            value: Value::from(value),
+        }
     }
 
     /// Create a numeric choice.
     pub fn number(name: impl Into<String>, value: f64) -> Result<Self, CommandOptionError> {
         let value = serde_json::Number::from_f64(value)
             .ok_or(CommandOptionError::NonFiniteNumber)?;
-        Ok(Self { name: name.into(), value: Value::Number(value) })
+        Ok(Self {
+            name: name.into(),
+            value: Value::Number(value),
+        })
     }
 
     /// Display name shown to users.
-    pub fn name(&self) -> &str { &self.name }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 /// Validated option schema builder.
 impl CommandOption {
     /// Declare a string argument.
-    pub fn string(name: impl Into<String>, description: impl Into<String>) -> Result<Self, CommandOptionError> {
+    pub fn string(
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<Self, CommandOptionError> {
         Self::new(name, description, CommandOptionType::String)
     }
 
     /// Declare an integer argument.
-    pub fn integer(name: impl Into<String>, description: impl Into<String>) -> Result<Self, CommandOptionError> {
+    pub fn integer(
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<Self, CommandOptionError> {
         Self::new(name, description, CommandOptionType::Integer)
     }
 
     /// Declare a floating-point argument.
-    pub fn number(name: impl Into<String>, description: impl Into<String>) -> Result<Self, CommandOptionError> {
+    pub fn number(
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<Self, CommandOptionError> {
         Self::new(name, description, CommandOptionType::Number)
     }
 
     /// Declare a true/false argument.
-    pub fn boolean(name: impl Into<String>, description: impl Into<String>) -> Result<Self, CommandOptionError> {
+    pub fn boolean(
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<Self, CommandOptionError> {
         Self::new(name, description, CommandOptionType::Boolean)
     }
 
     /// Declare a user ID argument.
-    pub fn user(name: impl Into<String>, description: impl Into<String>) -> Result<Self, CommandOptionError> {
+    pub fn user(
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<Self, CommandOptionError> {
         Self::new(name, description, CommandOptionType::User)
     }
 
     /// Declare a channel ID argument.
-    pub fn channel(name: impl Into<String>, description: impl Into<String>) -> Result<Self, CommandOptionError> {
+    pub fn channel(
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<Self, CommandOptionError> {
         Self::new(name, description, CommandOptionType::Channel)
     }
 
     /// Declare a role ID argument.
-    pub fn role(name: impl Into<String>, description: impl Into<String>) -> Result<Self, CommandOptionError> {
+    pub fn role(
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<Self, CommandOptionError> {
         Self::new(name, description, CommandOptionType::Role)
     }
 
-    fn new(name: impl Into<String>, description: impl Into<String>, kind: CommandOptionType) -> Result<Self, CommandOptionError> {
+    fn new(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        kind: CommandOptionType,
+    ) -> Result<Self, CommandOptionError> {
         let name = name.into();
         let description = description.into();
-        if name.is_empty() || name.len() > 32 || !name.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_') {
+        if name.is_empty()
+            || name.len() > 32
+            || !name
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+        {
             return Err(CommandOptionError::InvalidName);
         }
         if description.is_empty() || description.chars().count() > 100 {
             return Err(CommandOptionError::InvalidDescription);
         }
-        Ok(Self { name, description, kind, required: false, choices: Vec::new() })
+        Ok(Self {
+            name,
+            description,
+            kind,
+            required: false,
+            choices: Vec::new(),
+        })
     }
 
     /// Mark this argument as required.
@@ -117,7 +164,11 @@ impl CommandOption {
         if self.choices.len() >= 25 {
             return Err(CommandOptionError::TooManyChoices);
         }
-        if self.choices.iter().any(|existing| existing.value == choice.value || existing.name == choice.name) {
+        if self
+            .choices
+            .iter()
+            .any(|existing| existing.value == choice.value || existing.name == choice.name)
+        {
             return Err(CommandOptionError::DuplicateChoice);
         }
         self.choices.push(choice);
@@ -125,16 +176,24 @@ impl CommandOption {
     }
 
     /// Argument name.
-    pub fn name(&self) -> &str { &self.name }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 
     /// Argument description.
-    pub fn description(&self) -> &str { &self.description }
+    pub fn description(&self) -> &str {
+        &self.description
+    }
 
     /// Argument type.
-    pub fn kind(&self) -> CommandOptionType { self.kind }
+    pub fn kind(&self) -> CommandOptionType {
+        self.kind
+    }
 
     /// Whether the argument is required.
-    pub fn is_required(&self) -> bool { self.required }
+    pub fn is_required(&self) -> bool {
+        self.required
+    }
 }
 
 /// Parsed, validated values for a command invocation.
@@ -184,11 +243,15 @@ impl ParsedCommandOptions {
                 None
             };
             let Some(raw) = raw else {
-                if option.required { return Err(CommandOptionError::MissingRequired(option.name.clone())); }
+                if option.required {
+                    return Err(CommandOptionError::MissingRequired(option.name.clone()));
+                }
                 continue;
             };
             let value = parse_value(option.kind, &raw)?;
-            if !option.choices.is_empty() && !option.choices.iter().any(|choice| choice.value == value) {
+            if !option.choices.is_empty()
+                && !option.choices.iter().any(|choice| choice.value == value)
+            {
                 return Err(CommandOptionError::InvalidChoice(option.name.clone()));
             }
             values.insert(option.name.clone(), value);
@@ -238,7 +301,9 @@ impl ParsedCommandOptions {
     }
 
     /// Return the complete parsed value map.
-    pub fn as_map(&self) -> &BTreeMap<String, Value> { &self.values }
+    pub fn as_map(&self) -> &BTreeMap<String, Value> {
+        &self.values
+    }
 }
 
 fn parse_value(kind: CommandOptionType, raw: &str) -> Result<Value, CommandOptionError> {
@@ -249,8 +314,12 @@ fn parse_value(kind: CommandOptionType, raw: &str) -> Result<Value, CommandOptio
         CommandOptionType::Role => crate::ids::RoleId::new(raw.to_owned()).map(|id| Value::String(id.into_string())).map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
         CommandOptionType::Integer => raw.parse::<i64>().map(Value::from).map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
         CommandOptionType::Number => {
-            let number = raw.parse::<f64>().map_err(|_| CommandOptionError::InvalidValue(raw.to_owned()))?;
-            serde_json::Number::from_f64(number).map(Value::Number).ok_or(CommandOptionError::NonFiniteNumber)
+            let number = raw
+                .parse::<f64>()
+                .map_err(|_| CommandOptionError::InvalidValue(raw.to_owned()))?;
+            serde_json::Number::from_f64(number)
+                .map(Value::Number)
+                .ok_or(CommandOptionError::NonFiniteNumber)
         }
         CommandOptionType::Boolean => match raw.to_ascii_lowercase().as_str() {
             "true" | "yes" | "on" => Ok(Value::Bool(true)),
@@ -262,7 +331,10 @@ fn parse_value(kind: CommandOptionType, raw: &str) -> Result<Value, CommandOptio
 
 fn choice_matches(kind: CommandOptionType, value: &Value) -> bool {
     match kind {
-        CommandOptionType::String | CommandOptionType::User | CommandOptionType::Channel | CommandOptionType::Role => value.is_string(),
+        CommandOptionType::String
+        | CommandOptionType::User
+        | CommandOptionType::Channel
+        | CommandOptionType::Role => value.is_string(),
         CommandOptionType::Integer => value.as_i64().is_some(),
         CommandOptionType::Number => value.is_number(),
         CommandOptionType::Boolean => value.is_boolean(),
@@ -275,20 +347,37 @@ fn tokenize(input: &str) -> Result<Vec<String>, CommandOptionError> {
     let mut quote = None;
     let mut escaped = false;
     for ch in input.chars() {
-        if escaped { current.push(ch); escaped = false; continue; }
-        if ch == '\\' && quote.is_some() { escaped = true; continue; }
+        if escaped {
+            current.push(ch);
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' && quote.is_some() {
+            escaped = true;
+            continue;
+        }
         if let Some(active) = quote {
-            if ch == active { quote = None; } else { current.push(ch); }
+            if ch == active {
+                quote = None;
+            } else {
+                current.push(ch);
+            }
         } else if ch == '"' || ch == '\'' {
             quote = Some(ch);
         } else if ch.is_whitespace() {
-            if !current.is_empty() { tokens.push(std::mem::take(&mut current)); }
+            if !current.is_empty() {
+                tokens.push(std::mem::take(&mut current));
+            }
         } else {
             current.push(ch);
         }
     }
-    if quote.is_some() || escaped { return Err(CommandOptionError::UnterminatedQuote); }
-    if !current.is_empty() { tokens.push(current); }
+    if quote.is_some() || escaped {
+        return Err(CommandOptionError::UnterminatedQuote);
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
     Ok(tokens)
 }
 
@@ -347,7 +436,10 @@ mod tests {
         assert_eq!(parsed.get_string("name"), Some("Altix Dev"));
         assert_eq!(parsed.get_integer("count"), Some(12));
         assert_eq!(parsed.get_boolean("enabled"), Some(true));
-        assert_eq!(parsed.get_user("member").unwrap().as_str(), "123e4567-e89b-12d3-a456-426614174003");
+        assert_eq!(
+            parsed.get_user("member").unwrap().as_str(),
+            "123e4567-e89b-12d3-a456-426614174003"
+        );
     }
 
     #[test]
@@ -374,10 +466,19 @@ mod tests {
             .unwrap()
             .choice(CommandOptionChoice::string("Fast", "fast")).unwrap()
             .required(true)];
-        assert!(matches!(ParsedCommandOptions::parse(&schema, ""), Err(CommandOptionError::MissingRequired(_))));
-        assert!(matches!(ParsedCommandOptions::parse(&schema, "slow"), Err(CommandOptionError::InvalidChoice(_))));
+        assert!(matches!(
+            ParsedCommandOptions::parse(&schema, ""),
+            Err(CommandOptionError::MissingRequired(_))
+        ));
+        assert!(matches!(
+            ParsedCommandOptions::parse(&schema, "slow"),
+            Err(CommandOptionError::InvalidChoice(_))
+        ));
         let integer = [CommandOption::integer("count", "Count").unwrap()];
-        assert!(matches!(ParsedCommandOptions::parse(&integer, "nope"), Err(CommandOptionError::InvalidValue(_))));
+        assert!(matches!(
+            ParsedCommandOptions::parse(&integer, "nope"),
+            Err(CommandOptionError::InvalidValue(_))
+        ));
     }
 
     #[test]
@@ -406,8 +507,17 @@ mod tests {
     #[test]
     fn rejects_duplicate_unknown_and_unterminated_arguments() {
         let schema = [CommandOption::string("name", "Name").unwrap()];
-        assert!(matches!(ParsedCommandOptions::parse(&schema, "name=a name=b"), Err(CommandOptionError::DuplicateArgument(_))));
-        assert!(matches!(ParsedCommandOptions::parse(&schema, "other=a"), Err(CommandOptionError::UnknownArgument(_))));
-        assert!(matches!(ParsedCommandOptions::parse(&schema, r#""unfinished"#), Err(CommandOptionError::UnterminatedQuote)));
+        assert!(matches!(
+            ParsedCommandOptions::parse(&schema, "name=a name=b"),
+            Err(CommandOptionError::DuplicateArgument(_))
+        ));
+        assert!(matches!(
+            ParsedCommandOptions::parse(&schema, "other=a"),
+            Err(CommandOptionError::UnknownArgument(_))
+        ));
+        assert!(matches!(
+            ParsedCommandOptions::parse(&schema, r#""unfinished"#),
+            Err(CommandOptionError::UnterminatedQuote)
+        ));
     }
 }
