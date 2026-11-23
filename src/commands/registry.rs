@@ -212,6 +212,29 @@ mod tests {
     }
 
     #[test]
+    fn removes_only_commands_owned_by_selected_cog() {
+        let mut registry = CommandRegistry::default();
+        registry
+            .register_owned("one", "One", Some("alpha".to_owned()), |_context| async {
+                Ok(())
+            })
+            .unwrap();
+        registry
+            .register_owned("two", "Two", Some("alpha".to_owned()), |_context| async {
+                Ok(())
+            })
+            .unwrap();
+        registry
+            .register("plain", "Plain", |_context| async { Ok(()) })
+            .unwrap();
+
+        assert_eq!(registry.remove_owner("alpha"), 2);
+        assert_eq!(registry.definitions().len(), 1);
+        assert!(registry.contains("plain"));
+        assert!(!registry.contains("one"));
+    }
+
+    #[test]
     fn preserves_cog_ownership_for_registered_commands() {
         let mut registry = CommandRegistry::default();
         registry
