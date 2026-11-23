@@ -1189,6 +1189,15 @@ impl Bot {
         self.api.set_avatar(bytes, format).await
     }
 
+    /// Upload a bot avatar using the multipart file field.
+    pub async fn set_avatar_multipart(
+        &self,
+        bytes: &[u8],
+        format: ImageFormat,
+    ) -> Result<ImageAsset> {
+        self.api.set_avatar_multipart(bytes, format).await
+    }
+
     /// Remove the bot's avatar.
     pub async fn delete_avatar(&self) -> Result<()> {
         self.api.delete_avatar().await
@@ -1197,6 +1206,15 @@ impl Bot {
     /// Upload a PNG, JPEG, GIF, or WebP banner (maximum 10 MiB).
     pub async fn set_banner(&self, bytes: &[u8], format: ImageFormat) -> Result<ImageAsset> {
         self.api.set_banner(bytes, format).await
+    }
+
+    /// Upload a bot banner using the multipart file field.
+    pub async fn set_banner_multipart(
+        &self,
+        bytes: &[u8],
+        format: ImageFormat,
+    ) -> Result<ImageAsset> {
+        self.api.set_banner_multipart(bytes, format).await
     }
 
     /// Remove the bot's banner.
