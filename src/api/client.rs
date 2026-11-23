@@ -2676,4 +2676,35 @@ mod tests {
             "DELETE /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/categories/123e4567-e89b-12d3-a456-426614174024 HTTP/1.1"
         ));
     }
+
+    #[tokio::test]
+    async fn deletes_channel_and_rejects_empty_category_names() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174021";
+        let server = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
+        let client = test_client(&server, 1024).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        client.delete_channel(&channel_id).await.unwrap();
+        let request = server.finish();
+        assert!(request.starts_with(
+            "DELETE /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174021 HTTP/1.1"
+        ));
+
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+        assert!(matches!(
+            client.create_category(&server_id, "  ").await,
+            Err(Error::EmptyCategoryName)
+        ));
+        assert!(matches!(
+            client.rename_category(
+                &server_id,
+                &crate::ids::CategoryId::new("123e4567-e89b-12d3-a456-426614174024").unwrap(),
+                ""
+            ).await,
+            Err(Error::EmptyCategoryName)
+        ));
+    }
+
 }
