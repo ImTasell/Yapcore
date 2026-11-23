@@ -437,6 +437,8 @@ impl Bot {
         F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
+        crate::models::ParsedCommandOptions::validate_schema(&options)
+            .map_err(|_| crate::CommandDefinitionError::InvalidOptionSchema)?;
         let schema = Arc::new(options);
         let handler = Arc::new(handler);
         self.command(name, description, move |context| {
