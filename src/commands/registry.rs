@@ -207,9 +207,12 @@ mod tests {
     fn preserves_cog_ownership_for_registered_commands() {
         let mut registry = CommandRegistry::default();
         registry
-            .register_owned("ping", "Ping", Some("utility".to_owned()), |_context| async {
-                Ok(())
-            })
+            .register_owned(
+                "ping",
+                "Ping",
+                Some("utility".to_owned()),
+                |_context| async { Ok(()) },
+            )
             .unwrap();
         assert_eq!(registry.owner("ping"), Some("utility"));
         assert_eq!(registry.owner("missing"), None);
