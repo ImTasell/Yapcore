@@ -438,11 +438,25 @@ impl Bot {
         self.command(name, description, move |context| {
             let schema = schema.clone();
             let handler = handler.clone();
+            let original_context = context.clone();
+            let is_interaction = context.is_interaction();
             let context = context.with_option_schema(&schema);
             async move {
-                let context = context.map_err(|error| -> crate::HandlerError {
-                    Box::new(error)
-                })?;
+                let context = match context {
+                    Ok(context) => context,
+                    Err(error) => {
+                        let message = format!("Invalid arguments: {error}");
+                        let response = if is_interaction {
+                            original_context.ephemeral(message).await
+                        } else {
+                            original_context.reply(message).await
+                        };
+                        response.map_err(|error| -> crate::HandlerError {
+                            Box::new(error)
+                        })?;
+                        return Ok(());
+                    }
+                };
                 handler(context).await
             }
         })
