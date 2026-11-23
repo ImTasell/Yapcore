@@ -1,6 +1,6 @@
 use std::future::Future;
-use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::task::JoinHandle;
 
@@ -466,9 +466,7 @@ impl Bot {
                         } else {
                             original_context.reply(message).await
                         };
-                        response.map_err(|error| -> crate::HandlerError {
-                            Box::new(error)
-                        })?;
+                        response.map_err(|error| -> crate::HandlerError { Box::new(error) })?;
                         return Ok(());
                     }
                 };
@@ -654,35 +652,33 @@ impl Bot {
         for (event_type, added) in [("reaction_add", true), ("reaction_remove", false)] {
             let handler = Arc::clone(&handler);
             let bot_user_id = Arc::clone(&self.bot_user_id);
-            self.events.register_owned(event_type, owner.clone(), move |event| {
-                let handler = Arc::clone(&handler);
-                let bot_user_id = Arc::clone(&bot_user_id);
-                async move {
-                    let is_own_message = bot_user_id
-                        .read()
-                        .ok()
-                        .and_then(|current| {
-                            current.as_ref().map(|id| {
-                                event
-                                    .data
-                                    .get("message_author_id")
-                                    .and_then(Value::as_str)
-                                    == Some(id.as_str())
+            self.events
+                .register_owned(event_type, owner.clone(), move |event| {
+                    let handler = Arc::clone(&handler);
+                    let bot_user_id = Arc::clone(&bot_user_id);
+                    async move {
+                        let is_own_message = bot_user_id
+                            .read()
+                            .ok()
+                            .and_then(|current| {
+                                current.as_ref().map(|id| {
+                                    event.data.get("message_author_id").and_then(Value::as_str)
+                                        == Some(id.as_str())
+                                })
                             })
-                        })
-                        .unwrap_or(false);
+                            .unwrap_or(false);
 
-                    if !is_own_message {
-                        return Ok(());
-                    }
+                        if !is_own_message {
+                            return Ok(());
+                        }
 
-                    let mut enriched = event;
-                    if let Some(data) = enriched.data.as_object_mut() {
-                        data.insert("added".to_owned(), Value::Bool(added));
+                        let mut enriched = event;
+                        if let Some(data) = enriched.data.as_object_mut() {
+                            data.insert("added".to_owned(), Value::Bool(added));
+                        }
+                        handler(enriched).await
                     }
-                    handler(enriched).await
-                }
-            })?;
+                })?;
         }
 
         Ok(self)
@@ -1477,7 +1473,9 @@ impl Bot {
         message_id: &MessageId,
         components: &[crate::models::LayoutComponent],
     ) -> Result<Message> {
-        self.api.edit_layout(channel_id, message_id, components).await
+        self.api
+            .edit_layout(channel_id, message_id, components)
+            .await
     }
 
     /// Send a message with button action rows.
@@ -1848,6 +1846,7 @@ impl Bot {
                     &token,
                     InteractionResponseType::Ephemeral,
                     Some("This command could not be recognized."),
+None,
                 )
                 .await?;
             return Ok(());
@@ -1860,6 +1859,7 @@ impl Bot {
                     &token,
                     InteractionResponseType::Ephemeral,
                     Some("This command is not registered by this bot."),
+None,
                 )
                 .await?;
             return Ok(());
@@ -1872,6 +1872,7 @@ impl Bot {
                     &token,
                     InteractionResponseType::Ephemeral,
                     Some("This command has no channel context."),
+None,
                 )
                 .await?;
             return Ok(());
@@ -1886,6 +1887,7 @@ impl Bot {
                         &token,
                         InteractionResponseType::Ephemeral,
                         Some("This command has an invalid channel context."),
+None,
                     )
                     .await?;
                 return Ok(());
@@ -2644,10 +2646,8 @@ mod tests {
                 crate::models::CommandOption::string("name", "Display name")
                     .unwrap()
                     .required(true),
-                crate::models::CommandOption::integer("age", "Age")
-                    .unwrap(),
-                crate::models::CommandOption::boolean("public", "Public profile")
-                    .unwrap(),
+                crate::models::CommandOption::integer("age", "Age").unwrap(),
+                crate::models::CommandOption::boolean("public", "Public profile").unwrap(),
             ],
             move |context| {
                 let observed = observed_by_handler.clone();
@@ -2705,10 +2705,11 @@ mod tests {
             result,
             Err(crate::CommandDefinitionError::InvalidOptionSchema)
         ));
-        assert!(!bot
-            .command_definitions()
-            .iter()
-            .any(|command| command.name() == "invalid"));
+        assert!(
+            !bot.command_definitions()
+                .iter()
+                .any(|command| command.name() == "invalid")
+        );
     }
 
     #[tokio::test]
@@ -2726,9 +2727,11 @@ mod tests {
         bot.command_with_options(
             "count",
             "Set a count",
-            vec![crate::models::CommandOption::integer("value", "Count")
-                .unwrap()
-                .required(true)],
+            vec![
+                crate::models::CommandOption::integer("value", "Count")
+                    .unwrap()
+                    .required(true),
+            ],
             move |_context| {
                 let invoked = invoked_by_handler.clone();
                 async move {
@@ -2785,13 +2788,17 @@ mod tests {
 
             fn register(&self, bot: &mut Bot) -> std::result::Result<(), String> {
                 let invoked = self.invoked.clone();
-                bot.command("restricted", "A command guarded by its cog", move |_context| {
-                    let invoked = invoked.clone();
-                    async move {
-                        invoked.store(true, Ordering::SeqCst);
-                        Ok(())
-                    }
-                })
+                bot.command(
+                    "restricted",
+                    "A command guarded by its cog",
+                    move |_context| {
+                        let invoked = invoked.clone();
+                        async move {
+                            invoked.store(true, Ordering::SeqCst);
+                            Ok(())
+                        }
+                    },
+                )
                 .map_err(|error| error.to_string())?;
                 Ok(())
             }
@@ -2810,13 +2817,17 @@ mod tests {
 
         let public_invoked = Arc::new(AtomicBool::new(false));
         let public_invoked_by_handler = public_invoked.clone();
-        bot.command("public", "A command outside the guarded cog", move |_context| {
-            let invoked = public_invoked_by_handler.clone();
-            async move {
-                invoked.store(true, Ordering::SeqCst);
-                Ok(())
-            }
-        })
+        bot.command(
+            "public",
+            "A command outside the guarded cog",
+            move |_context| {
+                let invoked = public_invoked_by_handler.clone();
+                async move {
+                    invoked.store(true, Ordering::SeqCst);
+                    Ok(())
+                }
+            },
+        )
         .unwrap();
 
         let event = crate::models::EventEnvelope {
@@ -2856,17 +2867,17 @@ mod tests {
         use std::sync::{Arc, Mutex};
 
         let mut bot = Bot::builder().token("yb_test-token").build().unwrap();
-        let bot_user_id =
-            UserId::new("123e4567-e89b-12d3-a456-426614174099").unwrap();
+        let bot_user_id = UserId::new("123e4567-e89b-12d3-a456-426614174099").unwrap();
         let observed = Arc::new(Mutex::new(Vec::new()));
         let observed_by_handler = observed.clone();
 
         bot.on_reaction_on_mine(move |event| {
             let observed = observed_by_handler.clone();
             async move {
-                observed.lock().unwrap().push(
-                    event.data["added"].as_bool().expect("reaction added flag"),
-                );
+                observed
+                    .lock()
+                    .unwrap()
+                    .push(event.data["added"].as_bool().expect("reaction added flag"));
                 Ok(())
             }
         })
@@ -2888,7 +2899,9 @@ mod tests {
                 }),
                 created_at: None,
             };
-            bot.dispatch_event(&event, Some(&bot_user_id)).await.unwrap();
+            bot.dispatch_event(&event, Some(&bot_user_id))
+                .await
+                .unwrap();
         }
 
         assert_eq!(*observed.lock().unwrap(), [true, false]);
