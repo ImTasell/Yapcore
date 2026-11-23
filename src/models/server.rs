@@ -15,6 +15,24 @@ pub enum ChannelType {
     Voice,
 }
 
+/// Target for a channel or category permission override.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PermissionTarget {
+    /// The server-wide @everyone role.
+    Everyone,
+    /// A specific server role.
+    Role(RoleId),
+}
+
+impl PermissionTarget {
+    pub(crate) fn as_path_segment(&self) -> &str {
+        match self {
+            Self::Everyone => "everyone",
+            Self::Role(role_id) => role_id.as_str(),
+        }
+    }
+}
+
 impl ChannelType {
     pub(crate) fn as_query_value(self) -> &'static str {
         match self {
