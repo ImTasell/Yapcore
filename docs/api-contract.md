@@ -165,6 +165,10 @@ Send payload fields documented: `content`, `reply_to`, `embeds`, `components`. C
 
 The developer guide does not describe ordinary message-file uploads in its bot message endpoint summary. The Python source implements multipart attachments, sticker IDs, nonce handling and a Components V2 send format. Treat those as unverified extensions until the detailed API schema or live test-bot calls confirm them.
 
+### Lifecycle error callbacks
+
+The SDK surface also exposes an `error` callback for runtime and handler failures. Yapcore reports these through `Bot::on_error`, using an `ErrorEvent` with a stage, optional event ID/type, command name or button custom ID, and the error message. Failures inside an error callback are logged and are not recursively reported.
+
 ### Interactions
 
 | Method | Route | Contract |
@@ -187,6 +191,10 @@ The documented event schema is for button clicks (`type: "button"`). Interaction
 - The interaction token is sensitive and must not be logged or exposed.
 
 The current public guide documents buttons. It does not document the Python package's select-menu and modal-submit interaction paths in this endpoint summary; keep those behind an unverified/experimental boundary.
+
+### Generic authenticated API escape hatch
+
+The official SDKs expose `bot.api(method, path, body?)` for endpoints not wrapped by convenience methods. Yapcore exposes the same capability as `ApiClient::api` and `Bot::api`. The path is relative to the configured bot API base; absolute URLs, origin-relative paths, and traversal segments are rejected so the bot token cannot be redirected to an unrelated host. The response is returned as `serde_json::Value`.
 
 ### Member roles and moderation
 
@@ -261,7 +269,7 @@ This is distinct from a channel webhook URL used by external services to post me
 | --- | --- |
 | Polling | 100 events per response; wait up to 25 seconds; event retention one day |
 | Catch-up | `max_age` up to 86,400 seconds |
-| Commands | 50 commands per bot; name 1–32 chars; description max 100 |
+| Commands | 100 commands per bot; name 1–32 chars; description max 100 |
 | Message content | 2,000 characters |
 | Messages | 30/minute per server and 30/minute overall per bot; verified bots may send 300/minute overall; DM limit is per DM |
 | Message history | Default 50; max 100 |
