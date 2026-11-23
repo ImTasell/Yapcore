@@ -7,7 +7,7 @@ use crate::api::ApiClient;
 use crate::error::{Error, Result};
 use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
 use crate::interactions::InteractionSession;
-use crate::models::InteractionResponseType;
+use crate::models::{InteractionResponseType, Modal};
 
 /// Inputs required to create a slash-command context.
 #[derive(Debug, Clone)]
@@ -168,6 +168,17 @@ impl CommandContext {
     pub async fn ephemeral(&self, content: impl AsRef<str>) -> Result<()> {
         self.answer_interaction(InteractionResponseType::Ephemeral, Some(content.as_ref()))
             .await
+    }
+
+    /// Open a modal as the slash command's initial response.
+    ///
+    /// Prefix commands do not have an interaction token and return
+    /// Error::InteractionRequired from this method.
+    pub async fn show_modal(&self, modal: &Modal) -> Result<()> {
+        let Some(interaction) = self.interaction.as_ref() else {
+            return Err(Error::InteractionRequired);
+        };
+        interaction.respond_with_modal(&self.api, modal).await
     }
 
     /// Acknowledge a slash command without posting a visible message.
