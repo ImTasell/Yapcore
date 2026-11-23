@@ -359,7 +359,11 @@ impl SelectMenu {
                 actual: self.options.len() + 1,
             });
         }
-        if self.options.iter().any(|existing| existing.value == option.value) {
+        if self
+            .options
+            .iter()
+            .any(|existing| existing.value == option.value)
+        {
             return Err(ComponentValidationError::DuplicateSelectOptionValue);
         }
         self.options.push(option);
