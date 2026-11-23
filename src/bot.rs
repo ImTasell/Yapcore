@@ -1435,6 +1435,26 @@ impl Bot {
     pub async fn delete_banner(&self) -> Result<()> {
         self.api.delete_banner().await
     }
+    /// Send an experimental Components V2 layout as the complete message body.
+    pub async fn send_layout(
+        &self,
+        channel_id: &ChannelId,
+        components: &[crate::models::LayoutComponent],
+        reply_to: Option<&MessageId>,
+    ) -> Result<Message> {
+        self.api.send_layout(channel_id, components, reply_to).await
+    }
+
+    /// Replace the layout of an experimental Components V2 message.
+    pub async fn edit_layout(
+        &self,
+        channel_id: &ChannelId,
+        message_id: &MessageId,
+        components: &[crate::models::LayoutComponent],
+    ) -> Result<Message> {
+        self.api.edit_layout(channel_id, message_id, components).await
+    }
+
     /// Send a message with button action rows.
     pub async fn send_message_with_components(
         &self,
