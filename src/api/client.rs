@@ -2509,7 +2509,8 @@ mod tests {
         assert!(request.starts_with("GET /api/bot/v1/me HTTP/1.1"));
         assert!(matches!(error, Error::Api(api) if api.status() == reqwest::StatusCode::FOUND));
     }
-}\n
+
+
     #[tokio::test]
     async fn creates_private_channel_with_initial_access_in_one_request() {
         const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
@@ -2626,5 +2627,4 @@ mod tests {
         let request = delete.finish();
         assert!(request.starts_with("DELETE /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/categories/123e4567-e89b-12d3-a456-426614174024 HTTP/1.1"));
     }
-
-
+}
