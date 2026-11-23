@@ -30,9 +30,10 @@ enum ButtonMatcher {
 }
 
 #[derive(Clone)]
-struct RegisteredButton {
+pub(crate) struct RegisteredButton {
     matcher: ButtonMatcher,
-    handler: ButtonHandler,
+    pub(crate) handler: ButtonHandler,
+    pub(crate) owner: Option<String>,
 }
 
 impl std::fmt::Debug for RegisteredButton {
@@ -70,7 +71,21 @@ impl ButtonRegistry {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.register(ButtonMatcher::Exact(custom_id.into()), handler)
+        self.register(ButtonMatcher::Exact(custom_id.into()), None, handler)
+    }
+
+    /// Register an exact custom ID handler with optional cog ownership metadata.
+    pub fn register_exact_owned<F, Fut>(
+        &mut self,
+        custom_id: impl Into<String>,
+        owner: Option<String>,
+        handler: F,
+    ) -> Result<(), InteractionRegistrationError>
+    where
+        F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        self.register(ButtonMatcher::Exact(custom_id.into()), owner, handler)
     }
 
     /// Register a handler for every custom ID with the given prefix.
@@ -83,12 +98,27 @@ impl ButtonRegistry {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.register(ButtonMatcher::Prefix(prefix.into()), handler)
+        self.register(ButtonMatcher::Prefix(prefix.into()), None, handler)
+    }
+
+    /// Register a prefix handler with optional cog ownership metadata.
+    pub fn register_prefix_owned<F, Fut>(
+        &mut self,
+        prefix: impl Into<String>,
+        owner: Option<String>,
+        handler: F,
+    ) -> Result<(), InteractionRegistrationError>
+    where
+        F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        self.register(ButtonMatcher::Prefix(prefix.into()), owner, handler)
     }
 
     fn register<F, Fut>(
         &mut self,
         matcher: ButtonMatcher,
+        owner: Option<String>,
         handler: F,
     ) -> Result<(), InteractionRegistrationError>
     where
@@ -108,19 +138,23 @@ impl ButtonRegistry {
         }
 
         let handler: ButtonHandler = Arc::new(move |context| Box::pin(handler(context)));
-        self.entries.push(RegisteredButton { matcher, handler });
+        self.entries.push(RegisteredButton {
+            matcher,
+            handler,
+            owner,
+        });
         Ok(())
     }
 
     /// Clone all handlers matching a custom ID, preserving registration order.
-    pub fn handlers_for(&self, custom_id: &str) -> Vec<ButtonHandler> {
+    pub fn handlers_for(&self, custom_id: &str) -> Vec<RegisteredButton> {
         self.entries
             .iter()
             .filter(|entry| match &entry.matcher {
                 ButtonMatcher::Exact(expected) => expected == custom_id,
                 ButtonMatcher::Prefix(prefix) => custom_id.starts_with(prefix),
             })
-            .map(|entry| entry.handler.clone())
+            .cloned()
             .collect()
     }
 }
@@ -128,6 +162,19 @@ impl ButtonRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preserves_cog_ownership_for_button_handlers() {
+        let mut registry = ButtonRegistry::default();
+        registry
+            .register_prefix_owned("vote:", Some("polls".to_owned()), |_context| async {
+                Ok(())
+            })
+            .unwrap();
+        let handlers = registry.handlers_for("vote:yes");
+        assert_eq!(handlers.len(), 1);
+        assert_eq!(handlers[0].owner.as_deref(), Some("polls"));
+    }
 
     #[test]
     fn validates_custom_ids() {
