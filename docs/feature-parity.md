@@ -81,8 +81,8 @@ The official docs say event history is retained for one day. A persistent cursor
 | [x] Documented | `args` and `argv` | Typed `CommandContext` argument access |
 | [x] Documented | 100 command maximum per bot | `validate_command_list` enforces the current official 100-command cap before full-list sync |
 | [x] Documented | Per-command permission/check callback | `Bot::command_with_check` runs an async allow/deny predicate before prefix or slash handlers |
-| [ ] Verify | Typed options: string/integer/number/boolean/user/channel/role | Typed option schema and parser |
-| [ ] Verify | Choices and named `key=value` input | Parser compatibility tests |
+| [~] Verify | Typed options: string/integer/number/boolean/user/channel/role | `CommandOption` schemas, required flags, up to 25 choices, named `key=value` and quoted positional parsing, and typed getters are implemented through `Bot::command_with_options`; this validates local command input and does not yet publish option metadata to the remote slash-command registry |
+| [~] Verify | Choices and named `key=value` input | Choice validation and named/positional parsing are implemented locally; upstream Python compatibility and slash-option wire schema remain unverified |
 | [ ] Verify | Usage/error replies on invalid arguments | Optional built-in validation response |
 | [x] Documented | Command event distinct from regular message | Route slash `command` events to interaction-aware command contexts |
 | [~] Documented | Auto-acknowledge unanswered slash interactions | Two-second auto-ack fallback and ten-response counter; live timing still needs a test-bot smoke test |
