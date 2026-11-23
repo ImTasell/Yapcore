@@ -451,7 +451,14 @@ impl Bot {
                 let context = match context {
                     Ok(context) => context,
                     Err(error) => {
-                        let message = format!("Invalid arguments: {}", error.user_message());
+                        let usage = crate::models::CommandOption::usage(
+                            &original_context.command,
+                            &schema,
+                        );
+                        let message = format!(
+                            "Invalid arguments: {} Use it like this: `{usage}`",
+                            error.user_message()
+                        );
                         let response = if is_interaction {
                             original_context.ephemeral(message).await
                         } else {
