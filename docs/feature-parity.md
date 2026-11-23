@@ -59,9 +59,10 @@ Retry safety rules:
 | [x] Documented | One-day event retention | `run_from` resumes from a caller-persisted cursor within Yapper's one-day retention; persistence remains application-owned |
 | [x] Documented | Optional `max_age` catch-up filter | `poll_events` validates one-day maximum |
 | [x] Documented | Ready lifecycle callback | Synthetic `ready` event after profile retrieval and command synchronization |
-| [ ] Documented | Error lifecycle callback | Typed lifecycle notification for fatal/runtime errors |
+| [x] Documented | Error lifecycle callback | `Bot::on_error` receives typed `ErrorEvent` values for dispatch, listener, command and button-handler failures |
 | [ ] Documented | Event webhooks as a server-side delivery option | Not needed for normal outbound-only client; document as deployment mode |
 | [ ] Verify | WebSocket gateway `wss://rt.yapper.website/bot` | Defer; current public guide does not document its protocol |
+| [x] Documented | Member, reaction, voice and test events | Generic `Bot::on_event` supports the documented `member_join`, `member_leave`, `reaction_add`, `reaction_remove`, `voice_join`, `voice_leave` and `test` envelopes |
 | [ ] Verify | Invite/channel/thread/category/message/server extra event kinds | Preserve unknown event payloads; add typed events only after endpoint confirmation |
 | [ ] Verify | DM message event | Official docs say ordinary DMs are not delivered as bot events |
 | [x] Documented | Generic asynchronous event listeners | `Bot::on_event` delivers the full event envelope in registration order |
@@ -79,7 +80,7 @@ The official docs say event history is retained for one day. A persistent cursor
 | [x] Documented | Prefix-command parsing | Longest matching prefix, case-insensitive name handling |
 | [x] Documented | `args` and `argv` | Typed `CommandContext` argument access |
 | [x] Documented | 100 command maximum per bot | `validate_command_list` enforces the current official 100-command cap before full-list sync |
-| [ ] Documented | Per-command permission/check callback | Async check hook |
+| [x] Documented | Per-command permission/check callback | `Bot::command_with_check` runs an async allow/deny predicate before prefix or slash handlers |
 | [ ] Verify | Typed options: string/integer/number/boolean/user/channel/role | Typed option schema and parser |
 | [ ] Verify | Choices and named `key=value` input | Parser compatibility tests |
 | [ ] Verify | Usage/error replies on invalid arguments | Optional built-in validation response |
@@ -120,7 +121,7 @@ Rust API should favor explicit typed command registration and async handlers. It
 | [ ] Verify | Select menu option builders | Include after schema confirmation |
 | [ ] Verify | Modal/TextInput builders | Include after schema confirmation |
 | [ ] Verify | Components V2: text, section, gallery, separator, file, container | Dedicated typed component enum once protocol is confirmed |
-| [ ] Documented | Plain JSON interoperability | Accept raw `serde_json::Value` as escape hatch |
+| [x] Documented | Plain JSON interoperability | `ApiClient::api` / `Bot::api` provide authenticated relative-route access with origin and traversal checks |
 
 Do not expose both a huge builder API and dozens of raw JSON methods for the same behavior. The builder layer should serialize to stable API payload types.
 
@@ -169,11 +170,11 @@ Do not treat voice presence management as equivalent to voice media streaming. T
 
 | Status | Python feature | Rust target |
 | --- | --- | --- |
-| [ ] Documented | Cog groups commands/listeners/buttons | A `Cog` trait or builder-based registration group |
-| [ ] Documented | Setup function/extensions | Explicit setup function or module registration |
-| [ ] Documented | Load/unload/reload command groups | Runtime registration lifecycle |
+| [x] SDK feature | Cog groups commands/listeners/buttons | `Cog` trait plus `Bot::add_cog`; compiled cogs register commands, listeners and buttons as an all-or-nothing transaction |
+| [x] SDK feature | Setup function/extensions | `Cog::register(&mut Bot)` is the explicit Rust setup entry point |
+| [~] SDK adaptation | Load/unload/reload command groups | `Bot::add_cog` loads statically compiled modules before running; live unload/reload is not exposed because the registries are immutable while the poller runs |
 | [ ] Verify | File-system discovery of `.py` cogs | Rust cannot import source files dynamically; defer or design plugin ABI separately |
-| [ ] Documented | Error attribution to cog/extension | Handler metadata in diagnostics |
+| [~] SDK adaptation | Error attribution to cog/extension | Cog registration errors include the cog name; runtime handler errors include command/event/custom-ID context but do not yet attach cog ownership |
 | [ ] Verify | Opt-in telemetry client | Separate optional feature, off by default, report preview |
 | [ ] Out of scope | Telemetry collection web server/panel under upstream `server/` | Not part of a client SDK port unless explicitly requested |
 
