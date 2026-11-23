@@ -159,6 +159,10 @@ pub enum Error {
     #[error("this interaction has reached its 10-response limit")]
     InteractionAlreadyAnswered,
 
+    /// A modal cannot be opened in response to a modal submission.
+    #[error("a modal cannot be opened in response to a modal submission")]
+    ModalNotAllowedFromModalSubmit,
+
     /// Plain-text messages cannot be empty.
     #[error("message content must not be empty")]
     EmptyMessageContent,
