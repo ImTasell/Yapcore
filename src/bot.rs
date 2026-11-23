@@ -17,8 +17,9 @@ use crate::interactions::{
     ButtonRegistry, InteractionContext, InteractionInvocation, InteractionRegistrationError,
 };
 use crate::models::{
-    Activity, ActivityRotation, BotProfile, BotStatus, CommandDefinition, InteractionResponseType,
-    Message, PermissionTarget, Presence,
+    Activity, ActivityRotation, BotProfile, BotProfileEdit, BotStatus, CommandDefinition,
+    ImageAsset, ImageFormat, InteractionResponseType, Message, PermissionTarget, Presence,
+    VoiceChannelState,
 };
 
 /// Handle used to request a graceful stop of a running bot.
@@ -779,6 +780,32 @@ impl Bot {
             task: Some(task),
         })
     }
+    /// Read voice occupancy for each visible voice channel in a server.
+    pub async fn get_voice_states(
+        &self,
+        server_id: &crate::ids::ServerId,
+    ) -> Result<Vec<VoiceChannelState>> {
+        self.api.get_voice_states(server_id).await
+    }
+
+    /// Move a member from their current voice channel to another channel.
+    pub async fn move_member_to_voice(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &UserId,
+        channel_id: &ChannelId,
+    ) -> Result<Value> {
+        self.api.move_member_to_voice(server_id, user_id, channel_id).await
+    }
+
+    /// Disconnect a member from voice.
+    pub async fn disconnect_member_from_voice(
+        &self,
+        server_id: &crate::ids::ServerId,
+        user_id: &UserId,
+    ) -> Result<Value> {
+        self.api.disconnect_member_from_voice(server_id, user_id).await
+    }
     /// Fetch a member's effective server permissions (experimental API route).
     pub async fn get_member_permissions(
         &self,
@@ -863,6 +890,15 @@ impl Bot {
             .await
     }
 
+    /// Open or find a direct-message channel with a user.
+    pub async fn open_dm(&self, user_id: &UserId) -> Result<ChannelId> {
+        self.api.open_dm(user_id).await
+    }
+
+    /// Open a DM and send a plain-text message to it.
+    pub async fn send_dm(&self, user_id: &UserId, content: impl AsRef<str>) -> Result<Message> {
+        self.api.send_dm(user_id, content.as_ref()).await
+    }
     /// Fetch one public user profile.
     pub async fn get_user(&self, user_id: &UserId) -> Result<crate::models::UserProfile> {
         self.api.get_user(user_id).await
@@ -967,6 +1003,30 @@ impl Bot {
         self.api.get_me().await
     }
 
+    /// Edit the bot's display name and/or bio.
+    pub async fn edit_me(&self, changes: &BotProfileEdit) -> Result<BotProfile> {
+        self.api.edit_me(changes).await
+    }
+
+    /// Upload a PNG, JPEG, GIF, or WebP avatar (maximum 8 MiB).
+    pub async fn set_avatar(&self, bytes: &[u8], format: ImageFormat) -> Result<ImageAsset> {
+        self.api.set_avatar(bytes, format).await
+    }
+
+    /// Remove the bot's avatar.
+    pub async fn delete_avatar(&self) -> Result<()> {
+        self.api.delete_avatar().await
+    }
+
+    /// Upload a PNG, JPEG, GIF, or WebP banner (maximum 10 MiB).
+    pub async fn set_banner(&self, bytes: &[u8], format: ImageFormat) -> Result<ImageAsset> {
+        self.api.set_banner(bytes, format).await
+    }
+
+    /// Remove the bot's banner.
+    pub async fn delete_banner(&self) -> Result<()> {
+        self.api.delete_banner().await
+    }
     /// Send a message with button action rows.
     pub async fn send_message_with_components(
         &self,
