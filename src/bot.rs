@@ -2184,6 +2184,83 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn dispatches_select_submission_with_selected_values() {
+        use std::sync::{Arc, Mutex};
+
+        let server = CallbackServer::start();
+        let mut bot = test_bot(&server);
+        let observed = Arc::new(Mutex::new(None));
+        let observed_by_handler = observed.clone();
+
+        bot.on_select("food", move |context| {
+            let observed = observed_by_handler.clone();
+            async move {
+                *observed.lock().unwrap() = Some(context.values().clone());
+                context
+                    .reply("Selection received")
+                    .await
+                    .map_err(|error| -> crate::HandlerError { Box::new(error) })?;
+                Ok(())
+            }
+        })
+        .unwrap();
+
+        let mut event = button_interaction_event("food");
+        event.data["type"] = serde_json::json!("select");
+        event.data["values"] = serde_json::json!(["pizza", "taco"]);
+        bot.dispatch_event(&event, None).await.unwrap();
+
+        let request = server.finish();
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["type"], "reply");
+        assert_eq!(*observed.lock().unwrap(), Some(serde_json::json!(["pizza", "taco"])));
+    }
+
+    #[tokio::test]
+    async fn dispatches_modal_submission_with_field_values() {
+        use std::sync::{Arc, Mutex};
+
+        let server = CallbackServer::start();
+        let mut bot = test_bot(&server);
+        let observed = Arc::new(Mutex::new(None));
+        let observed_by_handler = observed.clone();
+
+        bot.on_modal("application", move |context| {
+            let observed = observed_by_handler.clone();
+            async move {
+                *observed.lock().unwrap() = Some(context.values().clone());
+                context
+                    .reply("Application received")
+                    .await
+                    .map_err(|error| -> crate::HandlerError { Box::new(error) })?;
+                Ok(())
+            }
+        })
+        .unwrap();
+
+        let mut event = button_interaction_event("application");
+        event.data["type"] = serde_json::json!("modal_submit");
+        event.data["values"] = serde_json::json!({
+            "why": "I enjoy building things",
+            "name": "Altix"
+        });
+        bot.dispatch_event(&event, None).await.unwrap();
+
+        let request = server.finish();
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["type"], "reply");
+        assert_eq!(
+            *observed.lock().unwrap(),
+            Some(serde_json::json!({
+                "why": "I enjoy building things",
+                "name": "Altix"
+            }))
+        );
+    }
+
+    #[tokio::test]
     async fn dispatches_slash_command_reply_through_interaction_callback() {
         let server = CallbackServer::start();
         let mut bot = test_bot(&server);
