@@ -1,7 +1,7 @@
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::models::{ActionRow, Button};
+use crate::models::{ActionRow, Button, SelectActionRow};
 
 /// Flag required when sending or editing a Components V2 layout message.
 pub const COMPONENTS_V2_FLAG: u64 = 1 << 15;
@@ -306,6 +306,8 @@ impl Container {
 pub enum LayoutComponent {
     /// Button action row.
     ActionRow(ActionRow),
+    /// Select-menu action row.
+    SelectActionRow(SelectActionRow),
     /// Markdown text.
     TextDisplay(TextDisplay),
     /// Text section with an accessory.
@@ -323,6 +325,12 @@ pub enum LayoutComponent {
 impl From<ActionRow> for LayoutComponent {
     fn from(value: ActionRow) -> Self {
         Self::ActionRow(value)
+    }
+}
+
+impl From<SelectActionRow> for LayoutComponent {
+    fn from(value: SelectActionRow) -> Self {
+        Self::SelectActionRow(value)
     }
 }
 
