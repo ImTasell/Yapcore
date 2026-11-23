@@ -450,10 +450,15 @@ mod tests {
             .unwrap()
             .into(),
             Separator::new(true, SeparatorSpacing::Large).into(),
-            Container::new([TextDisplay::new("Nested").unwrap().into()])
-                .accent_color(0x5865f2)
-                .unwrap()
-                .into(),
+            Container::new([
+                TextDisplay::new("Nested").unwrap().into(),
+                ActionRow::new([Button::primary("Go", "container:go").unwrap()])
+                    .unwrap()
+                    .into(),
+            ])
+            .accent_color(0x5865f2)
+            .unwrap()
+            .into(),
         ];
 
         let value = serde_json::to_value(&layout).unwrap();
@@ -468,6 +473,12 @@ mod tests {
         assert_eq!(value[3]["type"], 14);
         assert_eq!(value[3]["spacing"], 2);
         assert_eq!(value[4]["type"], 17);
+        assert_eq!(value[4]["components"][0]["type"], 10);
+        assert_eq!(value[4]["components"][1]["type"], "row");
+        assert_eq!(
+            value[4]["components"][1]["components"][0]["custom_id"],
+            "container:go"
+        );
         assert_eq!(value[4]["accent_color"], 0x5865f2);
     }
 
