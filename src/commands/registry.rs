@@ -18,6 +18,7 @@ type HandlerFuture = Pin<Box<dyn Future<Output = HandlerResult> + Send + 'static
 type Handler = Arc<dyn Fn(CommandContext) -> HandlerFuture + Send + Sync + 'static>;
 type CheckFuture = Pin<Box<dyn Future<Output = bool> + Send + 'static>>;
 type Check = Arc<dyn Fn(CommandContext) -> CheckFuture + Send + Sync + 'static>;
+type CogCheck = Arc<dyn Fn(&CommandContext) -> bool + Send + Sync + 'static>;
 
 #[derive(Clone)]
 struct RegisteredCommand {
@@ -31,6 +32,7 @@ struct RegisteredCommand {
 #[derive(Default, Clone)]
 pub(crate) struct CommandRegistry {
     entries: BTreeMap<String, RegisteredCommand>,
+    cog_checks: BTreeMap<String, CogCheck>,
 }
 
 impl std::fmt::Debug for CommandRegistry {
@@ -38,11 +40,20 @@ impl std::fmt::Debug for CommandRegistry {
         formatter
             .debug_struct("CommandRegistry")
             .field("commands", &self.entries.keys().collect::<Vec<_>>())
+            .field("cog_check_count", &self.cog_checks.len())
             .finish()
     }
 }
 
 impl CommandRegistry {
+    /// Attach a synchronous check shared by every command owned by one cog.
+    pub fn set_cog_check<F>(&mut self, owner: impl Into<String>, check: F)
+    where
+        F: Fn(&CommandContext) -> bool + Send + Sync + 'static,
+    {
+        self.cog_checks.insert(owner.into(), Arc::new(check));
+    }
+
     pub fn register<F, Fut>(
         &mut self,
         name: impl Into<String>,
@@ -158,6 +169,7 @@ impl CommandRegistry {
         let before = self.entries.len();
         self.entries
             .retain(|_, entry| entry.owner.as_deref() != Some(owner));
+        self.cog_checks.remove(owner);
         before - self.entries.len()
     }
 
@@ -178,6 +190,13 @@ impl CommandRegistry {
 
     pub async fn dispatch(&self, name: &str, context: CommandContext) -> Option<HandlerResult> {
         let entry = self.entries.get(name)?;
+        if let Some(owner) = entry.owner.as_deref() {
+            if let Some(check) = self.cog_checks.get(owner) {
+                if !check(&context) {
+                    return Some(Ok(()));
+                }
+            }
+        }
         if let Some(check) = &entry.check {
             if !check(context.clone()).await {
                 return Some(Ok(()));
