@@ -1846,7 +1846,7 @@ impl Bot {
                     &token,
                     InteractionResponseType::Ephemeral,
                     Some("This command could not be recognized."),
-None,
+                    None,
                 )
                 .await?;
             return Ok(());
@@ -1859,7 +1859,7 @@ None,
                     &token,
                     InteractionResponseType::Ephemeral,
                     Some("This command is not registered by this bot."),
-None,
+                    None,
                 )
                 .await?;
             return Ok(());
@@ -1872,7 +1872,7 @@ None,
                     &token,
                     InteractionResponseType::Ephemeral,
                     Some("This command has no channel context."),
-None,
+                    None,
                 )
                 .await?;
             return Ok(());
@@ -1887,7 +1887,7 @@ None,
                         &token,
                         InteractionResponseType::Ephemeral,
                         Some("This command has an invalid channel context."),
-None,
+                        None,
                     )
                     .await?;
                 return Ok(());
