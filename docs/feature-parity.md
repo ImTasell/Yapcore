@@ -1,7 +1,7 @@
 # Feature parity matrix
 
 **Target:** `our-websites/yapper.py` version advertised by package metadata: 1.8.5  
-**Audit date:** 2026-11-21
+**Audit date:** 2026-11-23
 
 This matrix separates the Python framework's API surface from what the current official Yapper documentation confirms. "Documented" means described by <https://www.yapper.website/developers>; "verify" means present in Python source but not clearly supported by that documentation.
 
@@ -24,7 +24,7 @@ Implementation status updated 2026-11-23. Stable REST primitives, prefix-command
 | [x] Documented | Read `YAPPER_BOT_TOKEN` | `token_from_env` with missing/invalid-token error |
 | [x] Documented | Configurable API base URL | `Config.api_base_url`, defaulting to official documented base |
 | [x] Documented | Prefix list, default `/` and `!` | `BotBuilder::prefixes`, longest prefix first |
-| [ ] Documented | Logging toggle | Integrate with optional `tracing`; no mandatory logger |
+| [x] SDK feature | Logging toggle | `BotBuilder::logging(bool)` gates Yapcore lifecycle and handler logs; applications still choose their global `tracing` subscriber |
 | [x] Documented | Ignore bot-authored messages by default | `BotBuilder::ignore_bots`, default true |
 | [~] Documented | Start, stop and graceful shutdown | Async `start().await` plus cancellation handle; bounded drain and service-signal helpers remain |
 | [ ] Verify | Automatic version check | Optional, non-blocking and opt-out; decide whether it is desirable |
@@ -38,7 +38,7 @@ Implementation status updated 2026-11-23. Stable REST primitives, prefix-command
 | [x] Documented | JSON request/response handling | Typed Serde models plus raw JSON extension boundaries |
 | [x] Documented | Error status and message | Structured `Error` / `ApiError` |
 | [x] Verify | Error code and permission fields | Preserve when present in server response |
-| [ ] Documented | 429 / 503 Retry-After handling | Shared retry policy; respect server-provided wait |
+| [x] Documented | 429 / 503 Retry-After handling | Shared request layer retries 429/503 only when `Retry-After` is present; at most two retries, no transport-error replay |
 | [ ] Verify | Proxy retry/fallback behavior | Retry only when safe; never duplicate a message send |
 | [x] Documented | Configurable request timeout | Builder/config option; 40-second default |
 | [ ] Documented | Multipart/file sending | Bounded streaming upload; verify current per-file/total limits |
@@ -54,9 +54,9 @@ Retry safety rules:
 | Status | Python feature | Rust target |
 | --- | --- | --- |
 | [x] Documented | Long poll `GET /events?after=&wait=` | `ApiClient::poll_events` and `Bot::run` |
-| [ ] Documented | Cursor-based ordered event delivery | Track monotonically increasing event ID |
+| [x] Documented | Cursor-based ordered event delivery | Monotonic event IDs, in-memory checkpoint, `Bot::last_event_id()` and `Bot::run_from(saved_cursor)` for caller-managed resume |
 | [x] Documented | Up to 100 events per poll, up to 25-second wait | Wait capped at 25 seconds; response body limit enforced |
-| [ ] Documented | One-day event retention | Explain restart/cursor implications |
+| [x] Documented | One-day event retention | `run_from` resumes from a caller-persisted cursor within Yapper's one-day retention; persistence remains application-owned |
 | [x] Documented | Optional `max_age` catch-up filter | `poll_events` validates one-day maximum |
 | [x] Documented | Ready lifecycle callback | Synthetic `ready` event after profile retrieval and command synchronization |
 | [ ] Documented | Error lifecycle callback | Typed lifecycle notification for fatal/runtime errors |
@@ -66,7 +66,7 @@ Retry safety rules:
 | [ ] Verify | DM message event | Official docs say ordinary DMs are not delivered as bot events |
 | [x] Documented | Generic asynchronous event listeners | `Bot::on_event` delivers the full event envelope in registration order |
 | [x] Documented | Filter bot-authored messages | Configurable bot-message filter, default on |
-| [~] Documented | Ignore duplicate/out-of-order event IDs | Deduplicates against the in-memory cursor; persisted cursor/recovery is not implemented |
+| [x] Documented | Ignore duplicate/out-of-order event IDs | Deduplicates against the committed cursor; `run_from` enables recovery when the application persists `last_event_id()` externally |
 
 The official docs say event history is retained for one day. A persistent cursor store is useful for catch-up across restarts, but users must be able to choose a clean-start policy too.
 
@@ -75,10 +75,10 @@ The official docs say event history is retained for one day. A persistent cursor
 | Status | Python feature | Rust target |
 | --- | --- | --- |
 | [x] Documented | Register command names/descriptions | Validated local command registry |
-| [x] Documented | Slash command synchronization | `Bot::run` synchronizes the full command registry before polling |
+| [x] Documented | Read and synchronize registered commands | `Bot::list_commands` reads GET `/commands`; `Bot::run` synchronizes the full registry with PUT before polling |
 | [x] Documented | Prefix-command parsing | Longest matching prefix, case-insensitive name handling |
 | [x] Documented | `args` and `argv` | Typed `CommandContext` argument access |
-| [x] Documented | 50 command maximum per bot (Python SDK local cap is 100) | Rust follows the stricter official platform cap before full-list sync |
+| [x] Documented | 100 command maximum per bot | `validate_command_list` enforces the current official 100-command cap before full-list sync |
 | [ ] Documented | Per-command permission/check callback | Async check hook |
 | [ ] Verify | Typed options: string/integer/number/boolean/user/channel/role | Typed option schema and parser |
 | [ ] Verify | Choices and named `key=value` input | Parser compatibility tests |
@@ -138,8 +138,9 @@ Do not expose both a huge builder API and dozens of raw JSON methods for the sam
 | [x] Documented | Edit nickname | `set_nickname` validates 32 characters; empty string clears |
 | [x] Documented | Create/edit/delete channel | `create_channel`, `edit_channel` and `delete_channel`; typed create/edit options validate names, private access lists and the 21,600-second slowmode cap |
 | [x] Documented | Create/rename/delete category | `create_category`, `rename_category` and `delete_category` |
-| [ ] Documented | Open DM/send DM | User DM endpoints |
-| [ ] Verify | Voice state lookup and move/disconnect members | Source-only routes; verify availability and payloads |
+| [x] Documented | Open DM/send DM | `Bot::open_dm` and `Bot::send_dm` use POST `/users/{user_id}/dm` and the returned channel ID |
+| [x] Documented | Voice state lookup and move/disconnect members | `get_voice_states`, `move_member_to_voice` and `disconnect_member_from_voice` use the documented server voice routes |
+| [x] Documented | Bot profile, avatar and banner | `edit_me`, `set_avatar`/`delete_avatar`, `set_banner`/`delete_banner`; raw image uploads are locally capped at the documented 8 MiB/10 MiB limits |
 | [x] Documented | Set bot status and activity | `Bot::set_status` plus typed `Bot::set_presence(&Presence)`; `Activity::playing` formats the plain activity line |
 | [x] SDK feature | Automatic activity rotation | `ActivityRotation` cycles validated activities; `Bot::rotate_presence` returns a cancellable `PresenceRotationHandle` |
 | [x] SDK feature | Dynamic server-count presence | `Activity::overviewing_servers`, one-shot `refresh_server_count_presence`, and periodic `monitor_server_count_presence` only publish when the server count changes |
@@ -158,7 +159,7 @@ All permission-dependent actions must return a useful structured 403 error. The 
 | [ ] Documented | Event webhooks (inbound HTTPS POST to user's server) | Documentation/reference only unless user wants a webhook server helper |
 | [ ] Verify | Bot-managed channel webhooks: create/list/send/delete | Validate source endpoints and permission requirements |
 | [ ] Verify | Webhook wrapper `send` and `delete` | Include after API confirmation |
-| [ ] Documented | Voice presence, member move and disconnect | Implement as normal REST API |
+| [x] Documented | Voice presence, member move and disconnect | Typed `VoiceChannelState` plus REST lookup, move and disconnect methods; bots still cannot join audio calls |
 | [ ] Defer | Bot joining calls and sending audio through LiveKit | Official docs currently state bots do not join calls; require explicit confirmation |
 | [ ] Defer | E2EE voice key exchange and `VoiceCall` lifecycle | Security-sensitive and undocumented in the current public contract |
 
