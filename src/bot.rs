@@ -420,8 +420,8 @@ impl Bot {
 
     /// Register a command with a typed positional/named argument schema.
     ///
-    /// Invalid arguments are rejected before the handler runs. Inside the
-    /// handler, use `context.options()` to read parsed values.
+    /// Invalid arguments receive an error response and skip the handler. Inside
+    /// the handler, use `context.options()` to read parsed values.
     pub fn command_with_options<F, Fut>(
         &mut self,
         name: impl Into<String>,
@@ -462,7 +462,6 @@ impl Bot {
         })
     }
 
-    /// Register a button handler for one exact component custom ID.
     /// Register a command that runs only when its asynchronous check returns true.
     ///
     /// A rejected check silently skips the handler. The check runs before every
