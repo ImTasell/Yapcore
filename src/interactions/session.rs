@@ -51,9 +51,7 @@ impl InteractionSession {
 
     /// Open a modal as the first response to this interaction.
     pub(crate) async fn respond_with_modal(&self, api: &ApiClient, modal: &Modal) -> Result<()> {
-        self.response_count
-            .compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire)
-            .map_err(|_| Error::InteractionAlreadyAnswered)?;
+        claim_first_interaction_response(&self.response_count)?;
         let modal = serde_json::to_value(modal)?;
         api.respond_interaction(
             &self.id,
@@ -65,6 +63,13 @@ impl InteractionSession {
         .await?;
         Ok(())
     }
+}
+
+fn claim_first_interaction_response(response_count: &AtomicU8) -> Result<()> {
+    response_count
+        .compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire)
+        .map(|_| ())
+        .map_err(|_| Error::InteractionAlreadyAnswered)
 }
 
 fn claim_interaction_response(response_count: &AtomicU8) -> Result<()> {
@@ -93,6 +98,17 @@ mod tests {
     use std::thread;
 
     use super::*;
+
+    #[test]
+    fn modal_can_only_claim_the_first_interaction_response() {
+        let response_count = AtomicU8::new(0);
+        assert!(claim_first_interaction_response(&response_count).is_ok());
+        assert!(matches!(
+            claim_first_interaction_response(&response_count),
+            Err(Error::InteractionAlreadyAnswered)
+        ));
+        assert_eq!(response_count.load(Ordering::Acquire), 1);
+    }
 
     #[test]
     fn interaction_allows_exactly_ten_response_claims() {
