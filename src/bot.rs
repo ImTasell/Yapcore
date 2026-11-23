@@ -2362,4 +2362,46 @@ mod presence_rotation_tests {
         assert_eq!(payload["status"], "online");
         assert_eq!(payload["activity"], "Overviewing 3 servers");
     }
+    #[tokio::test]
+    async fn cog_owned_event_errors_include_the_cog_name() {
+        use std::sync::Mutex;
+
+        struct FailingListenerCog;
+        impl crate::cogs::Cog for FailingListenerCog {
+            fn name(&self) -> &str { "welcome" }
+
+            fn register(&self, bot: &mut Bot) -> std::result::Result<(), String> {
+                bot.on_event("member_join", |_event| async {
+                    Err(Box::new(std::io::Error::other("listener failed")) as HandlerError)
+                })
+                .map_err(|error| error.to_string())?;
+                Ok(())
+            }
+        }
+
+        let captured = Arc::new(std::sync::Mutex::new(None));
+        let captured_handler = Arc::clone(&captured);
+        let mut bot = Bot::builder().token("yb_test-token").build().unwrap();
+        bot.on_error(move |error| {
+            let captured = Arc::clone(&captured_handler);
+            async move {
+                *captured.lock().unwrap() = Some(error);
+                Ok(())
+            }
+        });
+        bot.add_cog(FailingListenerCog).unwrap();
+
+        let event = crate::models::EventEnvelope {
+            id: 42,
+            event_type: "member_join".to_owned(),
+            data: serde_json::json!({ "user_id": "123e4567-e89b-12d3-a456-426614174022" }),
+            created_at: None,
+        };
+        bot.dispatch_event(&event, None).await.unwrap();
+
+        let error = captured.lock().unwrap().clone().unwrap();
+        assert_eq!(error.stage, ErrorStage::EventListener);
+        assert_eq!(error.event_id, Some(42));
+        assert_eq!(error.cog.as_deref(), Some("welcome"));
+    }
 }
