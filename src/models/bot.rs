@@ -102,6 +102,64 @@ impl Presence {
         self.activity.as_ref()
     }
 }
+/// Configuration for cycling through a list of bot activity lines.
+///
+/// The first activity is applied immediately. Remaining activities are
+/// applied one at a time at the configured interval, then the sequence
+/// repeats from the beginning. Yapper receives each item as plain activity
+/// text through its documented HTTP presence endpoint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActivityRotation {
+    activities: Vec<Activity>,
+    interval: std::time::Duration,
+    status: BotStatus,
+}
+
+impl ActivityRotation {
+    /// Create an online activity rotation.
+    ///
+    /// At least two activities and a non-zero interval are required.
+    pub fn new<I>(activities: I, interval: std::time::Duration) -> crate::error::Result<Self>
+    where
+        I: IntoIterator<Item = Activity>,
+    {
+        let activities: Vec<_> = activities.into_iter().collect();
+        if activities.len() < 2 {
+            return Err(crate::error::Error::TooFewRotationActivities {
+                actual: activities.len(),
+            });
+        }
+        if interval.is_zero() {
+            return Err(crate::error::Error::InvalidPresenceRotationInterval);
+        }
+        Ok(Self {
+            activities,
+            interval,
+            status: BotStatus::Online,
+        })
+    }
+
+    /// Set the online state used for every activity in this rotation.
+    pub fn status(mut self, status: BotStatus) -> Self {
+        self.status = status;
+        self
+    }
+
+    /// Return the configured activities.
+    pub fn activities(&self) -> &[Activity] {
+        &self.activities
+    }
+
+    /// Return the interval between activity changes.
+    pub fn interval(&self) -> std::time::Duration {
+        self.interval
+    }
+
+    /// Return the status applied to every activity.
+    pub fn bot_status(&self) -> BotStatus {
+        self.status
+    }
+}
 /// The profile returned by the Yapper GET /me endpoint.
 ///
 /// The extra map preserves fields added by the platform that are not yet
