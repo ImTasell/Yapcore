@@ -449,7 +449,7 @@ impl Bot {
                 let context = match context {
                     Ok(context) => context,
                     Err(error) => {
-                        let message = format!("Invalid arguments: {error}");
+                        let message = format!("Invalid arguments: {}", error.user_message());
                         let response = if is_interaction {
                             original_context.ephemeral(message).await
                         } else {
