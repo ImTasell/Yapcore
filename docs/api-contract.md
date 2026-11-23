@@ -20,7 +20,7 @@
 | Default event transport | Long polling; no public URL or port forwarding required |
 | Optional event delivery | Signed HTTPS webhook configured in the Developer settings; polling may run alongside it |
 
-Yapcore's `edit_me`, avatar and banner operations, DM open/send, voice state methods, and `GET /commands` reader are implemented and mock-tested. Image uploads currently use raw request bodies rather than the optional multipart form. Do not use the Python package's alternate configured hostnames as the Rust default. Its current source names `https://bots.yapper.website/api/bot/v1` as `BASE` and `https://www.yapin.gg/api/bot/v1` as a fallback; the current public developer guide explicitly gives the `www.yapper.website` base above. Any compatibility host should be added only after independent verification.
+Yapcore's `edit_me`, avatar and banner operations, DM open/send, voice state methods, and `GET /commands` reader are implemented and mock-tested. Avatar/banner uploads support both raw image bodies and multipart form requests using the documented `file` field. Do not use the Python package's alternate configured hostnames as the Rust default. Its current source names `https://bots.yapper.website/api/bot/v1` as `BASE` and `https://www.yapin.gg/api/bot/v1` as a fallback; the current public developer guide explicitly gives the `www.yapper.website` base above. Any compatibility host should be added only after independent verification.
 
 ## 2. Documented endpoint inventory
 
