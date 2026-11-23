@@ -2521,7 +2521,7 @@ mod tests {
                 "channel_id": "123e4567-e89b-12d3-a456-426614174002",
                 "author_id": "123e4567-e89b-12d3-a456-426614174003",
                 "author_bot": false,
-                "content": "!profile name=\"Altix Dev\" age=24 public=true"
+                "content": r#"!profile name="Altix Dev" age=24 public=true"#
             }),
             created_at: None,
         };
