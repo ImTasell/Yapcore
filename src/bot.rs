@@ -17,8 +17,8 @@ use crate::interactions::{
     ButtonRegistry, InteractionContext, InteractionInvocation, InteractionRegistrationError,
 };
 use crate::models::{
-    Activity, ActivityRotation, BotProfile, BotStatus, CommandDefinition,
-    InteractionResponseType, Message, PermissionTarget, Presence,
+    Activity, ActivityRotation, BotProfile, BotStatus, CommandDefinition, InteractionResponseType,
+    Message, PermissionTarget, Presence,
 };
 
 /// Handle used to request a graceful stop of a running bot.
@@ -99,9 +99,8 @@ impl ServerPresenceMonitorHandle {
         let Some(task) = self.task.take() else {
             return Ok(());
         };
-        task.await.map_err(|error| {
-            Error::ServerPresenceMonitorTaskFailed(error.to_string())
-        })?
+        task.await
+            .map_err(|error| Error::ServerPresenceMonitorTaskFailed(error.to_string()))?
     }
 }
 
@@ -2028,9 +2027,8 @@ mod presence_rotation_tests {
                     }
                     bytes.extend_from_slice(&buffer[..read]);
                     if expected.is_none() {
-                        if let Some(position) = bytes
-                            .windows(4)
-                            .position(|window| window == b"\r\n\r\n")
+                        if let Some(position) =
+                            bytes.windows(4).position(|window| window == b"\r\n\r\n")
                         {
                             let headers = String::from_utf8_lossy(&bytes[..position]);
                             let length = headers
@@ -2079,10 +2077,8 @@ mod presence_rotation_tests {
         let requests = server_thread.join().unwrap();
         assert!(requests[0].starts_with("GET /api/bot/v1/servers HTTP/1.1"));
         assert!(requests[1].starts_with("PUT /api/bot/v1/me/status HTTP/1.1"));
-        let payload: Value = serde_json::from_str(
-            requests[1].split_once("\r\n\r\n").unwrap().1,
-        )
-        .unwrap();
+        let payload: Value =
+            serde_json::from_str(requests[1].split_once("\r\n\r\n").unwrap().1).unwrap();
         assert_eq!(payload["status"], "online");
         assert_eq!(payload["activity"], "Overviewing 3 servers");
     }
