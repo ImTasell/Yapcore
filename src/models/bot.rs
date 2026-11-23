@@ -147,4 +147,20 @@ mod tests {
             Some(&serde_json::json!({ "enabled": true }))
         );
     }
+    #[test]
+    fn formats_and_validates_activity_lines() {
+        let activity = Activity::playing("Minecraft").unwrap();
+        assert_eq!(activity.as_str(), "Playing Minecraft");
+        assert_eq!(Activity::new("x".repeat(60)).unwrap().as_str().chars().count(), 60);
+        assert!(matches!(Activity::new(" "), Err(crate::error::Error::EmptyBotActivity)));
+        assert!(matches!(Activity::new("x".repeat(61)), Err(crate::error::Error::BotActivityTooLong { actual: 61 })));
+        assert!(matches!(Activity::playing("x".repeat(53)), Err(crate::error::Error::BotActivityTooLong { actual: 61 })));
+    }
+
+    #[test]
+    fn builds_presence_with_a_status_and_activity() {
+        let presence = Presence::online().activity(Activity::playing("Chess").unwrap());
+        assert_eq!(presence.status(), BotStatus::Online);
+        assert_eq!(presence.activity_line().unwrap().as_str(), "Playing Chess");
+    }
 }
