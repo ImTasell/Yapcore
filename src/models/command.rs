@@ -60,6 +60,9 @@ pub enum CommandDefinitionError {
     /// Command names must be unique within a bot.
     #[error("command names must be unique")]
     DuplicateName,
+    /// A command option schema violates local declaration constraints.
+    #[error("command option schema is invalid")]
+    InvalidOptionSchema,
 }
 
 /// Validate a full command list before replacing the bot's remote registry.
