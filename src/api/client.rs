@@ -10,7 +10,7 @@ use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
 use crate::ids::InteractionId;
 use crate::models::{
-    Activity, Ban, BotProfile, BotProfileEdit, BotStatus, Channel, ChannelCategory,
+    Ban, BotProfile, BotProfileEdit, BotStatus, Channel, ChannelCategory,
     ChannelCreateOptions, ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition,
     Embed, EventBatch, ImageAsset, ImageFormat, InteractionResponseType, Member, Message,
     PermissionTarget, Presence, Role, Server, UserProfile, VoiceChannelState, validate_action_rows,
