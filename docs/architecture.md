@@ -61,7 +61,7 @@ The first working runtime is intentionally narrower than the long-term architect
 - Poll transport failures use bounded exponential backoff; HTTP 429/503 responses are retried only when Yapper supplies `Retry-After`, with a two-retry ceiling. Transport errors are not blindly replayed.
 - Command, button and generic event-handler failures are logged and isolated from later listeners/polling.
 
-The current dispatcher is sequential. Cursor persistence remains caller-owned: store `last_event_id()` externally and pass it to `run_from()` when restarting. Select-menu and modal-submit handlers, bounded-concurrency dispatch and typed wrappers for individual server events remain future milestones. Compiled cogs can be registered transactionally through `Bot::add_cog`; live unload/reload is not part of the v0.1 lifecycle.
+The current dispatcher is sequential. Cursor persistence remains caller-owned: store `last_event_id()` externally and pass it to `run_from()` when restarting. Select-menu and modal-submit handlers, bounded-concurrency dispatch and typed wrappers for individual server events remain future milestones. Compiled cogs can be added, removed and replaced transactionally through `Bot::add_cog`, `remove_cog` and `replace_cog` before or between run sessions; there is no dynamic Rust code hot-reload.
 
 ### Explicitly deferred
 
