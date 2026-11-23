@@ -174,7 +174,7 @@ Do not treat voice presence management as equivalent to voice media streaming. T
 | [x] SDK feature | Setup function/extensions | `Cog::register(&mut Bot)` is the explicit Rust setup entry point |
 | [~] SDK adaptation | Load/unload/reload command groups | `Bot::add_cog` loads statically compiled modules before running; live unload/reload is not exposed because the registries are immutable while the poller runs |
 | [ ] Verify | File-system discovery of `.py` cogs | Rust cannot import source files dynamically; defer or design plugin ABI separately |
-| [~] SDK adaptation | Error attribution to cog/extension | Cog registration errors include the cog name; runtime handler errors include command/event/custom-ID context but do not yet attach cog ownership |
+| [x] SDK feature | Error attribution to cog | Cog-owned command, event-listener and button registrations retain their owner; `ErrorEvent.cog` identifies the owning cog when one of those handlers fails |
 | [ ] Verify | Opt-in telemetry client | Separate optional feature, off by default, report preview |
 | [ ] Out of scope | Telemetry collection web server/panel under upstream `server/` | Not part of a client SDK port unless explicitly requested |
 
