@@ -216,6 +216,18 @@ pub enum Error {
     #[error("a channel may list at most 50 allowed users; received {actual}")]
     TooManyChannelUsers { actual: usize },
 
+    /// An activity rotation must contain at least two different entries.
+    #[error("activity rotation requires at least 2 entries; received {actual}")]
+    TooFewRotationActivities { actual: usize },
+
+    /// An activity rotation interval must be greater than zero.
+    #[error("activity rotation interval must be greater than zero")]
+    InvalidPresenceRotationInterval,
+
+    /// An activity rotation task panicked while running.
+    #[error("presence rotation task failed: {0}")]
+    PresenceRotationTaskFailed(String),
+
     /// A bot activity string must contain visible text.
     #[error("bot activity must not be empty")]
     EmptyBotActivity,
