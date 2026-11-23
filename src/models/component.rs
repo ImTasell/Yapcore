@@ -302,6 +302,13 @@ pub struct SelectMenu {
     max_values: Option<u8>,
     #[serde(skip_serializing_if = "is_false")]
     disabled: bool,
+    // These three fields are only emitted when the menu is used as a modal input.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    required: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
 }
 
 impl SelectMenu {
@@ -319,7 +326,30 @@ impl SelectMenu {
             min_values: None,
             max_values: None,
             disabled: false,
+            label: None,
+            required: None,
+            description: None,
         })
+    }
+
+    /// Set the field label when this menu is used inside a modal.
+    ///
+    /// Ordinary message select menus omit this metadata.
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    /// Set whether a selection is required when this menu is used in a modal.
+    pub fn required(mut self, required: bool) -> Self {
+        self.required = Some(required);
+        self
+    }
+
+    /// Set the smaller descriptive text shown under a modal select label.
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
     }
 
     /// Append one selectable option. A menu supports up to 25 options.
