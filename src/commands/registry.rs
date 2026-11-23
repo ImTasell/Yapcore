@@ -19,6 +19,7 @@ type Handler = Arc<dyn Fn(CommandContext) -> HandlerFuture + Send + Sync + 'stat
 type CheckFuture = Pin<Box<dyn Future<Output = bool> + Send + 'static>>;
 type Check = Arc<dyn Fn(CommandContext) -> CheckFuture + Send + Sync + 'static>;
 
+#[derive(Clone)]
 struct RegisteredCommand {
     definition: CommandDefinition,
     handler: Handler,
@@ -26,7 +27,7 @@ struct RegisteredCommand {
 }
 
 /// Local registry of prefix commands and their asynchronous handlers.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(crate) struct CommandRegistry {
     entries: BTreeMap<String, RegisteredCommand>,
 }
