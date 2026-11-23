@@ -14,6 +14,7 @@ use crate::models::{
     ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch,
     ImageAsset, ImageFormat, InteractionResponseType, Member, Message, PermissionTarget, Presence,
     Role, Server, UserProfile, VoiceChannelState, validate_action_rows, validate_command_list,
+    validate_layout, LayoutComponent, COMPONENTS_V2_FLAG,
 };
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
@@ -428,6 +429,32 @@ impl ApiClient {
             .request_json(Method::POST, &route, Some(Value::Object(body)))
             .await?;
 
+        let message = response.get("message").cloned().unwrap_or(response);
+        serde_json::from_value(message).map_err(Error::from)
+    }
+
+    /// Send an experimental Components V2 layout as the complete message body.
+    ///
+    /// Components V2 messages use the dedicated flag and do not combine with
+    /// ordinary message content or embeds. This path mirrors the upstream
+    /// Python SDK; the public endpoint guide does not currently document the
+    /// full layout schema.
+    pub async fn send_layout(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        components: &[LayoutComponent],
+        reply_to: Option<&crate::ids::MessageId>,
+    ) -> Result<Message> {
+        validate_layout(components)?;
+        let route = format!("channels/{channel_id}/messages");
+        let mut body = serde_json::json!({
+            "flags": COMPONENTS_V2_FLAG,
+            "components": components,
+        });
+        if let Some(message_id) = reply_to {
+            body["reply_to"] = serde_json::json!(message_id.as_str());
+        }
+        let response = self.request_json(Method::POST, &route, Some(body)).await?;
         let message = response.get("message").cloned().unwrap_or(response);
         serde_json::from_value(message).map_err(Error::from)
     }
@@ -1012,6 +1039,24 @@ impl ApiClient {
 
         let route = format!("channels/{channel_id}/messages/{message_id}");
         let body = serde_json::json!({ "content": content });
+        let response = self.request_json(Method::PATCH, &route, Some(body)).await?;
+        let message = response.get("message").cloned().unwrap_or(response);
+        serde_json::from_value(message).map_err(Error::from)
+    }
+
+    /// Replace the layout of an experimental Components V2 message.
+    pub async fn edit_layout(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        message_id: &crate::ids::MessageId,
+        components: &[LayoutComponent],
+    ) -> Result<Message> {
+        validate_layout(components)?;
+        let route = format!("channels/{channel_id}/messages/{message_id}");
+        let body = serde_json::json!({
+            "flags": COMPONENTS_V2_FLAG,
+            "components": components,
+        });
         let response = self.request_json(Method::PATCH, &route, Some(body)).await?;
         let message = response.get("message").cloned().unwrap_or(response);
         serde_json::from_value(message).map_err(Error::from)
