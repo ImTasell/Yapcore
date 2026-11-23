@@ -2782,4 +2782,81 @@ mod tests {
             Err(Error::EmptyCategoryName)
         ));
     }
+
+    #[tokio::test]
+    async fn sets_bot_presence_through_the_documented_status_endpoint() {
+        let server = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
+        let client = test_client(&server, 1024).await;
+
+        client.set_status(BotStatus::Online, Some("Playing chess")).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with("PUT /api/bot/v1/me/status HTTP/1.1"));
+        let payload: Value = serde_json::from_str(request.split_once("\\r\\n\\r\\n").unwrap().1).unwrap();
+        assert_eq!(payload["status"], "online");
+        assert_eq!(payload["activity"], "Playing chess");
+    }
+
+    #[tokio::test]
+    async fn rejects_overlong_bot_activity_before_networking() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+
+        assert!(matches!(
+            client.set_status(BotStatus::Dnd, Some(&"x".repeat(61))).await,
+            Err(Error::BotActivityTooLong { actual: 61 })
+        ));
+    }
+
+    #[tokio::test]
+    async fn reads_member_permissions_from_the_source_parity_route() {
+        const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
+        const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            r#"{ "permissions": { "owner": false, "administrator": true, "permissions": { "manage_roles": true } } }"#.to_owned(),
+        );
+        let client = test_client(&server, 1024).await;
+        let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
+        let user_id = crate::ids::UserId::new(USER_ID).unwrap();
+
+        let permissions = client.get_member_permissions(&server_id, &user_id).await.unwrap();
+        let request = server.finish();
+
+        assert!(request.starts_with(
+            "GET /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/members/123e4567-e89b-12d3-a456-426614174022/permissions HTTP/1.1"
+        ));
+        assert_eq!(permissions["administrator"], true);
+        assert_eq!(permissions["permissions"]["manage_roles"], true);
+    }
+
+    #[tokio::test]
+    async fn sets_and_clears_channel_permission_overrides() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174021";
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let allow = vec!["send_messages".to_owned()];
+        let deny = vec!["view_channel".to_owned()];
+
+        let set = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
+        let client = test_client(&set, 1024).await;
+        let target = PermissionTarget::Everyone;
+        client.set_channel_permissions(&channel_id, &target, &allow, &deny).await.unwrap();
+        let request = set.finish();
+        assert!(request.starts_with(
+            "PUT /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174021/permissions/everyone HTTP/1.1"
+        ));
+        let payload: Value = serde_json::from_str(request.split_once("\\r\\n\\r\\n").unwrap().1).unwrap();
+        assert_eq!(payload["allow"][0], "send_messages");
+        assert_eq!(payload["deny"][0], "view_channel");
+
+        let clear = LocalMockServer::start(204, &[], String::new());
+        let client = test_client(&clear, 1024).await;
+        client.clear_channel_permissions(&channel_id, &target).await.unwrap();
+        let request = clear.finish();
+        assert!(request.starts_with(
+            "DELETE /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174021/permissions/everyone HTTP/1.1"
+        ));
+    }
+
 }
