@@ -5,6 +5,18 @@ use serde_json::Value;
 
 use crate::ids::UserId;
 
+/// Presence status accepted by Yapper's bot profile endpoint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BotStatus {
+    /// Show the bot as online.
+    Online,
+    /// Show the bot as idle.
+    Idle,
+    /// Show the bot as do-not-disturb.
+    Dnd,
+}
+
 /// The profile returned by the Yapper GET /me endpoint.
 ///
 /// The extra map preserves fields added by the platform that are not yet
