@@ -2552,6 +2552,33 @@ mod tests {
         );
     }
 
+    #[test]
+    fn rejects_invalid_typed_option_schema_at_registration() {
+        let mut bot = Bot::builder().token("yb_test-token").build().unwrap();
+        let schema = vec![
+            crate::models::CommandOption::string("optional", "Optional").unwrap(),
+            crate::models::CommandOption::integer("required", "Required")
+                .unwrap()
+                .required(true),
+        ];
+
+        let result = bot.command_with_options(
+            "invalid",
+            "Invalid option order",
+            schema,
+            |_context| async { Ok(()) },
+        );
+
+        assert!(matches!(
+            result,
+            Err(crate::CommandDefinitionError::InvalidOptionSchema)
+        ));
+        assert!(!bot
+            .command_definitions()
+            .iter()
+            .any(|command| command.name() == "invalid"));
+    }
+
     #[tokio::test]
     async fn invalid_typed_command_arguments_skip_handler() {
         use std::sync::{
