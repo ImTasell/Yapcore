@@ -1775,3 +1775,31 @@ mod tests {
         assert_eq!(*observed.lock().unwrap(), ["new-member"]);
     }
 }
+
+#[cfg(test)]
+mod presence_rotation_tests {
+    use super::*;
+    use std::sync::Arc;
+    use tokio::sync::Notify;
+
+    #[tokio::test]
+    async fn dropping_rotation_handle_requests_cancellation() {
+        let (sender, mut receiver) = watch::channel(false);
+        let notified = Arc::new(Notify::new());
+        let task_notified = Arc::clone(&notified);
+        let task = tokio::spawn(async move {
+            let _ = receiver.changed().await;
+            task_notified.notify_one();
+            Ok(())
+        });
+        let handle = PresenceRotationHandle {
+            sender,
+            task: Some(task),
+        };
+
+        drop(handle);
+        tokio::time::timeout(Duration::from_secs(1), notified.notified())
+            .await
+            .expect("dropping the handle should wake the rotation task");
+    }
+}
