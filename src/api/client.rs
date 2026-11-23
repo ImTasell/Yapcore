@@ -14,7 +14,8 @@ use crate::models::{
     ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch,
     ImageAsset, ImageFormat, InteractionResponseType, Member, Message, PermissionTarget, Presence,
     Role, Server, UserProfile, VoiceChannelState, validate_action_rows, validate_command_list,
-    validate_layout, LayoutComponent, COMPONENTS_V2_FLAG,
+    validate_layout, validate_component_rows, LayoutComponent, MessageComponentRow,
+    COMPONENTS_V2_FLAG,
 };
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
@@ -412,6 +413,77 @@ impl ApiClient {
         }
 
         validate_action_rows(components)?;
+
+        let mut body = serde_json::Map::new();
+        if let Some(content) = content {
+            body.insert("content".to_owned(), serde_json::json!(content));
+        }
+        if !embeds.is_empty() {
+            body.insert("embeds".to_owned(), serde_json::to_value(embeds)?);
+        }
+        if !components.is_empty() {
+            body.insert("components".to_owned(), serde_json::to_value(components)?);
+        }
+
+        let route = format!("channels/{channel_id}/messages");
+        let response = self
+            .request_json(Method::POST, &route, Some(Value::Object(body)))
+            .await?;
+
+        let message = response.get("message").cloned().unwrap_or(response);
+        serde_json::from_value(message).map_err(Error::from)
+    }
+
+    /// Send a message with button and/or select-menu action rows.
+    ///
+    /// Each row contains either one to five buttons or exactly one select menu.
+    /// This source-parity extension is not fully described by the public endpoint guide.
+    pub async fn send_message_with_component_rows(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        content: Option<&str>,
+        components: &[MessageComponentRow],
+    ) -> Result<Message> {
+        self.send_rich_message_with_component_rows(channel_id, content, &[], components)
+            .await
+    }
+
+    /// Send a rich message with mixed button/select rows.
+    pub async fn send_rich_message_with_component_rows(
+        &self,
+        channel_id: &crate::ids::ChannelId,
+        content: Option<&str>,
+        embeds: &[Embed],
+        components: &[MessageComponentRow],
+    ) -> Result<Message> {
+        if embeds.len() > 5 {
+            return Err(Error::TooManyEmbeds {
+                actual: embeds.len(),
+            });
+        }
+
+        let content = content.filter(|value| !value.is_empty());
+        if let Some(content) = content {
+            let actual = content.chars().count();
+            if actual > 2_000 {
+                return Err(Error::MessageContentTooLong { actual, max: 2_000 });
+            }
+        }
+
+        if content.is_none() && embeds.is_empty() {
+            return Err(Error::EmptyMessagePayload);
+        }
+
+        let mut embed_text = 0_usize;
+        for embed in embeds {
+            embed.validate()?;
+            embed_text += embed.text_characters();
+        }
+        if embed_text > 6_000 {
+            return Err(Error::MessageEmbedsTooLong { actual: embed_text });
+        }
+
+        validate_component_rows(components)?;
 
         let mut body = serde_json::Map::new();
         if let Some(content) = content {
