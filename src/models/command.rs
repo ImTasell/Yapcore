@@ -66,7 +66,7 @@ pub enum CommandDefinitionError {
 pub(crate) fn validate_command_list(
     commands: &[CommandDefinition],
 ) -> Result<(), CommandDefinitionError> {
-    if commands.len() > 50 {
+    if commands.len() > 100 {
         return Err(CommandDefinitionError::TooManyCommands);
     }
 
@@ -119,7 +119,7 @@ mod tests {
             Err(CommandDefinitionError::DuplicateName)
         );
 
-        let commands = (0..51)
+        let commands = (0..101)
             .map(|index| CommandDefinition::new(format!("cmd-{index}"), "Command").unwrap())
             .collect::<Vec<_>>();
         assert_eq!(
