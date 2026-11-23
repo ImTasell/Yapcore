@@ -216,6 +216,10 @@ pub enum Error {
     #[error("a channel may list at most 50 allowed users; received {actual}")]
     TooManyChannelUsers { actual: usize },
 
+    /// A bot activity string must contain visible text.
+    #[error("bot activity must not be empty")]
+    EmptyBotActivity,
+
     /// A bot activity string is longer than Yapper's 60-character limit.
     #[error("bot activity is {actual} characters; the maximum is 60")]
     BotActivityTooLong { actual: usize },
