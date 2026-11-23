@@ -110,9 +110,11 @@ mod tests {
                 "welcome"
             }
             fn register(&self, bot: &mut Bot) -> std::result::Result<(), String> {
-                bot.command("greet", "Partially added before failure", |_context| async {
-                    Ok(())
-                })
+                bot.command(
+                    "greet",
+                    "Partially added before failure",
+                    |_context| async { Ok(()) },
+                )
                 .map_err(|error| error.to_string())?;
                 Err("simulated setup failure".to_owned())
             }
@@ -121,7 +123,9 @@ mod tests {
         let mut bot = BotBuilder::new().token("yb_test-token").build().unwrap();
         bot.add_cog(GoodCog).unwrap();
         let error = bot.replace_cog(BrokenReplacement).unwrap_err();
-        assert!(matches!(error, CogRegistrationError::SetupFailed { name, .. } if name == "welcome"));
+        assert!(
+            matches!(error, CogRegistrationError::SetupFailed { name, .. } if name == "welcome")
+        );
         assert_eq!(bot.cogs(), vec!["welcome"]);
         let names = bot
             .command_definitions()
