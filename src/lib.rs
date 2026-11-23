@@ -10,6 +10,7 @@
 pub mod api;
 pub mod bot;
 pub mod commands;
+pub mod cogs;
 pub mod config;
 pub mod error;
 pub mod events;
@@ -21,6 +22,7 @@ pub use api::ApiClient;
 pub use bot::{
     Bot, BotBuilder, PresenceRotationHandle, ServerPresenceMonitorHandle, ShutdownHandle,
 };
+pub use cogs::{Cog, CogRegistrationError};
 pub use commands::{CommandContext, HandlerError, HandlerResult};
 pub use config::{Config, ConfigBuilder, ConfigError, DEFAULT_API_BASE_URL};
 pub use error::{ApiError, Error, Result};
