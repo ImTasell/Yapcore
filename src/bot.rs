@@ -291,7 +291,7 @@ impl Bot {
     /// fails, Yapcore restores the registries to their pre-registration state.
     /// Rust cogs are compiled code; dynamic source-file hot reload is intentionally
     /// not provided by this API.
-    pub fn add_cog<C: crate::cogs::Cog>(
+    pub fn add_cog<C: crate::cogs::Cog + 'static>(
         &mut self,
         cog: C,
     ) -> std::result::Result<&mut Self, crate::cogs::CogRegistrationError> {
@@ -312,6 +312,10 @@ impl Bot {
         let events = self.events.clone();
         let buttons = self.buttons.clone();
         let cog_names = self.cog_names.clone();
+        let cog = Arc::new(cog);
+        let cog_for_check = Arc::clone(&cog);
+        self.commands
+            .set_cog_check(name.clone(), move |context| cog_for_check.check(context));
         let previous_owner = self.registering_cog.replace(name.clone());
         let setup_result = cog.register(self);
         self.registering_cog = previous_owner;
@@ -347,7 +351,7 @@ impl Bot {
     ///
     /// If registration fails, the previous cog and all its handlers are restored.
     /// This replaces registrations only; it does not dynamically reload Rust code.
-    pub fn replace_cog<C: crate::cogs::Cog>(
+    pub fn replace_cog<C: crate::cogs::Cog + 'static>(
         &mut self,
         cog: C,
     ) -> std::result::Result<&mut Self, crate::cogs::CogRegistrationError> {
