@@ -51,7 +51,9 @@ mod tests {
     struct GoodCog;
 
     impl Cog for GoodCog {
-        fn name(&self) -> &str { "welcome" }
+        fn name(&self) -> &str {
+            "welcome"
+        }
 
         fn register(&self, bot: &mut Bot) -> std::result::Result<(), String> {
             bot.command("welcome", "Welcome a member", |_context| async { Ok(()) })
@@ -67,13 +69,19 @@ mod tests {
     struct FailingCog;
 
     impl Cog for FailingCog {
-        fn name(&self) -> &str { "broken" }
+        fn name(&self) -> &str {
+            "broken"
+        }
 
         fn register(&self, bot: &mut Bot) -> std::result::Result<(), String> {
-            bot.command("temporary", "Must be rolled back", |_context| async { Ok(()) })
-                .map_err(|error| error.to_string())?;
-            bot.command("duplicate", "Conflicting command", |_context| async { Ok(()) })
-                .map_err(|error| error.to_string())?;
+            bot.command("temporary", "Must be rolled back", |_context| async {
+                Ok(())
+            })
+            .map_err(|error| error.to_string())?;
+            bot.command("duplicate", "Conflicting command", |_context| async {
+                Ok(())
+            })
+            .map_err(|error| error.to_string())?;
             Ok(())
         }
     }
@@ -83,7 +91,11 @@ mod tests {
         let mut bot = BotBuilder::new().token("yb_test-token").build().unwrap();
         bot.add_cog(GoodCog).unwrap();
         assert_eq!(bot.cogs(), vec!["welcome"]);
-        assert!(bot.command_definitions().iter().any(|item| item.name() == "welcome"));
+        assert!(
+            bot.command_definitions()
+                .iter()
+                .any(|item| item.name() == "welcome")
+        );
         assert!(matches!(
             bot.add_cog(GoodCog),
             Err(CogRegistrationError::DuplicateName(name)) if name == "welcome"
@@ -93,10 +105,14 @@ mod tests {
     #[test]
     fn rolls_back_all_registrations_when_cog_setup_fails() {
         let mut bot = BotBuilder::new().token("yb_test-token").build().unwrap();
-        bot.command("duplicate", "Already registered", |_context| async { Ok(()) })
-            .unwrap();
+        bot.command("duplicate", "Already registered", |_context| async {
+            Ok(())
+        })
+        .unwrap();
         let result = bot.add_cog(FailingCog);
-        assert!(matches!(result, Err(CogRegistrationError::SetupFailed { name, .. }) if name == "broken"));
+        assert!(
+            matches!(result, Err(CogRegistrationError::SetupFailed { name, .. }) if name == "broken")
+        );
         let names = bot.command_definitions();
         assert_eq!(names.len(), 1);
         assert_eq!(names[0].name(), "duplicate");
