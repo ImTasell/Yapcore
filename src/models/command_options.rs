@@ -203,11 +203,10 @@ pub struct ParsedCommandOptions {
 }
 
 impl ParsedCommandOptions {
-    /// Parse whitespace-separated positional values and named `name=value` pairs.
-    ///
-    /// Quoted values support single or double quotes. User, channel and role
-    /// arguments are retained as strings because Yapper IDs are opaque.
-    pub fn parse(schema: &[CommandOption], input: &str) -> Result<Self, CommandOptionError> {
+    /// Validate option count, unique names and required-before-optional ordering.
+    pub(crate) fn validate_schema(
+        schema: &[CommandOption],
+    ) -> Result<(), CommandOptionError> {
         if schema.len() > 10 {
             return Err(CommandOptionError::TooManyOptions);
         }
@@ -225,6 +224,15 @@ impl ParsedCommandOptions {
             }
             optional_seen |= !option.required;
         }
+        Ok(())
+    }
+
+    /// Parse whitespace-separated positional values and named `name=value` pairs.
+    ///
+    /// Quoted values support single or double quotes. User, channel and role
+    /// arguments are retained as strings because Yapper IDs are opaque.
+    pub fn parse(schema: &[CommandOption], input: &str) -> Result<Self, CommandOptionError> {
+        Self::validate_schema(schema)?;
         let tokens = tokenize(input)?;
         let mut positional = Vec::new();
         let mut named = BTreeMap::new();
