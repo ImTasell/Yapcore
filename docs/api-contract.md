@@ -36,7 +36,7 @@ The following is the human-readable REST endpoint index as exposed by the develo
 | DELETE | `/me/avatar` | Remove avatar |
 | PUT | `/me/banner` | Raw image or multipart field `file`; max 10 MB |
 | DELETE | `/me/banner` | Remove banner |
-| PUT | `/me/status` | `{ "status": "online" | "idle" | "dnd", "activity": "..." }`; activity max 60 |
+| PUT | `/me/status` | `{ "status": "online" | "idle" | "dnd", "activity": "..." }`; activity max 60. Implemented as `Bot::set_status`; this is HTTP bot presence, not Discord RPC/IPC. |
 | GET | `/commands` | Read registered commands |
 | PUT | `/commands` | Replace the entire command list: `{ "commands": [{ "name": "ping", "description": "..." }] }` |
 
@@ -75,6 +75,21 @@ Command registration constraints: the current official guide says up to 50 comma
 | GET | `/users/{user_id}` | Public user profile |
 
 Channel objects documented in the guide include fields such as `id`, `name`, `type`, `server_id`, `position`, `category`, `category_id`, `private`, `read_only` and `slowmode`. Private channels are omitted unless the bot or one of its roles is allowed to see them.
+
+### Permissions (experimental source-parity surface)
+
+The public guide explains that bot actions are authorized through the bot's assigned server roles, but its endpoint overview does not currently enumerate permission-inspection or override-management routes. The upstream Python framework contains these routes and marks effective-permission methods as testing-only. An independent Rust SDK report observed HTTP 403 `feature_off` for some permission reads, so Yapcore exposes these methods as experimental and mock tests must not be treated as proof of live availability.
+
+| Method | Route | Request / response notes |
+| --- | --- | --- |
+| GET | `/servers/{server_id}/members/{user_id}/permissions` | Effective server permissions for a member |
+| GET | `/channels/{channel_id}/permissions/{user_id}` | Effective permissions for a member in a channel, including overrides |
+| GET | `/channels/{channel_id}/permissions` | Channel override list |
+| PATCH | `/servers/{server_id}/roles/everyone` | `{ "permissions": { ... } }` |
+| PUT / DELETE | `/channels/{channel_id}/permissions/{target}` | `{ "allow": [...], "deny": [...] }`; target is `everyone` or a role ID |
+| PUT / DELETE | `/servers/{server_id}/categories/{category_id}/permissions/{target}` | Category-level override |
+
+Do not confuse these first-generation `permissions` routes with the newer upstream `overrides` routes (`/channels/{id}/overrides/...`). The latter are also marked testing-only in the Python source and are not implemented here. A live test bot and platform confirmation are required before removing the experimental label.
 
 ### Messages and reactions
 
