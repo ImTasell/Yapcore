@@ -1608,6 +1608,7 @@ mod tests {
                 &interaction_token,
                 InteractionResponseType::Ephemeral,
                 Some("Only you can see this"),
+                None,
             )
             .await
             .unwrap();
