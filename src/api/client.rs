@@ -1670,6 +1670,108 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn send_layout_uses_components_v2_flag_and_reply_reference() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "message": {
+                    "id": MESSAGE_ID,
+                    "channel_id": CHANNEL_ID
+                }
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 2048).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let reply_to = crate::ids::MessageId::new(MESSAGE_ID).unwrap();
+        let layout = vec![
+            crate::models::TextDisplay::new("# Hello").unwrap().into(),
+            crate::models::Container::new([
+                crate::models::TextDisplay::new("A V2 card").unwrap().into(),
+                crate::models::Separator::new(
+                    true,
+                    crate::models::SeparatorSpacing::Small,
+                )
+                .into(),
+            ])
+            .into(),
+        ];
+
+        let message = client
+            .send_layout(&channel_id, &layout, Some(&reply_to))
+            .await
+            .unwrap();
+        assert_eq!(message.id.as_str(), MESSAGE_ID);
+
+        let request = server.finish();
+        assert!(request.starts_with(
+            "POST /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174002/messages HTTP/1.1"
+        ));
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["flags"], 1 << 15);
+        assert_eq!(payload["reply_to"], MESSAGE_ID);
+        assert_eq!(payload["components"][0]["type"], 10);
+        assert_eq!(payload["components"][1]["type"], 17);
+        assert_eq!(payload["components"][1]["components"][1]["type"], 14);
+        assert!(payload.get("content").is_none());
+        assert!(payload.get("embeds").is_none());
+    }
+
+    #[tokio::test]
+    async fn edit_layout_patches_components_v2_flag_and_layout() {
+        const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
+        const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "message": {
+                    "id": MESSAGE_ID,
+                    "channel_id": CHANNEL_ID
+                }
+            })
+            .to_string(),
+        );
+        let client = test_client(&server, 2048).await;
+        let channel_id = crate::ids::ChannelId::new(CHANNEL_ID).unwrap();
+        let message_id = crate::ids::MessageId::new(MESSAGE_ID).unwrap();
+        let layout = [crate::models::TextDisplay::new("Updated").unwrap().into()];
+
+        client
+            .edit_layout(&channel_id, &message_id, &layout)
+            .await
+            .unwrap();
+
+        let request = server.finish();
+        assert!(request.starts_with(
+            "PATCH /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174002/messages/123e4567-e89b-12d3-a456-426614174001 HTTP/1.1"
+        ));
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        let payload: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(payload["flags"], 1 << 15);
+        assert_eq!(payload["components"][0]["type"], 10);
+    }
+
+    #[tokio::test]
+    async fn send_layout_rejects_an_empty_layout_before_networking() {
+        let config = Config::builder().token("yb_test-token").build().unwrap();
+        let client = ApiClient::new(config).unwrap();
+        let channel_id =
+            crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174002").unwrap();
+
+        assert!(matches!(
+            client.send_layout(&channel_id, &[], None).await,
+            Err(Error::LayoutValidation(
+                crate::models::LayoutValidationError::EmptyLayout
+            ))
+        ));
+    }
+
+    #[tokio::test]
     async fn send_message_with_components_serializes_button_rows() {
         const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174002";
         const MESSAGE_ID: &str = "123e4567-e89b-12d3-a456-426614174001";
