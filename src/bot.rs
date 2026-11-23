@@ -17,6 +17,7 @@ use crate::interactions::{
 };
 use crate::models::{
     BotProfile, BotStatus, CommandDefinition, InteractionResponseType, Message, PermissionTarget,
+    Presence,
 };
 
 /// Handle used to request a graceful stop of a running bot.
@@ -492,6 +493,14 @@ impl Bot {
     /// Set the bot's online state and optional activity line.
     pub async fn set_status(&self, status: BotStatus, activity: Option<&str>) -> Result<Value> {
         self.api.set_status(status, activity).await
+    }
+
+    /// Set the bot's status and activity using the typed presence builder.
+    ///
+    /// This can be called while the bot is running; presence changes use the
+    /// HTTP API and do not interrupt event polling.
+    pub async fn set_presence(&self, presence: &Presence) -> Result<Value> {
+        self.api.set_presence(presence).await
     }
 
     /// Fetch a member's effective server permissions (experimental API route).
