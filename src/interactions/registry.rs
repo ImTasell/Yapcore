@@ -155,7 +155,12 @@ impl ButtonRegistry {
         if !matches!(kind.as_str(), "button" | "select" | "modal_submit") {
             return Err(InteractionRegistrationError::UnsupportedKind);
         }
-        self.register(&kind, ButtonMatcher::Exact(custom_id.into()), owner, handler)
+        self.register(
+            &kind,
+            ButtonMatcher::Exact(custom_id.into()),
+            owner,
+            handler,
+        )
     }
 
     fn register<F, Fut>(
