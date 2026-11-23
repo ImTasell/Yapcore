@@ -34,7 +34,6 @@ pub use ids::{
 };
 pub use interactions::{InteractionContext, InteractionRegistrationError};
 
-pub use webhooks::{EventWebhook, WebhookVerificationError, verify_event_webhook};
 pub use models::{
     ActionRow, Activity, ActivityRotation, Ban, BotProfile, BotProfileEdit, BotStatus, Button,
     ButtonStyle, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions,
@@ -44,3 +43,5 @@ pub use models::{
     InteractionResponseType, Member, Message, PermissionTarget, Presence, Role, RoleEditOptions,
     Server, UserProfile, VoiceChannelState,
 };
+
+pub use webhooks::{EventWebhook, WebhookVerificationError, verify_event_webhook};
