@@ -6,7 +6,7 @@ use secrecy::SecretString;
 use crate::api::ApiClient;
 use crate::error::{Error, Result};
 use crate::ids::InteractionId;
-use crate::models::InteractionResponseType;
+use crate::models::{InteractionResponseType, Modal};
 
 /// Secret credentials and response budget shared by all clones of an interaction.
 #[derive(Debug, Clone)]
@@ -46,6 +46,23 @@ impl InteractionSession {
         api.respond_interaction(&self.id, &self.token, response_type, content)
             .await?;
 
+        Ok(())
+    }
+
+    /// Open a modal as the first response to this interaction.
+    pub(crate) async fn respond_with_modal(&self, api: &ApiClient, modal: &Modal) -> Result<()> {
+        self.response_count
+            .compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire)
+            .map_err(|_| Error::InteractionAlreadyAnswered)?;
+        let modal = serde_json::to_value(modal)?;
+        api.respond_interaction(
+            &self.id,
+            &self.token,
+            InteractionResponseType::Modal,
+            None,
+            Some(&modal),
+        )
+        .await?;
         Ok(())
     }
 }
