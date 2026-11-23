@@ -5,7 +5,7 @@
 **Python comparison target:** [our-websites/yapper.py](https://github.com/our-websites/yapper.py), default branch `main`  
 **Purpose:** record the public HTTP/event contract Yapcore should implement, and separate confirmed platform behavior from extra Python SDK behavior.
 
-> **Contract source note:** The current developer guide and linked OpenAPI 3.1 document at [`/openapi.json`](https://www.yapper.website/openapi.json) were retrieved and compared on 2026-11-23, alongside the detailed API reference at [`/developers/api`](https://www.yapper.website/developers/api). This is the current documented contract baseline. No live request was made with a dedicated test bot, so endpoint behavior is covered by mock-server tests but has not yet been smoke-tested against a real Yapper bot.
+> **Contract source note:** This pass was checked against the human-readable developer guide (last updated 18 October 2026) on 23 November 2026. The linked OpenAPI 3.1 JSON (`/openapi.json`) and detailed `/developers/api` page could not be retrieved by the available browser, so this document does not claim a full schema-level comparison. No live request was made with a dedicated test bot; newly added endpoint behavior is mock-tested but has not yet been smoke-tested against a real Yapper bot.
 
 ## 1. Connection and authentication
 
@@ -40,7 +40,7 @@ The following is the human-readable REST endpoint index as exposed by the develo
 | GET | `/commands` | Read registered commands; exposed as `Bot::list_commands`. |
 | PUT | `/commands` | Replace the entire command list: `{ "commands": [{ "name": "ping", "description": "..." }] }` |
 
-Command registration constraints: the current official guide and OpenAPI schema allow up to 100 commands; names are 1–32 lowercase letters, numbers, hyphens or underscores; descriptions max 100 characters; names must be unique. The Python upstream source also allows 100 locally. Yapcore validates to the documented 100-command cap. `GET /commands` reads the current registration; `PUT /commands` replaces the entire list, so Yapcore synchronizes the complete registry rather than one command at a time.
+Command registration constraints: the current official developer guide allows up to 100 commands; names are 1–32 lowercase letters, numbers, hyphens or underscores; descriptions max 100 characters; names must be unique. The Python upstream source also allows 100 locally. Yapcore validates to the documented 100-command cap. `GET /commands` reads the current registration; `PUT /commands` replaces the entire list, so Yapcore synchronizes the complete registry rather than one command at a time.
 
 Typed presence example:
 
@@ -403,7 +403,7 @@ The separate telemetry receiver/panel under upstream `server/` is not part of th
 - [ ] Run mock-server contract tests in CI and manual smoke tests using a dedicated test bot.
 - [ ] Keep all real bot credentials out of Git and test output.
 
-**No live test-bot API request was made for this audit or implementation pass.** The public OpenAPI schema and developer guide were retrieved; new route behavior is mock-tested. The final verification checklist remains open for an end-to-end smoke test using a dedicated bot.
+**No live test-bot API request was made for this audit or implementation pass.** The human-readable developer guide was retrieved; the linked OpenAPI schema was not. New route behavior is mock-tested. The final verification checklist remains open for an end-to-end smoke test using a dedicated bot.
 
 ## 9. References
 
