@@ -196,7 +196,6 @@ pub enum Error {
         actual: usize,
     },
 
-
     /// A channel name must not be empty.
     #[error("channel name must not be empty")]
     EmptyChannelName,
