@@ -17,6 +17,7 @@ pub mod events;
 pub mod ids;
 pub mod interactions;
 pub mod models;
+pub mod webhooks;
 
 pub use api::ApiClient;
 pub use bot::{
@@ -32,6 +33,7 @@ pub use ids::{
     UserId, WebhookId,
 };
 pub use interactions::{InteractionContext, InteractionRegistrationError};
+pub use webhooks::{verify_event_webhook, EventWebhook, WebhookVerificationError};
 pub use models::{
     ActionRow, Activity, ActivityRotation, Ban, BotProfile, BotProfileEdit, BotStatus, Button,
     ButtonStyle, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions,
