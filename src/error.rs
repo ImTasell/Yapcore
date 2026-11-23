@@ -6,6 +6,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::config::ConfigError;
+use crate::ids::IdError;
 use crate::models::{CommandDefinitionError, ComponentValidationError, EmbedValidationError};
 
 /// Result type used by Yapcore's public API.
@@ -100,6 +101,10 @@ impl ApiError {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// A string could not be decoded as a Yapper identifier.
+    #[error(transparent)]
+    Identifier(#[from] IdError),
+
     /// Invalid or incomplete local configuration.
     #[error(transparent)]
     Configuration(#[from] ConfigError),
@@ -235,6 +240,30 @@ pub enum Error {
     /// An activity rotation task panicked while running.
     #[error("presence rotation task failed: {0}")]
     PresenceRotationTaskFailed(String),
+
+    /// A bot profile patch must change at least one field.
+    #[error("bot profile update must set a display name or bio")]
+    EmptyBotProfileEdit,
+
+    /// The bot's display name exceeds 32 characters.
+    #[error("bot display name is {actual} characters; the maximum is 32")]
+    BotDisplayNameTooLong { actual: usize },
+
+    /// The bot's bio exceeds 190 characters.
+    #[error("bot bio is {actual} characters; the maximum is 190")]
+    BotBioTooLong { actual: usize },
+
+    /// An uploaded image must not be empty.
+    #[error("image upload must not be empty")]
+    EmptyImageUpload,
+
+    /// An image upload is larger than the endpoint's maximum size.
+    #[error("image upload is {actual} bytes; the maximum is {max} bytes")]
+    ImageUploadTooLarge { actual: usize, max: usize },
+
+    /// A DM-open response did not contain a valid channel identifier.
+    #[error("Yapper's DM response did not contain a valid channel_id")]
+    MissingDmChannelId,
 
     /// A bot activity string must contain visible text.
     #[error("bot activity must not be empty")]
