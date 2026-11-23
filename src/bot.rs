@@ -241,6 +241,7 @@ impl BotBuilder {
             ignore_bots: self.ignore_bots,
             logging: self.logging,
             cog_names: Vec::new(),
+            registering_cog: None,
             last_event_id: Arc::new(AtomicU64::new(0)),
             shutdown,
         })
@@ -258,6 +259,7 @@ pub struct Bot {
     ignore_bots: bool,
     logging: bool,
     cog_names: Vec<String>,
+    registering_cog: Option<String>,
     last_event_id: Arc<AtomicU64>,
     shutdown: watch::Sender<bool>,
 }
@@ -310,7 +312,10 @@ impl Bot {
         let events = self.events.clone();
         let buttons = self.buttons.clone();
         let cog_names = self.cog_names.clone();
-        if let Err(reason) = cog.register(self) {
+        let previous_owner = self.registering_cog.replace(name.clone());
+        let setup_result = cog.register(self);
+        self.registering_cog = previous_owner;
+        if let Err(reason) = setup_result {
             self.commands = commands;
             self.events = events;
             self.buttons = buttons;
@@ -357,7 +362,8 @@ impl Bot {
         F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.commands.register(name, description, handler)?;
+        self.commands
+            .register_owned(name, description, self.registering_cog.clone(), handler)?;
         Ok(self)
     }
 
@@ -379,8 +385,13 @@ impl Bot {
         F: Fn(CommandContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.commands
-            .register_with_check(name, description, check, handler)?;
+        self.commands.register_with_check_owned(
+            name,
+            description,
+            check,
+            self.registering_cog.clone(),
+            handler,
+        )?;
         Ok(self)
     }
 
@@ -404,7 +415,8 @@ impl Bot {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.buttons.register_exact(custom_id, handler)?;
+        self.buttons
+            .register_exact_owned(custom_id, self.registering_cog.clone(), handler)?;
         Ok(self)
     }
 
@@ -418,7 +430,8 @@ impl Bot {
         F: Fn(InteractionContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.buttons.register_prefix(prefix, handler)?;
+        self.buttons
+            .register_prefix_owned(prefix, self.registering_cog.clone(), handler)?;
         Ok(self)
     }
 
@@ -435,7 +448,8 @@ impl Bot {
         F: Fn(crate::models::EventEnvelope) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = HandlerResult> + Send + 'static,
     {
-        self.events.register(event_type, handler)?;
+        self.events
+            .register_owned(event_type, self.registering_cog.clone(), handler)?;
         Ok(self)
     }
 
@@ -1371,16 +1385,18 @@ impl Bot {
             _ => Ok(()),
         };
 
-        for handler in self.events.handlers_for(&event.event_type) {
-            if let Err(error) = handler(event.clone()).await {
+        for registered in self.events.handlers_for(&event.event_type) {
+            if let Err(error) = (registered.handler)(event.clone()).await {
                 let mut report = ErrorEvent::new(ErrorStage::EventListener, error.to_string());
                 report.event_id = Some(event.id);
                 report.event_type = Some(event.event_type.clone());
+                report.cog = registered.owner.clone();
                 log_error!(
                     self.logging,
                     event_type = %event.event_type,
                     event_id = event.id,
                     error = %error,
+                    cog = registered.owner.as_deref().unwrap_or("<none>"),
                     "event listener failed"
                 );
                 self.report_error(report).await;
@@ -1484,6 +1500,7 @@ impl Bot {
             let mut report = ErrorEvent::new(ErrorStage::CommandHandler, error.to_string());
             report.event_id = Some(event.id);
             report.event_type = Some(event.event_type.clone());
+            report.cog = self.commands.owner(&command).map(str::to_owned);
             report.command = Some(command);
             self.report_error(report).await;
         }
@@ -1626,6 +1643,7 @@ impl Bot {
                     ErrorEvent::new(ErrorStage::SlashCommandHandler, error.to_string());
                 report.event_id = Some(event.id);
                 report.event_type = Some(event.event_type.clone());
+                report.cog = self.commands.owner(&command).map(str::to_owned);
                 report.command = Some(command.clone());
                 self.report_error(report).await;
                 if response_count.load(Ordering::Acquire) == 0 {
@@ -1652,6 +1670,7 @@ impl Bot {
                         ErrorEvent::new(ErrorStage::SlashCommandAfterAck, error.to_string());
                     report.event_id = Some(event.id);
                     report.event_type = Some(event.event_type.clone());
+                    report.cog = self.commands.owner(&command).map(str::to_owned);
                     report.command = Some(command.clone());
                     self.report_error(report).await;
                 }
@@ -1736,8 +1755,8 @@ impl Bot {
         let custom_id_for_log = custom_id.to_owned();
 
         let dispatch = async {
-            for handler in handlers {
-                if let Err(error) = handler(context.clone()).await {
+            for registered in handlers {
+                if let Err(error) = (registered.handler)(context.clone()).await {
                     log_error!(
                         self.logging,
                         custom_id = %custom_id_for_log,
@@ -1748,6 +1767,7 @@ impl Bot {
                     report.event_id = Some(event.id);
                     report.event_type = Some(event.event_type.clone());
                     report.custom_id = Some(custom_id_for_log.clone());
+                    report.cog = registered.owner.clone();
                     self.report_error(report).await;
                 }
             }
