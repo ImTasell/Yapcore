@@ -2698,13 +2698,14 @@ mod tests {
             Err(Error::EmptyCategoryName)
         ));
         assert!(matches!(
-            client.rename_category(
-                &server_id,
-                &crate::ids::CategoryId::new("123e4567-e89b-12d3-a456-426614174024").unwrap(),
-                ""
-            ).await,
+            client
+                .rename_category(
+                    &server_id,
+                    &crate::ids::CategoryId::new("123e4567-e89b-12d3-a456-426614174024").unwrap(),
+                    ""
+                )
+                .await,
             Err(Error::EmptyCategoryName)
         ));
     }
-
 }
