@@ -1889,7 +1889,7 @@ impl Bot {
                         self.logging,
                         custom_id = %custom_id_for_log,
                         error = %error,
-                        "button interaction handler failed"
+                        "component interaction handler failed"
                     );
                     let mut report = ErrorEvent::new(error_stage, error.to_string());
                     report.event_id = Some(event.id);
