@@ -1,5 +1,5 @@
 use std::future::Future;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tokio::task::JoinHandle;
@@ -243,6 +243,7 @@ impl BotBuilder {
             cog_names: Vec::new(),
             registering_cog: None,
             last_event_id: Arc::new(AtomicU64::new(0)),
+            bot_user_id: Arc::new(RwLock::new(None)),
             shutdown,
         })
     }
@@ -261,6 +262,7 @@ pub struct Bot {
     cog_names: Vec<String>,
     registering_cog: Option<String>,
     last_event_id: Arc<AtomicU64>,
+    bot_user_id: Arc<RwLock<Option<UserId>>>,
     shutdown: watch::Sender<bool>,
 }
 
@@ -611,6 +613,78 @@ impl Bot {
         } else {
             self.events.register(event_type, handler)?;
         }
+        Ok(self)
+    }
+
+    /// Register a listener for direct messages sent to this bot.
+    ///
+    /// This is a named alias for `on_event("dm_message", ...)`. Delivery of
+    /// ordinary DM events is source-parity behavior and is not guaranteed by
+    /// the currently published bot event contract.
+    pub fn on_dm<F, Fut>(
+        &mut self,
+        handler: F,
+    ) -> std::result::Result<&mut Self, EventRegistrationError>
+    where
+        F: Fn(crate::models::EventEnvelope) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        self.on_event("dm_message", handler)
+    }
+
+    /// Listen only for reactions added to or removed from messages authored by this bot.
+    ///
+    /// The callback receives the original event envelope with an extra
+    /// `data.added` boolean. The bot ID is learned from the runtime's profile
+    /// lookup; events are ignored until that identity is available.
+    ///
+    /// This helper mirrors upstream Python behavior but remains source-parity
+    /// because the published event contract does not guarantee DM reaction data.
+    pub fn on_reaction_on_mine<F, Fut>(
+        &mut self,
+        handler: F,
+    ) -> std::result::Result<&mut Self, EventRegistrationError>
+    where
+        F: Fn(crate::models::EventEnvelope) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = HandlerResult> + Send + 'static,
+    {
+        let owner = self.registering_cog.clone();
+        let handler = Arc::new(handler);
+
+        for (event_type, added) in [("reaction_add", true), ("reaction_remove", false)] {
+            let handler = Arc::clone(&handler);
+            let bot_user_id = Arc::clone(&self.bot_user_id);
+            self.events.register_owned(event_type, owner.clone(), move |event| {
+                let handler = Arc::clone(&handler);
+                let bot_user_id = Arc::clone(&bot_user_id);
+                async move {
+                    let is_own_message = bot_user_id
+                        .read()
+                        .ok()
+                        .and_then(|current| {
+                            current.as_ref().map(|id| {
+                                event
+                                    .data
+                                    .get("message_author_id")
+                                    .and_then(Value::as_str)
+                                    == Some(id.as_str())
+                            })
+                        })
+                        .unwrap_or(false);
+
+                    if !is_own_message {
+                        return Ok(());
+                    }
+
+                    let mut enriched = event;
+                    if let Some(data) = enriched.data.as_object_mut() {
+                        data.insert("added".to_owned(), Value::Bool(added));
+                    }
+                    handler(enriched).await
+                }
+            })?;
+        }
+
         Ok(self)
     }
 
@@ -1550,6 +1624,12 @@ impl Bot {
         event: &crate::models::EventEnvelope,
         bot_id: Option<&UserId>,
     ) -> Result<()> {
+        if let Some(bot_id) = bot_id {
+            if let Ok(mut current_bot_id) = self.bot_user_id.write() {
+                *current_bot_id = Some(bot_id.clone());
+            }
+        }
+
         if event.event_type == "message"
             && self.ignore_bots
             && event.data.get("author_bot").and_then(Value::as_bool) == Some(true)
