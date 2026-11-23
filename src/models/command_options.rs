@@ -309,10 +309,19 @@ impl ParsedCommandOptions {
 fn parse_value(kind: CommandOptionType, raw: &str) -> Result<Value, CommandOptionError> {
     match kind {
         CommandOptionType::String => Ok(Value::String(raw.to_owned())),
-        CommandOptionType::User => crate::ids::UserId::new(raw.to_owned()).map(|id| Value::String(id.into_string())).map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
-        CommandOptionType::Channel => crate::ids::ChannelId::new(raw.to_owned()).map(|id| Value::String(id.into_string())).map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
-        CommandOptionType::Role => crate::ids::RoleId::new(raw.to_owned()).map(|id| Value::String(id.into_string())).map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
-        CommandOptionType::Integer => raw.parse::<i64>().map(Value::from).map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
+        CommandOptionType::User => crate::ids::UserId::new(raw.to_owned())
+            .map(|id| Value::String(id.into_string()))
+            .map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
+        CommandOptionType::Channel => crate::ids::ChannelId::new(raw.to_owned())
+            .map(|id| Value::String(id.into_string()))
+            .map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
+        CommandOptionType::Role => crate::ids::RoleId::new(raw.to_owned())
+            .map(|id| Value::String(id.into_string()))
+            .map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
+        CommandOptionType::Integer => raw
+            .parse::<i64>()
+            .map(Value::from)
+            .map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
         CommandOptionType::Number => {
             let number = raw
                 .parse::<f64>()
