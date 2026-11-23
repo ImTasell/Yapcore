@@ -118,7 +118,7 @@ pub struct ActivityRotation {
 impl ActivityRotation {
     /// Create an online activity rotation.
     ///
-    /// At least two activities and a non-zero interval are required.
+    /// At least two activity entries and a non-zero interval are required.
     pub fn new<I>(activities: I, interval: std::time::Duration) -> crate::error::Result<Self>
     where
         I: IntoIterator<Item = Activity>,
@@ -235,6 +235,39 @@ mod tests {
         ));
     }
 
+
+    #[test]
+    fn validates_activity_rotation_configuration() {
+        use std::time::Duration;
+
+        assert!(matches!(
+            ActivityRotation::new(Vec::<Activity>::new(), Duration::from_secs(30)),
+            Err(crate::error::Error::TooFewRotationActivities { actual: 0 })
+        ));
+        assert!(matches!(
+            ActivityRotation::new(
+                vec![Activity::new("Only one").unwrap()],
+                Duration::from_secs(30)
+            ),
+            Err(crate::error::Error::TooFewRotationActivities { actual: 1 })
+        ));
+
+        let activities = vec![
+            Activity::playing("Minecraft").unwrap(),
+            Activity::new("Monitoring servers").unwrap(),
+        ];
+        assert!(matches!(
+            ActivityRotation::new(activities.clone(), Duration::ZERO),
+            Err(crate::error::Error::InvalidPresenceRotationInterval)
+        ));
+
+        let rotation = ActivityRotation::new(activities, Duration::from_secs(30))
+            .unwrap()
+            .status(BotStatus::Idle);
+        assert_eq!(rotation.activities().len(), 2);
+        assert_eq!(rotation.interval(), Duration::from_secs(30));
+        assert_eq!(rotation.bot_status(), BotStatus::Idle);
+    }
     #[test]
     fn builds_presence_with_a_status_and_activity() {
         let presence = Presence::online().activity(Activity::playing("Chess").unwrap());
