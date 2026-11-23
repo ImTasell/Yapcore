@@ -1435,6 +1435,31 @@ impl Bot {
     pub async fn delete_banner(&self) -> Result<()> {
         self.api.delete_banner().await
     }
+    /// Send a message with button and/or select-menu rows.
+    pub async fn send_message_with_component_rows(
+        &self,
+        channel_id: &ChannelId,
+        content: Option<&str>,
+        components: &[crate::models::MessageComponentRow],
+    ) -> Result<Message> {
+        self.api
+            .send_message_with_component_rows(channel_id, content, components)
+            .await
+    }
+
+    /// Send a rich message with embeds and mixed button/select rows.
+    pub async fn send_rich_message_with_component_rows(
+        &self,
+        channel_id: &ChannelId,
+        content: Option<&str>,
+        embeds: &[crate::models::Embed],
+        components: &[crate::models::MessageComponentRow],
+    ) -> Result<Message> {
+        self.api
+            .send_rich_message_with_component_rows(channel_id, content, embeds, components)
+            .await
+    }
+
     /// Send an experimental Components V2 layout as the complete message body.
     pub async fn send_layout(
         &self,
