@@ -59,7 +59,7 @@ Retry safety rules:
 | [x] Documented | One-day event retention | `run_from` resumes from a caller-persisted cursor within Yapper's one-day retention; persistence remains application-owned |
 | [x] Documented | Optional `max_age` catch-up filter | `poll_events` validates one-day maximum |
 | [x] Documented | Ready lifecycle callback | Synthetic `ready` event after profile retrieval and command synchronization |
-| [x] Documented | Error lifecycle callback | `Bot::on_error` receives typed `ErrorEvent` values for dispatch, listener, command and button-handler failures |
+| [x] Documented | Error lifecycle callback | `Bot::on_error` receives typed `ErrorEvent` values for fatal startup/poll failures and dispatch, listener, command and button-handler failures |
 | [ ] Documented | Event webhooks as a server-side delivery option | Not needed for normal outbound-only client; document as deployment mode |
 | [ ] Verify | WebSocket gateway `wss://rt.yapper.website/bot` | Defer; current public guide does not document its protocol |
 | [x] Documented | Member, reaction, voice and test events | Generic `Bot::on_event` supports the documented `member_join`, `member_leave`, `reaction_add`, `reaction_remove`, `voice_join`, `voice_leave` and `test` envelopes |
