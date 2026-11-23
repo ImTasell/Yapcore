@@ -332,30 +332,18 @@ fn parse_value(
 ) -> Result<Value, CommandOptionError> {
     match kind {
         CommandOptionType::String => Ok(Value::String(raw.to_owned())),
-        CommandOptionType::User => {
-            let id = raw
-                .strip_prefix("<@!")
-                .or_else(|| raw.strip_prefix("<@"))
-                .unwrap_or(raw);
-            let id = id.strip_suffix('>').unwrap_or(id);
-            crate::ids::UserId::new(id.to_owned())
-                .map(|id| Value::String(id.into_string()))
-                .map_err(|_| CommandOptionError::InvalidValue(option_name.to_owned()))
-        }
-        CommandOptionType::Channel => {
-            let id = raw.strip_prefix("<#").unwrap_or(raw);
-            let id = id.strip_suffix('>').unwrap_or(id);
-            crate::ids::ChannelId::new(id.to_owned())
-                .map(|id| Value::String(id.into_string()))
-                .map_err(|_| CommandOptionError::InvalidValue(option_name.to_owned()))
-        }
-        CommandOptionType::Role => {
-            let id = raw.strip_prefix("<@&").unwrap_or(raw);
-            let id = id.strip_suffix('>').unwrap_or(id);
-            crate::ids::RoleId::new(id.to_owned())
-                .map(|id| Value::String(id.into_string()))
-                .map_err(|_| CommandOptionError::InvalidValue(option_name.to_owned()))
-        }
+        CommandOptionType::User => normalize_id_mention(raw, &["<@!", "<@"])
+            .and_then(|id| crate::ids::UserId::new(id.to_owned()).ok())
+            .map(|id| Value::String(id.into_string()))
+            .ok_or_else(|| CommandOptionError::InvalidValue(option_name.to_owned())),
+        CommandOptionType::Channel => normalize_id_mention(raw, &["<#"])
+            .and_then(|id| crate::ids::ChannelId::new(id.to_owned()).ok())
+            .map(|id| Value::String(id.into_string()))
+            .ok_or_else(|| CommandOptionError::InvalidValue(option_name.to_owned())),
+        CommandOptionType::Role => normalize_id_mention(raw, &["<@&"])
+            .and_then(|id| crate::ids::RoleId::new(id.to_owned()).ok())
+            .map(|id| Value::String(id.into_string()))
+            .ok_or_else(|| CommandOptionError::InvalidValue(option_name.to_owned())),
         CommandOptionType::Integer => raw
             .parse::<i64>()
             .map(Value::from)
@@ -374,6 +362,18 @@ fn parse_value(
             _ => Err(CommandOptionError::InvalidValue(raw.to_owned())),
         },
     }
+}
+
+fn normalize_id_mention<'a>(raw: &'a str, prefixes: &[&str]) -> Option<&'a str> {
+    if !raw.starts_with('<') {
+        return Some(raw);
+    }
+
+    let prefix = prefixes
+        .iter()
+        .find(|prefix| raw.starts_with(**prefix))
+        .copied()?;
+    raw.strip_prefix(prefix)?.strip_suffix('>')
 }
 
 fn choice_matches(kind: CommandOptionType, value: &Value) -> bool {
@@ -511,6 +511,18 @@ mod tests {
             parsed.get_user("member").unwrap().as_str(),
             "123e4567-e89b-12d3-a456-426614174003"
         );
+    }
+
+    #[test]
+    fn rejects_malformed_id_mentions() {
+        let schema = [CommandOption::user("member", "Member").unwrap()];
+        assert!(matches!(
+            ParsedCommandOptions::parse(
+                &schema,
+                "member=<@123e4567-e89b-12d3-a456-426614174003",
+            ),
+            Err(CommandOptionError::InvalidValue(_))
+        ));
     }
 
     #[test]
