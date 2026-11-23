@@ -198,6 +198,35 @@ Send payload fields documented: `content`, `reply_to`, `embeds`, `components`. C
 
 The developer guide does not describe ordinary message-file uploads in its bot message endpoint summary. The Python source implements multipart attachments, sticker IDs, nonce handling and a Components V2 send format. Treat those as unverified extensions until the detailed API schema or live test-bot calls confirm them.
 
+#### Components V2 layouts (experimental source-parity)
+
+The upstream Python SDK implements Components V2 messages as a complete layout payload with flag `1 << 15`, rather than ordinary message text/embeds/action rows. Yapcore provides typed experimental builders and dedicated methods:
+
+~~~rust
+use yapcore::{
+    Button, Container, LayoutComponent, Section, Separator, SeparatorSpacing, TextDisplay,
+};
+
+let layout: Vec<LayoutComponent> = vec![
+    TextDisplay::new("# Welcome")?.into(),
+    Section::new(
+        [TextDisplay::new("Ready to continue?")?],
+        Button::primary("Continue", "continue")?,
+    )?
+    .into(),
+    Separator::new(true, SeparatorSpacing::Large).into(),
+    Container::new([TextDisplay::new("More details")?.into()])
+        .accent_color(0x5865f2)?
+        .into(),
+];
+
+bot.send_layout(&channel_id, &layout, None).await?;
+// Replace the layout of an existing Components V2 message:
+bot.edit_layout(&channel_id, &message_id, &layout).await?;
+~~~
+
+The model includes text displays, sections with button/thumbnail accessories, media galleries, separators, file displays and nested containers. Locally validated constraints include 1–3 text displays per section, 1–10 media gallery items, HTTPS media/file URLs, 24-bit container accent colors and at least one top-level layout item. This support mirrors the Python source but is not a guarantee that every component shape is accepted by the current public API. A live test bot or current OpenAPI schema is still required before treating it as stable.
+
 ### Signed event webhooks
 
 When a bot is hosted behind a public HTTPS URL, Yapper can POST the same events configured for polling. The request carries `X-Yapper-Bot` and `X-Yapper-Signature: sha256=<hex HMAC-SHA256 of the raw request body>`, keyed with the webhook secret from Settings → Developer → Advanced. The envelope is `{ "id": 1234, "event": "message", "data": { ... } }`; it uses `event` rather than the polling envelope's `type`. Yapper waits three seconds for HTTP 200 and does not retry failed deliveries. The ID is shared with polling, so use event-ID deduplication and keep polling as a recovery path when missing events is unacceptable.
