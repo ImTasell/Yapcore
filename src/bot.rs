@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -241,7 +240,7 @@ impl BotBuilder {
             prefixes: self.prefixes,
             ignore_bots: self.ignore_bots,
             logging: self.logging,
-            cog_names: BTreeSet::new(),
+            cog_names: Vec::new(),
             last_event_id: Arc::new(AtomicU64::new(0)),
             shutdown,
         })
@@ -258,7 +257,7 @@ pub struct Bot {
     prefixes: Vec<String>,
     ignore_bots: bool,
     logging: bool,
-    cog_names: BTreeSet<String>,
+    cog_names: Vec<String>,
     last_event_id: Arc<AtomicU64>,
     shutdown: watch::Sender<bool>,
 }
