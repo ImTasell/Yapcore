@@ -2475,6 +2475,109 @@ mod tests {
         );
     }
     #[tokio::test]
+    async fn typed_command_registration_parses_values_before_handler() {
+        use std::sync::{Arc, Mutex};
+
+        let mut bot = Bot::builder()
+            .token("yb_test-token")
+            .prefixes(["!"])
+            .build()
+            .unwrap();
+        let observed = Arc::new(Mutex::new(None));
+        let observed_by_handler = observed.clone();
+
+        bot.command_with_options(
+            "profile",
+            "Update a profile",
+            vec![
+                crate::models::CommandOption::string("name", "Display name")
+                    .unwrap()
+                    .required(true),
+                crate::models::CommandOption::integer("age", "Age")
+                    .unwrap(),
+                crate::models::CommandOption::boolean("public", "Public profile")
+                    .unwrap(),
+            ],
+            move |context| {
+                let observed = observed_by_handler.clone();
+                async move {
+                    let options = context.options().expect("typed options are installed");
+                    *observed.lock().unwrap() = Some((
+                        options.get_string("name").unwrap().to_owned(),
+                        options.get_integer("age"),
+                        options.get_boolean("public"),
+                    ));
+                    Ok(())
+                }
+            },
+        )
+        .unwrap();
+
+        let event = crate::models::EventEnvelope {
+            id: 2,
+            event_type: "message".to_owned(),
+            data: serde_json::json!({
+                "id": "123e4567-e89b-12d3-a456-426614174001",
+                "channel_id": "123e4567-e89b-12d3-a456-426614174002",
+                "author_id": "123e4567-e89b-12d3-a456-426614174003",
+                "author_bot": false,
+                "content": "!profile name=\"Altix Dev\" age=24 public=true"
+            }),
+            created_at: None,
+        };
+
+        bot.dispatch_event(&event, None).await.unwrap();
+        assert_eq!(
+            *observed.lock().unwrap(),
+            Some(("Altix Dev".to_owned(), Some(24), Some(true)))
+        );
+    }
+
+    #[tokio::test]
+    async fn invalid_typed_command_arguments_skip_handler() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+
+        let mut bot = Bot::builder().token("yb_test-token").build().unwrap();
+        let invoked = Arc::new(AtomicBool::new(false));
+        let invoked_by_handler = invoked.clone();
+
+        bot.command_with_options(
+            "count",
+            "Set a count",
+            vec![crate::models::CommandOption::integer("value", "Count")
+                .unwrap()
+                .required(true)],
+            move |_context| {
+                let invoked = invoked_by_handler.clone();
+                async move {
+                    invoked.store(true, Ordering::SeqCst);
+                    Ok(())
+                }
+            },
+        )
+        .unwrap();
+
+        let event = crate::models::EventEnvelope {
+            id: 3,
+            event_type: "message".to_owned(),
+            data: serde_json::json!({
+                "id": "123e4567-e89b-12d3-a456-426614174001",
+                "channel_id": "123e4567-e89b-12d3-a456-426614174002",
+                "author_id": "123e4567-e89b-12d3-a456-426614174003",
+                "author_bot": false,
+                "content": "!count value=not-a-number"
+            }),
+            created_at: None,
+        };
+
+        bot.dispatch_event(&event, None).await.unwrap();
+        assert!(!invoked.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
     async fn dispatches_general_event_listeners_in_order_and_isolates_failures() {
         use std::sync::{Arc, Mutex};
 
