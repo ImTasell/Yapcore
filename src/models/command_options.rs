@@ -259,7 +259,7 @@ impl ParsedCommandOptions {
                 }
                 continue;
             };
-            let value = parse_value(option.kind, &raw)?;
+            let value = parse_value(option.kind, &raw, &option.name)?;
             if !option.choices.is_empty()
                 && !option.choices.iter().any(|choice| choice.value == value)
             {
@@ -317,26 +317,45 @@ impl ParsedCommandOptions {
     }
 }
 
-fn parse_value(kind: CommandOptionType, raw: &str) -> Result<Value, CommandOptionError> {
+fn parse_value(
+    kind: CommandOptionType,
+    raw: &str,
+    option_name: &str,
+) -> Result<Value, CommandOptionError> {
     match kind {
         CommandOptionType::String => Ok(Value::String(raw.to_owned())),
-        CommandOptionType::User => crate::ids::UserId::new(raw.to_owned())
-            .map(|id| Value::String(id.into_string()))
-            .map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
-        CommandOptionType::Channel => crate::ids::ChannelId::new(raw.to_owned())
-            .map(|id| Value::String(id.into_string()))
-            .map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
-        CommandOptionType::Role => crate::ids::RoleId::new(raw.to_owned())
-            .map(|id| Value::String(id.into_string()))
-            .map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
+        CommandOptionType::User => {
+            let id = raw
+                .strip_prefix("<@!")
+                .or_else(|| raw.strip_prefix("<@"))
+                .unwrap_or(raw);
+            let id = id.strip_suffix('>').unwrap_or(id);
+            crate::ids::UserId::new(id.to_owned())
+                .map(|id| Value::String(id.into_string()))
+                .map_err(|_| CommandOptionError::InvalidValue(option_name.to_owned()))
+        }
+        CommandOptionType::Channel => {
+            let id = raw.strip_prefix("<#").unwrap_or(raw);
+            let id = id.strip_suffix('>').unwrap_or(id);
+            crate::ids::ChannelId::new(id.to_owned())
+                .map(|id| Value::String(id.into_string()))
+                .map_err(|_| CommandOptionError::InvalidValue(option_name.to_owned()))
+        }
+        CommandOptionType::Role => {
+            let id = raw.strip_prefix("<@&").unwrap_or(raw);
+            let id = id.strip_suffix('>').unwrap_or(id);
+            crate::ids::RoleId::new(id.to_owned())
+                .map(|id| Value::String(id.into_string()))
+                .map_err(|_| CommandOptionError::InvalidValue(option_name.to_owned()))
+        }
         CommandOptionType::Integer => raw
             .parse::<i64>()
             .map(Value::from)
-            .map_err(|_| CommandOptionError::InvalidValue(raw.to_owned())),
+            .map_err(|_| CommandOptionError::InvalidValue(option_name.to_owned())),
         CommandOptionType::Number => {
             let number = raw
                 .parse::<f64>()
-                .map_err(|_| CommandOptionError::InvalidValue(raw.to_owned()))?;
+                .map_err(|_| CommandOptionError::InvalidValue(option_name.to_owned()))?;
             serde_json::Number::from_f64(number)
                 .map(Value::Number)
                 .ok_or(CommandOptionError::NonFiniteNumber)
@@ -399,6 +418,26 @@ fn tokenize(input: &str) -> Result<Vec<String>, CommandOptionError> {
         tokens.push(current);
     }
     Ok(tokens)
+}
+
+impl CommandOptionError {
+    /// Build a safe, non-echoing validation response for bot messages.
+    pub(crate) fn user_message(&self) -> String {
+        match self {
+            Self::MissingRequired(name) => format!("Missing required option: {name}."),
+            Self::InvalidChoice(name) => {
+                format!("Option {name} must use one of its allowed choices.")
+            }
+            Self::InvalidValue(name) => format!("Option {name} has an invalid value."),
+            Self::TooManyArguments => "Too many arguments were supplied.".to_owned(),
+            Self::UnknownArgument(_) => "An unknown named option was supplied.".to_owned(),
+            Self::DuplicateArgument(_) => "An option was supplied more than once.".to_owned(),
+            Self::InvalidNamedArgument(_) => "A named option is malformed.".to_owned(),
+            Self::UnterminatedQuote => "A quoted argument was not closed.".to_owned(),
+            Self::NonFiniteNumber => "Numeric values must be finite.".to_owned(),
+            _ => "The command option schema is invalid.".to_owned(),
+        }
+    }
 }
 
 /// Errors raised while declaring or parsing command options.
@@ -467,6 +506,26 @@ mod tests {
     }
 
     #[test]
+    fn accepts_mentioned_user_channel_and_role_ids() {
+        let user_id = "123e4567-e89b-12d3-a456-426614174003";
+        let channel_id = "123e4567-e89b-12d3-a456-426614174004";
+        let role_id = "123e4567-e89b-12d3-a456-426614174005";
+        let schema = [
+            CommandOption::user("member", "Member").unwrap(),
+            CommandOption::channel("channel", "Channel").unwrap(),
+            CommandOption::role("role", "Role").unwrap(),
+        ];
+        let parsed = ParsedCommandOptions::parse(
+            &schema,
+            &format!("member=<@!{user_id}> channel=<#{channel_id}> role=<@&{role_id}>"),
+        )
+        .unwrap();
+        assert_eq!(parsed.get_user("member").unwrap().as_str(), user_id);
+        assert_eq!(parsed.get_channel("channel").unwrap().as_str(), channel_id);
+        assert_eq!(parsed.get_role("role").unwrap().as_str(), role_id);
+    }
+
+    #[test]
     fn validates_platform_ids_and_returns_typed_id_values() {
         let schema = [CommandOption::user("member", "Member").unwrap()];
         assert!(matches!(
@@ -503,6 +562,13 @@ mod tests {
             ParsedCommandOptions::parse(&integer, "nope"),
             Err(CommandOptionError::InvalidValue(_))
         ));
+    }
+
+    #[test]
+    fn user_facing_errors_never_echo_untrusted_argument_text() {
+        let error = CommandOptionError::InvalidNamedArgument("@everyone".to_owned());
+        assert_eq!(error.user_message(), "A named option is malformed.");
+        assert!(!error.user_message().contains("@everyone"));
     }
 
     #[test]
