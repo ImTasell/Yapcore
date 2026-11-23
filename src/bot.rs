@@ -2807,6 +2807,85 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn own_reaction_listener_filters_and_marks_add_remove_events() {
+        use std::sync::{Arc, Mutex};
+
+        let mut bot = Bot::builder().token("yb_test-token").build().unwrap();
+        let bot_user_id =
+            UserId::new("123e4567-e89b-12d3-a456-426614174099").unwrap();
+        let observed = Arc::new(Mutex::new(Vec::new()));
+        let observed_by_handler = observed.clone();
+
+        bot.on_reaction_on_mine(move |event| {
+            let observed = observed_by_handler.clone();
+            async move {
+                observed.lock().unwrap().push(
+                    event.data["added"].as_bool().expect("reaction added flag"),
+                );
+                Ok(())
+            }
+        })
+        .unwrap();
+
+        for (id, event_type, author_id) in [
+            (50, "reaction_add", bot_user_id.as_str()),
+            (51, "reaction_remove", bot_user_id.as_str()),
+            (52, "reaction_add", "123e4567-e89b-12d3-a456-426614174003"),
+        ] {
+            let event = crate::models::EventEnvelope {
+                id,
+                event_type: event_type.to_owned(),
+                data: serde_json::json!({
+                    "message_id": "123e4567-e89b-12d3-a456-426614174010",
+                    "message_author_id": author_id,
+                    "user_id": "123e4567-e89b-12d3-a456-426614174011",
+                    "emoji": "🔥"
+                }),
+                created_at: None,
+            };
+            bot.dispatch_event(&event, Some(&bot_user_id)).await.unwrap();
+        }
+
+        assert_eq!(*observed.lock().unwrap(), [true, false]);
+    }
+
+    #[tokio::test]
+    async fn on_dm_is_an_alias_for_dm_message_events() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+
+        let mut bot = Bot::builder().token("yb_test-token").build().unwrap();
+        let received = Arc::new(AtomicBool::new(false));
+        let received_by_handler = received.clone();
+
+        bot.on_dm(move |event| {
+            let received = received_by_handler.clone();
+            async move {
+                assert_eq!(event.event_type, "dm_message");
+                received.store(true, Ordering::SeqCst);
+                Ok(())
+            }
+        })
+        .unwrap();
+
+        let event = crate::models::EventEnvelope {
+            id: 53,
+            event_type: "dm_message".to_owned(),
+            data: serde_json::json!({
+                "channel_id": "123e4567-e89b-12d3-a456-426614174002",
+                "user_id": "123e4567-e89b-12d3-a456-426614174003",
+                "content": "Hello"
+            }),
+            created_at: None,
+        };
+
+        bot.dispatch_event(&event, None).await.unwrap();
+        assert!(received.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
     async fn dispatches_general_event_listeners_in_order_and_isolates_failures() {
         use std::sync::{Arc, Mutex};
 
