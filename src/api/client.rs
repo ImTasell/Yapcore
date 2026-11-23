@@ -1169,6 +1169,13 @@ impl ApiClient {
         self.request_json_url(Method::POST, url, Some(body)).await
     }
 
+    /// Read the bot's currently registered slash commands.
+    pub async fn list_commands(&self) -> Result<Vec<CommandDefinition>> {
+        let response = self.request_json(Method::GET, "commands", None).await?;
+        let commands = response.get("commands").cloned().unwrap_or(response);
+        serde_json::from_value(commands).map_err(Error::from)
+    }
+
     /// Replace the bot's complete registered command list with PUT /commands.
     ///
     /// Yapper replaces the full list in one request. The list is validated
