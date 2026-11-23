@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -240,6 +241,7 @@ impl BotBuilder {
             prefixes: self.prefixes,
             ignore_bots: self.ignore_bots,
             logging: self.logging,
+            cog_names: BTreeSet::new(),
             last_event_id: Arc::new(AtomicU64::new(0)),
             shutdown,
         })
@@ -256,6 +258,7 @@ pub struct Bot {
     prefixes: Vec<String>,
     ignore_bots: bool,
     logging: bool,
+    cog_names: BTreeSet<String>,
     last_event_id: Arc<AtomicU64>,
     shutdown: watch::Sender<bool>,
 }
@@ -279,6 +282,49 @@ impl Bot {
         body: Option<Value>,
     ) -> Result<Value> {
         self.api.api(method, route, body).await
+    }
+
+    /// Register a statically compiled cog as one atomic registration unit.
+    ///
+    /// A cog groups commands, event listeners and button handlers. If its setup
+    /// fails, Yapcore restores the registries to their pre-registration state.
+    /// Rust cogs are compiled code; dynamic source-file hot reload is intentionally
+    /// not provided by this API.
+    pub fn add_cog<C: crate::cogs::Cog>(
+        &mut self,
+        cog: C,
+    ) -> std::result::Result<&mut Self, crate::cogs::CogRegistrationError> {
+        let name = cog.name().to_owned();
+        if name.is_empty() || name.len() > 64 {
+            return Err(crate::cogs::CogRegistrationError::InvalidName);
+        }
+        if !name
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_' || byte == b'-')
+        {
+            return Err(crate::cogs::CogRegistrationError::InvalidName);
+        }
+        if self.cog_names.contains(&name) {
+            return Err(crate::cogs::CogRegistrationError::DuplicateName(name));
+        }
+
+        let commands = self.commands.clone();
+        let events = self.events.clone();
+        let buttons = self.buttons.clone();
+        if let Err(reason) = cog.register(self) {
+            self.commands = commands;
+            self.events = events;
+            self.buttons = buttons;
+            return Err(crate::cogs::CogRegistrationError::SetupFailed { name, reason });
+        }
+
+        self.cog_names.insert(name);
+        Ok(self)
+    }
+
+    /// Names of cogs registered on this bot in registration order.
+    pub fn cogs(&self) -> Vec<&str> {
+        self.cog_names.iter().map(String::as_str).collect()
     }
 
     /// Return the last event cursor observed by the runtime.
