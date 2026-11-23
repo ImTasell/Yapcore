@@ -14,7 +14,7 @@ pub(crate) use component::validate_action_rows;
 pub use component::{ActionRow, Button, ButtonStyle, ComponentValidationError};
 pub(crate) use components_v2::validate_layout;
 pub use components_v2::{
-    ComponentV2ValidationError, Container, FileDisplay, LayoutComponent, LayoutValidationError,
+    Container, FileDisplay, LayoutComponent, LayoutValidationError,
     MediaGallery, MediaGalleryItem, Section, SectionAccessory, Separator, SeparatorSpacing,
     TextDisplay, Thumbnail, COMPONENTS_V2_FLAG,
 };
