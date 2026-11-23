@@ -17,8 +17,8 @@ use crate::interactions::{
     ButtonRegistry, InteractionContext, InteractionInvocation, InteractionRegistrationError,
 };
 use crate::models::{
-    BotProfile, BotStatus, CommandDefinition, InteractionResponseType, Message, PermissionTarget,
-    ActivityRotation, Presence,
+    ActivityRotation, BotProfile, BotStatus, CommandDefinition, InteractionResponseType, Message,
+    PermissionTarget, Presence,
 };
 
 /// Handle used to request a graceful stop of a running bot.
@@ -45,7 +45,7 @@ pub struct PresenceRotationHandle {
 }
 
 impl PresenceRotationHandle {
-    /// Request that the activity rotation stop after its current request.
+    /// Request that the activity rotation stop promptly.
     pub fn cancel(&self) {
         self.sender.send_replace(true);
     }
@@ -71,6 +71,7 @@ impl Drop for PresenceRotationHandle {
         self.sender.send_replace(true);
     }
 }
+
 /// Builder for a configured Yapper bot.
 #[derive(Debug)]
 pub struct BotBuilder {
