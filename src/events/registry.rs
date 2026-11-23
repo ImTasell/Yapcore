@@ -45,7 +45,7 @@ pub struct ErrorEvent {
     pub command: Option<String>,
     /// Owning cog for failures from cog-registered handlers.
     pub cog: Option<String>,
-    /// Button custom ID, when available.
+    /// Button, select or modal custom ID, when available.
     pub custom_id: Option<String>,
     /// Human-readable error message.
     pub message: String,
