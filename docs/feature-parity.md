@@ -136,8 +136,8 @@ Do not expose both a huge builder API and dozens of raw JSON methods for the sam
 | [ ] Documented | Get and set permissions/overrides | Documented permission endpoints first |
 | [x] Documented | Kick/ban/unban/list bans/timeout | Typed ban models, role-safe REST methods and local timeout/reason validation |
 | [x] Documented | Edit nickname | `set_nickname` validates 32 characters; empty string clears |
-| [ ] Documented | Create/edit/delete channel | Channel endpoints |
-| [ ] Documented | Create/rename/delete category | Category endpoints |
+| [x] Documented | Create/edit/delete channel | `create_channel`, `edit_channel` and `delete_channel`; typed create/edit options validate names, private access lists and the 21,600-second slowmode cap |
+| [x] Documented | Create/rename/delete category | `create_category`, `rename_category` and `delete_category` |
 | [ ] Documented | Open DM/send DM | User DM endpoints |
 | [ ] Documented | Voice state lookup and move/disconnect members | Voice management endpoints |
 | [ ] Verify | Scheduled server events | Source has list/create; verify current public API schema |
