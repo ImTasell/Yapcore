@@ -10,10 +10,9 @@ use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
 use crate::ids::InteractionId;
 use crate::models::{
-    Ban, BotProfile, BotStatus, Channel, ChannelCategory, ChannelCreateOptions,
-    ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch,
-    InteractionResponseType, Member, Message, PermissionTarget, Presence, Role, Server,
-    UserProfile, validate_action_rows,
+    Ban, BotProfile, BotStatus, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions,
+    ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch, InteractionResponseType,
+    Member, Message, PermissionTarget, Presence, Role, Server, UserProfile, validate_action_rows,
     validate_command_list,
 };
 
@@ -96,7 +95,10 @@ impl ApiClient {
     /// restarting or interrupting the event poller.
     pub async fn set_presence(&self, presence: &Presence) -> Result<Value> {
         let mut body = serde_json::Map::new();
-        body.insert("status".to_owned(), serde_json::to_value(presence.status())?);
+        body.insert(
+            "status".to_owned(),
+            serde_json::to_value(presence.status())?,
+        );
         if let Some(activity) = presence.activity_line() {
             let actual = activity.as_str().chars().count();
             if actual > 60 {
@@ -2880,7 +2882,8 @@ mod tests {
     async fn sets_typed_presence_with_a_formatted_activity_line() {
         let server = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
         let client = test_client(&server, 1024).await;
-        let presence = Presence::dnd().activity(crate::models::Activity::playing("Minecraft").unwrap());
+        let presence =
+            Presence::dnd().activity(crate::models::Activity::playing("Minecraft").unwrap());
 
         client.set_presence(&presence).await.unwrap();
         let request = server.finish();
@@ -2891,6 +2894,7 @@ mod tests {
         assert_eq!(payload["status"], "dnd");
         assert_eq!(payload["activity"], "Playing Minecraft");
     }
+
     #[tokio::test]
     async fn rejects_overlong_bot_activity_before_networking() {
         let config = Config::builder().token("yb_test-token").build().unwrap();
