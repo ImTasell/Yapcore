@@ -29,6 +29,7 @@ enum ButtonMatcher {
     Prefix(String),
 }
 
+#[derive(Clone)]
 struct RegisteredButton {
     matcher: ButtonMatcher,
     handler: ButtonHandler,
@@ -44,7 +45,7 @@ impl std::fmt::Debug for RegisteredButton {
 }
 
 /// Ordered registry of button/component interaction handlers.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(crate) struct ButtonRegistry {
     entries: Vec<RegisteredButton>,
 }
