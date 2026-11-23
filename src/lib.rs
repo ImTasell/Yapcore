@@ -39,7 +39,7 @@ pub use models::{
     ButtonStyle, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions,
     ChannelListing, ChannelType, CommandDefinition, CommandDefinitionError,
     CommandOption, CommandOptionChoice, CommandOptionError, CommandOptionType,
-    ComponentValidationError, ComponentV2ValidationError, Container, Embed, EmbedAuthor,
+    ComponentValidationError, Container, Embed, EmbedAuthor,
     EmbedBuilder, EmbedField, EmbedFooter, FileDisplay, LayoutComponent, LayoutValidationError,
     EmbedValidationError, EventBatch, EventEnvelope, ImageAsset, ImageFormat,
     InteractionResponseType, Member, Message, Modal, ModalValidationError, PermissionTarget,
