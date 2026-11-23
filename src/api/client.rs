@@ -10,9 +10,9 @@ use crate::config::Config;
 use crate::error::{ApiError, Error, Result, parse_retry_after, sanitize_transport_error};
 use crate::ids::InteractionId;
 use crate::models::{
-    Ban, BotProfile, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions, ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch,
-    InteractionResponseType, Member, Message, Role, Server, UserProfile, validate_action_rows,
-    validate_command_list,
+    Ban, BotProfile, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions,
+    ChannelListing, ChannelType, CommandDefinition, Embed, EventBatch, InteractionResponseType,
+    Member, Message, Role, Server, UserProfile, validate_action_rows, validate_command_list,
 };
 
 /// Cloneable authenticated client for Yapper's documented bot REST API.
@@ -258,7 +258,6 @@ impl ApiClient {
         serde_json::from_value(channel).map_err(Error::from)
     }
 
-
     /// Create a text or voice channel in a server.
     ///
     /// Channel creation supports initial privacy and role/user access settings
@@ -310,7 +309,11 @@ impl ApiClient {
         }
         let route = format!("servers/{server_id}/categories");
         let response = self
-            .request_json(Method::POST, &route, Some(serde_json::json!({ "name": name })))
+            .request_json(
+                Method::POST,
+                &route,
+                Some(serde_json::json!({ "name": name })),
+            )
             .await?;
         let category = response.get("category").cloned().unwrap_or(response);
         serde_json::from_value(category).map_err(Error::from)
@@ -328,7 +331,11 @@ impl ApiClient {
         }
         let route = format!("servers/{server_id}/categories/{category_id}");
         let response = self
-            .request_json(Method::PATCH, &route, Some(serde_json::json!({ "name": name })))
+            .request_json(
+                Method::PATCH,
+                &route,
+                Some(serde_json::json!({ "name": name })),
+            )
             .await?;
         let category = response.get("category").cloned().unwrap_or(response);
         serde_json::from_value(category).map_err(Error::from)
@@ -2510,7 +2517,6 @@ mod tests {
         assert!(matches!(error, Error::Api(api) if api.status() == reqwest::StatusCode::FOUND));
     }
 
-
     #[tokio::test]
     async fn creates_private_channel_with_initial_access_in_one_request() {
         const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
@@ -2519,9 +2525,14 @@ mod tests {
         const USER_ID: &str = "123e4567-e89b-12d3-a456-426614174022";
         const CHANNEL_ID: &str = "123e4567-e89b-12d3-a456-426614174021";
 
-        let server = LocalMockServer::start(200, &[], serde_json::json!({
-            "channel": { "id": CHANNEL_ID, "name": "ticket-7", "type": "text", "private": true }
-        }).to_string());
+        let server = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "channel": { "id": CHANNEL_ID, "name": "ticket-7", "type": "text", "private": true }
+            })
+            .to_string(),
+        );
         let client = test_client(&server, 1024).await;
         let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
         let category_id = crate::ids::CategoryId::new(CATEGORY_ID).unwrap();
@@ -2535,8 +2546,11 @@ mod tests {
 
         let channel = client.create_channel(&server_id, &options).await.unwrap();
         let request = server.finish();
-        assert!(request.starts_with("POST /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/channels HTTP/1.1"));
-        let payload: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert!(request.starts_with(
+            "POST /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/channels HTTP/1.1"
+        ));
+        let payload: Value =
+            serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
         assert_eq!(payload["name"], "ticket-7");
         assert_eq!(payload["kind"], "text");
         assert_eq!(payload["private"], true);
@@ -2566,8 +2580,11 @@ mod tests {
 
         let channel = client.edit_channel(&channel_id, &changes).await.unwrap();
         let request = server.finish();
-        assert!(request.starts_with("PATCH /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174021 HTTP/1.1"));
-        let payload: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert!(request.starts_with(
+            "PATCH /api/bot/v1/channels/123e4567-e89b-12d3-a456-426614174021 HTTP/1.1"
+        ));
+        let payload: Value =
+            serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
         assert!(payload["category_id"].is_null());
         assert_eq!(payload["role_ids"], serde_json::json!([]));
         assert_eq!(payload["post_role_ids"], serde_json::json!([]));
@@ -2581,18 +2598,25 @@ mod tests {
     async fn validates_channel_edit_options_before_sending() {
         let config = Config::builder().token("yb_test-token").build().unwrap();
         let client = ApiClient::new(config).unwrap();
-        let channel_id = crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174021").unwrap();
+        let channel_id =
+            crate::ids::ChannelId::new("123e4567-e89b-12d3-a456-426614174021").unwrap();
 
         assert!(matches!(
-            client.edit_channel(&channel_id, &ChannelEditOptions::new()).await,
+            client
+                .edit_channel(&channel_id, &ChannelEditOptions::new())
+                .await,
             Err(Error::EmptyChannelEditOptions)
         ));
         assert!(matches!(
-            client.edit_channel(&channel_id, &ChannelEditOptions::new().slowmode(21_601)).await,
+            client
+                .edit_channel(&channel_id, &ChannelEditOptions::new().slowmode(21_601))
+                .await,
             Err(Error::InvalidChannelSlowmode { actual: 21_601 })
         ));
         assert!(matches!(
-            client.edit_channel(&channel_id, &ChannelEditOptions::new().name(" ")).await,
+            client
+                .edit_channel(&channel_id, &ChannelEditOptions::new().name(" "))
+                .await,
             Err(Error::EmptyChannelName)
         ));
     }
@@ -2601,30 +2625,55 @@ mod tests {
     async fn creates_renames_and_deletes_categories() {
         const SERVER_ID: &str = "123e4567-e89b-12d3-a456-426614174020";
         const CATEGORY_ID: &str = "123e4567-e89b-12d3-a456-426614174024";
-        let create = LocalMockServer::start(200, &[], serde_json::json!({
-            "category": { "id": CATEGORY_ID, "name": "Community" }
-        }).to_string());
+        let create = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "category": { "id": CATEGORY_ID, "name": "Community" }
+            })
+            .to_string(),
+        );
         let client = test_client(&create, 1024).await;
         let server_id = crate::ids::ServerId::new(SERVER_ID).unwrap();
-        let category = client.create_category(&server_id, "Community").await.unwrap();
+        let category = client
+            .create_category(&server_id, "Community")
+            .await
+            .unwrap();
         let request = create.finish();
-        assert!(request.starts_with("POST /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/categories HTTP/1.1"));
+        assert!(request.starts_with(
+            "POST /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/categories HTTP/1.1"
+        ));
         assert_eq!(category.name.as_deref(), Some("Community"));
 
-        let rename = LocalMockServer::start(200, &[], serde_json::json!({
-            "category": { "id": CATEGORY_ID, "name": "Staff" }
-        }).to_string());
+        let rename = LocalMockServer::start(
+            200,
+            &[],
+            serde_json::json!({
+                "category": { "id": CATEGORY_ID, "name": "Staff" }
+            })
+            .to_string(),
+        );
         let client = test_client(&rename, 1024).await;
         let category_id = crate::ids::CategoryId::new(CATEGORY_ID).unwrap();
-        let category = client.rename_category(&server_id, &category_id, "Staff").await.unwrap();
+        let category = client
+            .rename_category(&server_id, &category_id, "Staff")
+            .await
+            .unwrap();
         let request = rename.finish();
-        assert!(request.starts_with("PATCH /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/categories/123e4567-e89b-12d3-a456-426614174024 HTTP/1.1"));
+        assert!(request.starts_with(
+            "PATCH /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/categories/123e4567-e89b-12d3-a456-426614174024 HTTP/1.1"
+        ));
         assert_eq!(category.name.as_deref(), Some("Staff"));
 
         let delete = LocalMockServer::start(200, &[], r#"{ "ok": true }"#.to_owned());
         let client = test_client(&delete, 1024).await;
-        client.delete_category(&server_id, &category_id).await.unwrap();
+        client
+            .delete_category(&server_id, &category_id)
+            .await
+            .unwrap();
         let request = delete.finish();
-        assert!(request.starts_with("DELETE /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/categories/123e4567-e89b-12d3-a456-426614174024 HTTP/1.1"));
+        assert!(request.starts_with(
+            "DELETE /api/bot/v1/servers/123e4567-e89b-12d3-a456-426614174020/categories/123e4567-e89b-12d3-a456-426614174024 HTTP/1.1"
+        ));
     }
 }
