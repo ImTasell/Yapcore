@@ -2554,7 +2554,8 @@ mod tests {
             atomic::{AtomicBool, Ordering},
         };
 
-        let mut bot = Bot::builder().token("yb_test-token").build().unwrap();
+        let server = CallbackServer::start();
+        let mut bot = test_bot(&server);
         let invoked = Arc::new(AtomicBool::new(false));
         let invoked_by_handler = invoked.clone();
 
@@ -2589,6 +2590,11 @@ mod tests {
 
         bot.dispatch_event(&event, None).await.unwrap();
         assert!(!invoked.load(Ordering::SeqCst));
+
+        let request = server.finish();
+        let body = request.split_once("\r\n\r\n").unwrap().1;
+        assert!(body.contains("Invalid arguments"));
+        assert!(body.contains("value"));
     }
 
     #[tokio::test]
