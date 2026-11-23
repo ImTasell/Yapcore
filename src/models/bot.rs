@@ -243,9 +243,18 @@ mod tests {
 
     #[test]
     fn formats_server_count_activities() {
-        assert_eq!(Activity::overviewing_servers(0).unwrap().as_str(), "Overviewing 0 servers");
-        assert_eq!(Activity::overviewing_servers(1).unwrap().as_str(), "Overviewing 1 server");
-        assert_eq!(Activity::overviewing_servers(12).unwrap().as_str(), "Overviewing 12 servers");
+        assert_eq!(
+            Activity::overviewing_servers(0).unwrap().as_str(),
+            "Overviewing 0 servers"
+        );
+        assert_eq!(
+            Activity::overviewing_servers(1).unwrap().as_str(),
+            "Overviewing 1 server"
+        );
+        assert_eq!(
+            Activity::overviewing_servers(12).unwrap().as_str(),
+            "Overviewing 12 servers"
+        );
     }
 
     #[test]
