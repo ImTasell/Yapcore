@@ -342,12 +342,12 @@ mod tests {
         ];
         let parsed = ParsedCommandOptions::parse(
             &schema,
-            r#" "Altix Dev" 12 enabled=true member=usr_123 "#,
+            r#" "Altix Dev" 12 enabled=true member=123e4567-e89b-12d3-a456-426614174003 "#,
         ).unwrap();
         assert_eq!(parsed.get_string("name"), Some("Altix Dev"));
         assert_eq!(parsed.get_integer("count"), Some(12));
         assert_eq!(parsed.get_boolean("enabled"), Some(true));
-        assert_eq!(parsed.get_string("member"), Some("usr_123"));
+        assert_eq!(parsed.get_user("member").unwrap().as_str(), "123e4567-e89b-12d3-a456-426614174003");
     }
 
     #[test]
