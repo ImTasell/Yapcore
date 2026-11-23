@@ -173,7 +173,7 @@ Yapcore's `verify_event_webhook(secret, raw_body, signature_header)` validates t
 
 ### Lifecycle error callbacks
 
-The SDK surface also exposes an `error` callback for runtime and handler failures. Yapcore reports these through `Bot::on_error`, using an `ErrorEvent` with a stage, optional event ID/type, command name or button custom ID, and the error message. Failures inside an error callback are logged and are not recursively reported.
+The SDK surface also exposes an `error` callback for runtime and handler failures. Yapcore reports these through `Bot::on_error`, using an `ErrorEvent` with a stage, optional event ID/type, command name, button custom ID, optional owning cog name (`cog`), and the error message. Failures inside an error callback are logged and are not recursively reported.
 
 ### Interactions
 
