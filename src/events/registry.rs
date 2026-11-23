@@ -77,7 +77,7 @@ type HandlerFuture = Pin<Box<dyn Future<Output = HandlerResult> + Send + 'static
 pub(crate) type EventHandler = Arc<dyn Fn(EventEnvelope) -> HandlerFuture + Send + Sync + 'static>;
 
 /// Ordered event-listener registry.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(crate) struct EventRegistry {
     handlers: BTreeMap<String, Vec<EventHandler>>,
     error_handlers: Vec<ErrorHandler>,
