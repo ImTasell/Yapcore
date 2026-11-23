@@ -2,7 +2,7 @@
 
 mod bot;
 
-pub use bot::BotProfile;
+pub use bot::{BotProfile, BotStatus};
 
 mod component;
 
@@ -34,5 +34,5 @@ mod server;
 
 pub use server::{
     Ban, Channel, ChannelCategory, ChannelCreateOptions, ChannelEditOptions, ChannelListing,
-    ChannelType, Member, Role, RoleEditOptions, Server, UserProfile,
+    ChannelType, Member, PermissionTarget, Role, RoleEditOptions, Server, UserProfile,
 };
