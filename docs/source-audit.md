@@ -122,11 +122,11 @@ The Python framework supports:
 - `Cog` subclasses with decorated commands, listeners and button handlers.
 - `setup(bot)` functions in extension modules.
 - Loading/unloading/reloading files and folders at runtime.
-- Ownership tracking so a cog/extension can unregister only its own handlers.
+- Ownership tracking so a cog/extension can attribute failures to its own handlers and unregister only its own handlers.
 - Command-list synchronization after cog changes.
 - Optional checks and lifecycle hooks.
 
-Rust cannot safely recreate Python's import-and-reload behavior as a direct equivalent. Yapcore provides a `Cog` trait and transactional `Bot::add_cog` registration for statically compiled handlers. Live unload/reload and dynamic code hot-reload are intentionally not part of the initial API; a plugin ABI would be a separate project.
+Rust cannot safely recreate Python's import-and-reload behavior as a direct equivalent. Yapcore provides a `Cog` trait and transactional `Bot::add_cog` registration for statically compiled handlers, and retains the owning cog name on command, listener and button registrations for error attribution. Live unload/reload and dynamic code hot-reload are intentionally not part of the initial API; a plugin ABI would be a separate project.
 
 ### REST surface exposed by the Python Bot
 
