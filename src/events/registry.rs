@@ -172,6 +172,17 @@ impl EventRegistry {
         self.error_handlers.clone()
     }
 
+    /// Remove every event listener registered by one cog and return the number removed.
+    pub fn remove_owner(&mut self, owner: &str) -> usize {
+        let before = self.handlers.values().map(Vec::len).sum::<usize>();
+        self.handlers.retain(|_, handlers| {
+            handlers.retain(|handler| handler.owner.as_deref() != Some(owner));
+            !handlers.is_empty()
+        });
+        let after = self.handlers.values().map(Vec::len).sum::<usize>();
+        before - after
+    }
+
     /// Return handlers for an event in registration order.
     pub fn handlers_for(&self, event_type: &str) -> Vec<RegisteredEventHandler> {
         self.handlers.get(event_type).cloned().unwrap_or_default()
