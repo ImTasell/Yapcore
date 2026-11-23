@@ -43,7 +43,7 @@ impl InteractionSession {
     ) -> Result<()> {
         claim_interaction_response(&self.response_count)?;
 
-        api.respond_interaction(&self.id, &self.token, response_type, content)
+        api.respond_interaction(&self.id, &self.token, response_type, content, None)
             .await?;
 
         Ok(())
