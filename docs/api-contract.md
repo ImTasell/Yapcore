@@ -234,7 +234,7 @@ bot.on_button("apply", |interaction| async move {
 })?;
 ~~~
 
-A modal response is claimed atomically as the interaction's first answer; trying to open one after replying or acknowledging returns InteractionAlreadyAnswered.
+A modal response is claimed atomically as the interaction's first answer; trying to open one after replying or acknowledging returns InteractionAlreadyAnswered. The same Modal/TextInput builder can be passed to CommandContext::show_modal for a slash-command invocation; prefix-command contexts return InteractionRequired. Modal-submit handlers may read their values and answer normally, but cannot open another modal.
 
 ### Generic authenticated API escape hatch
 
