@@ -149,6 +149,12 @@ impl ParsedCommandOptions {
     /// Quoted values support single or double quotes. User, channel and role
     /// arguments are retained as strings because Yapper IDs are opaque.
     pub fn parse(schema: &[CommandOption], input: &str) -> Result<Self, CommandOptionError> {
+        let mut schema_names = std::collections::BTreeSet::new();
+        for option in schema {
+            if !schema_names.insert(option.name.as_str()) {
+                return Err(CommandOptionError::DuplicateOption(option.name.clone()));
+            }
+        }
         let tokens = tokenize(input)?;
         let mut positional = Vec::new();
         let mut named = BTreeMap::new();
@@ -282,6 +288,8 @@ pub enum CommandOptionError {
     TooManyChoices,
     #[error("choice names and values must be unique within an option")]
     DuplicateChoice,
+    #[error("option names must be unique within a command schema")]
+    DuplicateOption(String),
     #[error("required argument '{0}' is missing")]
     MissingRequired(String),
     #[error("unknown named argument '{0}'")]
